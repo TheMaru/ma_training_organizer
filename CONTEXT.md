@@ -1,0 +1,25 @@
+# Organizer
+
+A tool for martial-arts trainers to organize the people they train. Discipline-agnostic (not tied to BJJ), unified by the concept of graduation. First capability: a roster of athletes.
+
+## Language
+
+**Athlete**:
+A person who trains at the club/school and is tracked by trainers. Not necessarily a child; the tool is martial-arts-general. Distinct from the trainer who logs in to use the tool.
+_Avoid_: Member, student, kid, participant
+
+**Trainer**:
+A person who logs in to manage athletes and award promotions. The only kind of account in v1 (one login = one trainer); all trainers are equal, with no in-app roles. Accounts are provisioned out-of-band, not via self-registration.
+_Avoid_: Coach, instructor, admin, user
+
+**Promotion**:
+The event of an athlete reaching a rank on a date. An athlete's current rank is their most recent promotion by date; the full sequence is their graduation history.
+_Avoid_: Graduation (the field/state), grading
+
+**GradingSystem**:
+An ordered set of ranks for one discipline-and-cohort, e.g. "BJJ Kids" and "BJJ Adult" are two separate systems. Data-driven and seeded, not hardcoded.
+_Avoid_: Belt system, curriculum, style
+
+**Rank**:
+A single named position within a grading system, carrying its order in that system. A promotion targets exactly one rank. Order is for sorting/display only, not a mandatory path — ranks may be skipped. Current rank = the athlete's most recent promotion by date.
+_Avoid_: Belt, grade, level, degree
