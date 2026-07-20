@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/TheMaru/ma_training_organizer/internal/config"
+	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
@@ -40,6 +41,15 @@ func run(args []string) error {
 }
 
 func serve(cfg config.Config) error {
+	db, err := store.Open(cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := store.Migrate(db); err != nil {
+		return err
+	}
+
 	srv, err := web.NewServer()
 	if err != nil {
 		return err
