@@ -37,3 +37,19 @@ Trainer hours · billing / administrative membership · training planning · att
 ## Tickets
 
 See `issues/`. Dependency order is recorded via `Blocked by:` lines.
+
+## Implementation conventions
+
+Agreed for this feature; applies to every ticket unless a ticket says otherwise.
+
+- **Testing (TDD).** Test test-first at three seams: the store/data-access layer,
+  the pure domain logic (notably current-rank derivation), and the HTTP handlers.
+  Handler tests are **behaviour-based** — assert on status codes, redirects, DB
+  side effects and single semantic signals, **never** against rendered HTML markup
+  (that couples tests to layout and drifts on every change).
+- **Issue 07 (deployment).** Produce the config artifacts only (`Dockerfile`,
+  `fly.toml`, `litestream.yml`, a short `DEPLOY.md`); do **not** deploy. It stays
+  `ready-for-human` — the human runs `fly deploy` after a local review.
+- **Workflow.** One `/implement` per ticket, clearing context between tickets, so
+  each ticket is built fresh within the model's sharp-reasoning window. Commit
+  each ticket as its own checkpoint on `main`.
