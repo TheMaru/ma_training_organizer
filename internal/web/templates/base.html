@@ -1,0 +1,24 @@
+{{define "base"}}<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{block "title" .}}Organizer{{end}}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/htmx.min.js" defer></script>
+  </head>
+  <body>
+    {{if .Authenticated}}
+    <header class="app">
+      <a class="brand" href="/athletes">Organizer</a>
+      <nav>
+        <a href="/athletes">Athletes</a>
+        <a href="/account/password">Passwort</a>
+        <a href="/logout" hx-post="/logout" hx-target="body" hx-push-url="true">Logout</a>
+      </nav>
+    </header>
+    {{end}}
+    <main>{{block "content" .}}{{end}}</main>
+  </body>
+</html>
+{{end}}

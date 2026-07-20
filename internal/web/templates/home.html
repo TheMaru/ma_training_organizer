@@ -1,0 +1,14 @@
+{{define "title"}}Organizer{{end}}
+{{define "content"}}
+<h1>Organizer</h1>
+<p class="muted">
+  Ein Werkzeug für Kampfsport-Trainer zur Verwaltung ihrer Athleten.
+</p>
+<p>
+  <button class="btn" hx-get="/healthz" hx-target="#health" hx-swap="innerHTML">
+    Healthcheck
+  </button>
+</p>
+<pre id="health" class="muted"></pre>
+<p><a class="btn secondary" href="/login">Zum Login</a></p>
+{{end}}

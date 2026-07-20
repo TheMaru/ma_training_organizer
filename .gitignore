@@ -1,0 +1,11 @@
+# SQLite database files (and Litestream/WAL sidecars)
+*.db
+*.db-shm
+*.db-wal
+*.db-litestream
+
+# Compiled binary
+/organizer
+
+# Local environment overrides
+.env
