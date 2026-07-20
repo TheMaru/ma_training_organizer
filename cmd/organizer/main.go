@@ -49,6 +49,9 @@ func serve(cfg config.Config) error {
 	if err := store.Migrate(db); err != nil {
 		return err
 	}
+	if err := store.Seed(db); err != nil {
+		return err
+	}
 
 	srv, err := web.NewServer()
 	if err != nil {
