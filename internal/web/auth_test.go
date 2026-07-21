@@ -1,0 +1,308 @@
+package web_test
+
+import (
+	"database/sql"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/TheMaru/ma_training_organizer/internal/auth"
+	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/web"
+)
+
+const (
+	testUsername = "trainer"
+	testPassword = "correct-horse"
+)
+
+// newAuthTestServer starts an httptest server backed by a migrated database that
+// already holds one trainer (testUsername/testPassword), and returns a client
+// whose cookie jar carries the session across requests. Redirects are not
+// followed, so tests can assert on the 303/Location and HX-Redirect responses.
+func newAuthTestServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "test.db")
+	db, err := store.Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := store.Migrate(db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	hash, err := auth.Hash(testPassword)
+	if err != nil {
+		t.Fatalf("Hash: %v", err)
+	}
+	if _, err := store.CreateTrainer(db, testUsername, hash); err != nil {
+		t.Fatalf("CreateTrainer: %v", err)
+	}
+
+	sessions := web.NewSessionManager(db, time.Hour, false)
+	srv, err := web.NewServer(db, sessions)
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	return ts, newClient(t), db
+}
+
+// newClient builds an HTTP client with its own cookie jar (so it carries one
+// session) that does not follow redirects, letting tests assert on the 303 and
+// HX-Redirect responses directly.
+func newClient(t *testing.T) *http.Client {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookiejar: %v", err)
+	}
+	return &http.Client{
+		Jar: jar,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
+func login(t *testing.T, ts *httptest.Server, client *http.Client, username, password string) *http.Response {
+	t.Helper()
+	resp, err := client.PostForm(ts.URL+"/login", url.Values{
+		"username": {username},
+		"password": {password},
+	})
+	if err != nil {
+		t.Fatalf("POST /login: %v", err)
+	}
+	return resp
+}
+
+func get(t *testing.T, ts *httptest.Server, client *http.Client, path string) *http.Response {
+	t.Helper()
+	resp, err := client.Get(ts.URL + path)
+	if err != nil {
+		t.Fatalf("GET %s: %v", path, err)
+	}
+	return resp
+}
+
+func TestUnauthenticatedAppRouteRedirectsToLogin(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	resp := get(t, ts, client, "/")
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+	if loc := resp.Header.Get("Location"); loc != "/login" {
+		t.Errorf("Location = %q, want %q", loc, "/login")
+	}
+}
+
+func TestLoginWithCorrectCredentialsStartsSession(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	resp := login(t, ts, client, testUsername, testPassword)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("login status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+	if loc := resp.Header.Get("Location"); loc != "/" {
+		t.Errorf("Location = %q, want %q", loc, "/")
+	}
+
+	// The session cookie now grants access to a gated route.
+	home := get(t, ts, client, "/")
+	defer home.Body.Close()
+	if home.StatusCode != http.StatusOK {
+		t.Errorf("GET / after login status = %d, want %d", home.StatusCode, http.StatusOK)
+	}
+}
+
+func TestLoginWithWrongPasswordFails(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	resp := login(t, ts, client, testUsername, "wrong")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+
+	// No session was started.
+	home := get(t, ts, client, "/")
+	defer home.Body.Close()
+	if home.StatusCode != http.StatusSeeOther {
+		t.Errorf("GET / after failed login status = %d, want %d (redirect)", home.StatusCode, http.StatusSeeOther)
+	}
+}
+
+func TestLoginWithUnknownUserFails(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	resp := login(t, ts, client, "nobody", testPassword)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+}
+
+func TestLogoutEndsSession(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	resp, err := client.PostForm(ts.URL+"/logout", nil)
+	if err != nil {
+		t.Fatalf("POST /logout: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Errorf("logout status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+
+	home := get(t, ts, client, "/")
+	defer home.Body.Close()
+	if home.StatusCode != http.StatusSeeOther {
+		t.Errorf("GET / after logout status = %d, want %d (redirect)", home.StatusCode, http.StatusSeeOther)
+	}
+}
+
+func TestChangePasswordEndToEnd(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	const newPassword = "brand-new-secret"
+
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
+		"current": {testPassword},
+		"new":     {newPassword},
+		"confirm": {newPassword},
+	})
+	if err != nil {
+		t.Fatalf("POST /account/password: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("change password status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+
+	// The stored hash now verifies the new password and rejects the old one.
+	tr, err := store.TrainerByUsername(db, testUsername)
+	if err != nil {
+		t.Fatalf("TrainerByUsername: %v", err)
+	}
+	if ok, _ := auth.Verify(newPassword, tr.PasswordHash); !ok {
+		t.Error("new password does not verify against stored hash")
+	}
+	if ok, _ := auth.Verify(testPassword, tr.PasswordHash); ok {
+		t.Error("old password still verifies after change")
+	}
+
+	// A fresh client can log in with the new password but not the old one.
+	fresh := newClient(t)
+	if r := login(t, ts, fresh, testUsername, newPassword); r.StatusCode != http.StatusSeeOther {
+		r.Body.Close()
+		t.Errorf("login with new password status = %d, want %d", r.StatusCode, http.StatusSeeOther)
+	} else {
+		r.Body.Close()
+	}
+	if r := login(t, ts, newClient(t), testUsername, testPassword); r.StatusCode != http.StatusUnauthorized {
+		r.Body.Close()
+		t.Errorf("login with old password status = %d, want %d", r.StatusCode, http.StatusUnauthorized)
+	} else {
+		r.Body.Close()
+	}
+}
+
+func TestChangePasswordWrongCurrentIsRejected(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	before, _ := store.TrainerByUsername(db, testUsername)
+
+	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
+		"current": {"not-the-current"},
+		"new":     {"another-secret"},
+		"confirm": {"another-secret"},
+	})
+	if err != nil {
+		t.Fatalf("POST /account/password: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+
+	after, _ := store.TrainerByUsername(db, testUsername)
+	if before.PasswordHash != after.PasswordHash {
+		t.Error("password hash changed despite wrong current password")
+	}
+}
+
+func TestChangePasswordMismatchIsRejected(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	before, _ := store.TrainerByUsername(db, testUsername)
+
+	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
+		"current": {testPassword},
+		"new":     {"secret-one"},
+		"confirm": {"secret-two"},
+	})
+	if err != nil {
+		t.Fatalf("POST /account/password: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+
+	after, _ := store.TrainerByUsername(db, testUsername)
+	if before.PasswordHash != after.PasswordHash {
+		t.Error("password hash changed despite mismatched confirmation")
+	}
+}
+
+func TestChangePasswordTooShortIsRejected(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	short := strings.Repeat("a", auth.MinPasswordLength-1)
+	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
+		"current": {testPassword},
+		"new":     {short},
+		"confirm": {short},
+	})
+	if err != nil {
+		t.Fatalf("POST /account/password: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+}
+
+func TestPasswordPageRequiresAuth(t *testing.T) {
+	ts, client, _ := newAuthTestServer(t)
+
+	resp := get(t, ts, client, "/account/password")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Errorf("status = %d, want %d (redirect)", resp.StatusCode, http.StatusSeeOther)
+	}
+	if loc := resp.Header.Get("Location"); loc != "/login" {
+		t.Errorf("Location = %q, want %q", loc, "/login")
+	}
+}

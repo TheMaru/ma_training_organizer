@@ -32,9 +32,15 @@ func run(args []string) error {
 		return err
 	}
 
-	// Subcommands are added in later issues (create-trainer, reset-password).
 	if len(args) > 0 {
-		return fmt.Errorf("unknown command: %s", args[0])
+		switch args[0] {
+		case "create-trainer":
+			return cmdCreateTrainer(cfg.DBPath, args[1:])
+		case "reset-password":
+			return cmdResetPassword(cfg.DBPath, args[1:])
+		default:
+			return fmt.Errorf("unknown command: %s", args[0])
+		}
 	}
 
 	return serve(cfg)
@@ -53,7 +59,9 @@ func serve(cfg config.Config) error {
 		return err
 	}
 
-	srv, err := web.NewServer()
+	sessions := web.NewSessionManager(db, cfg.SessionLifetime, cfg.Secure)
+
+	srv, err := web.NewServer(db, sessions)
 	if err != nil {
 		return err
 	}

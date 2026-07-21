@@ -123,6 +123,15 @@ textarea {
   margin: 0.5rem 0;
 }
 
+/* Narrow, single-column forms (login, password change). */
+.stack {
+  max-width: 24rem;
+}
+
+.stack .btn {
+  margin-top: 1rem;
+}
+
 .rank-current {
   font-weight: 700;
 }
