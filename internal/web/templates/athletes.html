@@ -1,0 +1,41 @@
+{{define "title"}}Athleten · Organizer{{end}}
+{{define "content"}}
+<div class="row-between">
+  <h1>Athleten</h1>
+  <a class="btn" href="/athletes/new">Neuer Athlet</a>
+</div>
+{{if .Athletes}}
+<table>
+  <thead>
+    <tr>
+      <th><a href="/athletes?dir={{.NextDir}}">Nachname</a></th>
+      <th>Vorname</th>
+      <th>Geburtsdatum</th>
+      <th>Eintritt</th>
+      <th class="actions"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Athletes}}
+    <tr>
+      <td>{{.LastName}}</td>
+      <td>{{.FirstName}}</td>
+      <td>{{.BirthDate}}</td>
+      <td>{{.JoinedOn}}</td>
+      <td class="actions">
+        <a class="btn secondary" href="/athletes/{{.ID}}/edit">Bearbeiten</a>
+        <form method="post" action="/athletes/{{.ID}}/delete"
+              hx-post="/athletes/{{.ID}}/delete"
+              hx-confirm="{{.FirstName}} {{.LastName}} löschen? Die Graduierungen werden mitgelöscht."
+              hx-target="body">
+          <button class="btn danger" type="submit">Löschen</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">Noch keine Athleten. Lege den ersten an.</p>
+{{end}}
+{{end}}

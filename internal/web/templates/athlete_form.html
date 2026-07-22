@@ -1,0 +1,32 @@
+{{define "title"}}{{.Heading}} · Organizer{{end}}
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+<form method="post" action="{{.Action}}" hx-post="{{.Action}}" hx-target="body" class="stack">
+  <label>
+    Vorname
+    <input name="firstName" value="{{.Athlete.FirstName}}" autocomplete="off" autofocus required />
+  </label>
+  <label>
+    Nachname
+    <input name="lastName" value="{{.Athlete.LastName}}" autocomplete="off" required />
+  </label>
+  <label>
+    Geburtsdatum
+    <input type="date" name="birthDate" value="{{.Athlete.BirthDate}}" />
+  </label>
+  <label>
+    Eintrittsdatum
+    <input type="date" name="joinedOn" value="{{.Athlete.JoinedOn}}" />
+  </label>
+  <label>
+    Notizen
+    <textarea name="notes" rows="4">{{.Athlete.Notes}}</textarea>
+    <span class="hint">keine Gesundheits-/Sonderdaten</span>
+  </label>
+  <div class="form-actions">
+    <button class="btn" type="submit">Speichern</button>
+    <a class="btn secondary" href="/athletes">Abbrechen</a>
+  </div>
+</form>
+{{end}}

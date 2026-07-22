@@ -63,6 +63,13 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/logout", s.handleLogout)
 			r.Get("/account/password", s.handlePasswordForm)
 			r.Post("/account/password", s.handleChangePassword)
+
+			r.Get("/athletes", s.handleAthletesList)
+			r.Get("/athletes/new", s.handleAthleteNew)
+			r.Post("/athletes", s.handleAthleteCreate)
+			r.Get("/athletes/{id}/edit", s.handleAthleteEdit)
+			r.Post("/athletes/{id}", s.handleAthleteUpdate)
+			r.Post("/athletes/{id}/delete", s.handleAthleteDelete)
 		})
 	})
 
