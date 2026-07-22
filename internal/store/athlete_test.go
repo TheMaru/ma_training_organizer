@@ -112,6 +112,38 @@ func TestListAthletesSortsByLastName(t *testing.T) {
 	}
 }
 
+func TestListAthletesTieBreakerFlipsWithDirection(t *testing.T) {
+	db := newTestDB(t)
+
+	// Same last name: the first-name tie-breaker decides order, and must flip
+	// with the direction so descending is a true reverse of ascending.
+	for _, a := range []store.Athlete{
+		{FirstName: "Bob", LastName: "Gracie"},
+		{FirstName: "Alice", LastName: "Gracie"},
+		{FirstName: "Carol", LastName: "Gracie"},
+	} {
+		if _, err := store.CreateAthlete(db, a); err != nil {
+			t.Fatalf("CreateAthlete %s: %v", a.FirstName, err)
+		}
+	}
+
+	asc, err := store.ListAthletes(db, false)
+	if err != nil {
+		t.Fatalf("ListAthletes asc: %v", err)
+	}
+	if got := firstNames(asc); !equal(got, []string{"Alice", "Bob", "Carol"}) {
+		t.Errorf("ascending first names = %v, want [Alice Bob Carol]", got)
+	}
+
+	desc, err := store.ListAthletes(db, true)
+	if err != nil {
+		t.Fatalf("ListAthletes desc: %v", err)
+	}
+	if got := firstNames(desc); !equal(got, []string{"Carol", "Bob", "Alice"}) {
+		t.Errorf("descending first names = %v, want [Carol Bob Alice]", got)
+	}
+}
+
 func TestUpdateAthlete(t *testing.T) {
 	db := newTestDB(t)
 
@@ -203,6 +235,14 @@ func lastNames(as []store.Athlete) []string {
 	names := make([]string, len(as))
 	for i, a := range as {
 		names[i] = a.LastName
+	}
+	return names
+}
+
+func firstNames(as []store.Athlete) []string {
+	names := make([]string, len(as))
+	for i, a := range as {
+		names[i] = a.FirstName
 	}
 	return names
 }

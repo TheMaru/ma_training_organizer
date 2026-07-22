@@ -61,18 +61,19 @@ func AthleteByID(db *sql.DB, id int64) (Athlete, error) {
 }
 
 // ListAthletes returns the whole roster ordered by last name (spec). descending
-// flips the direction; first name is the tie-breaker either way for a stable
-// order. ORDER BY stays plain SQL (no COLLATE) to remain portable (ADR-0002).
+// flips the direction; first name is the tie-breaker and flips with it, so a
+// descending list is a true reverse of the ascending one. ORDER BY stays plain
+// SQL (no COLLATE) to remain portable (ADR-0002).
 func ListAthletes(db *sql.DB, descending bool) ([]Athlete, error) {
 	// dir is a controlled constant (never user input), so interpolating it is
-	// injection-safe; first name is a fixed tie-breaker for a stable order.
+	// injection-safe. Both keys use it so the whole order reverses together.
 	dir := "ASC"
 	if descending {
 		dir = "DESC"
 	}
 	rows, err := db.Query(fmt.Sprintf(
 		`SELECT id, first_name, last_name, birth_date, joined_on, notes
-		 FROM athletes ORDER BY last_name %s, first_name ASC`, dir,
+		 FROM athletes ORDER BY last_name %s, first_name %s`, dir, dir,
 	))
 	if err != nil {
 		return nil, fmt.Errorf("list athletes: %w", err)
