@@ -1,0 +1,109 @@
+package store_test
+
+import (
+	"database/sql"
+	"testing"
+
+	"github.com/TheMaru/ma_training_organizer/internal/store"
+)
+
+// seedRankID looks up a seeded rank's id within a named system, so promotion
+// tests can target real ranks without hardcoding auto-increment ids.
+func seedRankID(t *testing.T, db *sql.DB, system, name string) int64 {
+	t.Helper()
+	var id int64
+	err := db.QueryRow(`
+		SELECT r.id FROM ranks r
+		JOIN grading_systems g ON g.id = r.grading_system_id
+		WHERE g.name = ? AND r.name = ?`, system, name).Scan(&id)
+	if err != nil {
+		t.Fatalf("lookup rank %q/%q: %v", system, name, err)
+	}
+	return id
+}
+
+func TestCreateAndListPromotions(t *testing.T) {
+	db := seededDB(t)
+
+	athleteID, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+
+	white := seedRankID(t, db, "BJJ Adult", "White")
+	blue := seedRankID(t, db, "BJJ Adult", "Blue")
+
+	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: athleteID, RankID: white, PromotedOn: "2025-01-10"}); err != nil {
+		t.Fatalf("CreatePromotion white: %v", err)
+	}
+	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: athleteID, RankID: blue, PromotedOn: "2026-03-01"}); err != nil {
+		t.Fatalf("CreatePromotion blue: %v", err)
+	}
+
+	got, err := store.ListPromotions(db, athleteID)
+	if err != nil {
+		t.Fatalf("ListPromotions: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("promotions = %d, want 2", len(got))
+	}
+	// Most recent first, joined with rank + system names for display.
+	if got[0].RankName != "Blue" || got[0].SystemName != "BJJ Adult" || got[0].PromotedOn != "2026-03-01" {
+		t.Errorf("promotions[0] = %+v, want Blue/BJJ Adult/2026-03-01", got[0])
+	}
+	if got[1].RankName != "White" || got[1].PromotedOn != "2025-01-10" {
+		t.Errorf("promotions[1] = %+v, want White/2025-01-10", got[1])
+	}
+}
+
+func TestCurrentRankPicksMostRecentByDate(t *testing.T) {
+	// Out-of-order input, ranks skipped: the latest date wins regardless of slice
+	// order or rank ordering.
+	ps := []store.Promotion{
+		{ID: 1, RankName: "White", PromotedOn: "2025-01-10"},
+		{ID: 2, RankName: "White, 2 stripes", PromotedOn: "2025-09-01"},
+		{ID: 3, RankName: "Blue", PromotedOn: "2025-06-01"},
+	}
+	got, ok := store.CurrentRank(ps)
+	if !ok {
+		t.Fatal("CurrentRank ok = false, want true")
+	}
+	if got.RankName != "White, 2 stripes" {
+		t.Errorf("current = %q, want White, 2 stripes", got.RankName)
+	}
+}
+
+func TestCurrentRankCrossesSystems(t *testing.T) {
+	// Kids → adult: the adult rank is current when its date is latest, even though
+	// it belongs to a different system.
+	ps := []store.Promotion{
+		{ID: 1, RankName: "Green", SystemName: "BJJ Kids", PromotedOn: "2024-05-01"},
+		{ID: 2, RankName: "White", SystemName: "BJJ Adult", PromotedOn: "2026-02-01"},
+	}
+	got, ok := store.CurrentRank(ps)
+	if !ok {
+		t.Fatal("CurrentRank ok = false, want true")
+	}
+	if got.SystemName != "BJJ Adult" || got.RankName != "White" {
+		t.Errorf("current = %+v, want White/BJJ Adult", got)
+	}
+}
+
+func TestCurrentRankSameDateTakesLatestRecorded(t *testing.T) {
+	// Two promotions on one date: the more recently recorded (higher id) wins, so
+	// a correction on the same day supersedes the earlier entry.
+	ps := []store.Promotion{
+		{ID: 5, RankName: "Blue", PromotedOn: "2026-01-01"},
+		{ID: 9, RankName: "Purple", PromotedOn: "2026-01-01"},
+	}
+	got, _ := store.CurrentRank(ps)
+	if got.RankName != "Purple" {
+		t.Errorf("current = %q, want Purple", got.RankName)
+	}
+}
+
+func TestCurrentRankEmpty(t *testing.T) {
+	if _, ok := store.CurrentRank(nil); ok {
+		t.Error("CurrentRank(nil) ok = true, want false")
+	}
+}

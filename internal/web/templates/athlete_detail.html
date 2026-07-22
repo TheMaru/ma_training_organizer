@@ -1,0 +1,65 @@
+{{define "title"}}{{.Athlete.FirstName}} {{.Athlete.LastName}} · Organizer{{end}}
+{{define "content"}}
+<div class="row-between">
+  <h1>{{.Athlete.FirstName}} {{.Athlete.LastName}}</h1>
+  <a class="btn secondary" href="/athletes/{{.Athlete.ID}}/edit">Bearbeiten</a>
+</div>
+
+<dl class="meta">
+  <div><dt>Aktueller Rang</dt>
+    <dd>{{if .HasCurrent}}{{.Current.RankName}} <span class="muted">({{.Current.SystemName}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">noch keine Graduierung</span>{{end}}</dd>
+  </div>
+  {{if .Athlete.BirthDate}}<div><dt>Geburtsdatum</dt><dd>{{.Athlete.BirthDate}}</dd></div>{{end}}
+  {{if .Athlete.JoinedOn}}<div><dt>Eintritt</dt><dd>{{.Athlete.JoinedOn}}</dd></div>{{end}}
+  {{if .Athlete.Notes}}<div><dt>Notizen</dt><dd>{{.Athlete.Notes}}</dd></div>{{end}}
+</dl>
+
+<h2>Graduierung eintragen</h2>
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+<form method="post" action="/athletes/{{.Athlete.ID}}/promotions"
+      hx-post="/athletes/{{.Athlete.ID}}/promotions" hx-target="body" class="stack">
+  <label>
+    Rang
+    <select name="rankId" required>
+      <option value="" selected disabled>Rang wählen …</option>
+      {{range .Systems}}
+      <optgroup label="{{.Name}}">
+        {{range .Ranks}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+      </optgroup>
+      {{end}}
+    </select>
+  </label>
+  <label>
+    Datum
+    <input type="date" name="promotedOn" required />
+  </label>
+  <div class="form-actions">
+    <button class="btn" type="submit">Eintragen</button>
+    <a class="btn secondary" href="/athletes">Zurück</a>
+  </div>
+</form>
+
+<h2>Verlauf</h2>
+{{if .Promotions}}
+<table>
+  <thead>
+    <tr>
+      <th>Datum</th>
+      <th>Rang</th>
+      <th>System</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Promotions}}
+    <tr>
+      <td>{{.PromotedOn}}</td>
+      <td>{{.RankName}}</td>
+      <td>{{.SystemName}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">Noch keine Graduierungen eingetragen.</p>
+{{end}}
+{{end}}

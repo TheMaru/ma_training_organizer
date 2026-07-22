@@ -136,6 +136,26 @@ textarea {
   font-weight: 700;
 }
 
+/* Athlete detail: label/value rows for the derived rank and basic fields. */
+.meta {
+  margin: 1rem 0 2rem;
+}
+
+.meta > div {
+  display: flex;
+  gap: 1rem;
+  padding: 0.35rem 0;
+}
+
+.meta dt {
+  flex: 0 0 8rem;
+  color: var(--muted);
+}
+
+.meta dd {
+  margin: 0;
+}
+
 .muted {
   color: var(--muted);
 }

@@ -18,7 +18,7 @@
   <tbody>
     {{range .Athletes}}
     <tr>
-      <td>{{.LastName}}</td>
+      <td><a href="/athletes/{{.ID}}">{{.LastName}}</a></td>
       <td>{{.FirstName}}</td>
       <td>{{.BirthDate}}</td>
       <td>{{.JoinedOn}}</td>
