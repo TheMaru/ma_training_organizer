@@ -52,9 +52,9 @@
   <tbody>
     {{range .Promotions}}
     <tr>
-      <td>{{.PromotedOn}}</td>
-      <td>{{.RankName}}</td>
-      <td>{{.SystemName}}</td>
+      <td data-label="Datum">{{.PromotedOn}}</td>
+      <td data-label="Rang">{{.RankName}}</td>
+      <td data-label="System">{{.SystemName}}</td>
     </tr>
     {{end}}
   </tbody>

@@ -261,3 +261,73 @@ td.actions .btn {
   gap: 0.5rem;
   align-items: center;
 }
+
+/* Phone-width polish. The header wraps instead of squeezing, padding tightens,
+   and every table drops its header row to become a stack of labelled cards —
+   the `data-label` on each cell supplies the column name the <thead> no longer
+   shows. Keeps the clickable roster rows and their delete action intact. */
+@media (max-width: 600px) {
+  header.app {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  header.app nav a:first-child {
+    margin-left: 0;
+  }
+
+  main {
+    margin: 1rem auto;
+    padding: 0 1rem;
+  }
+
+  /* Turn the table into a list of cards. thead is hidden but stays in the
+     accessibility tree via off-screen positioning rather than display:none. */
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  thead {
+    position: absolute;
+    left: -9999px;
+  }
+
+  tr {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  tr.clickable:hover td {
+    background: transparent;
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.2rem 0;
+    border-bottom: none;
+  }
+
+  /* Left-hand column name, pulled from the cell's data-label. */
+  td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  td.actions {
+    justify-content: flex-end;
+    margin-top: 0.25rem;
+  }
+
+  td.actions .btn {
+    margin-left: 0;
+  }
+}

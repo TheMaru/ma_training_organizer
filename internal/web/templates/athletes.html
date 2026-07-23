@@ -21,10 +21,10 @@
          keyboard/screen-reader access. The delete form stops the click from
          bubbling to the row so deleting never navigates. */}}
     <tr class="clickable" onclick="location.href='/athletes/{{.ID}}'">
-      <td><a href="/athletes/{{.ID}}">{{.LastName}}</a></td>
-      <td>{{.FirstName}}</td>
-      <td>{{.BirthDate}}</td>
-      <td>{{.JoinedOn}}</td>
+      <td data-label="Nachname"><a href="/athletes/{{.ID}}">{{.LastName}}</a></td>
+      <td data-label="Vorname">{{.FirstName}}</td>
+      <td data-label="Geburtsdatum">{{.BirthDate}}</td>
+      <td data-label="Eintritt">{{.JoinedOn}}</td>
       <td class="actions">
         <form method="post" action="/athletes/{{.ID}}/delete"
               hx-post="/athletes/{{.ID}}/delete"
