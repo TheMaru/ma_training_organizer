@@ -9,6 +9,7 @@
   --hint: #8a6d00;
   --surface: #ffffff;
   --row-hover: rgba(0, 0, 0, 0.04);
+  --link: #1f6feb;
 }
 
 /* Dark palette. Applied automatically when the OS prefers dark unless the user
@@ -26,6 +27,7 @@
     --hint: #d6b95c;
     --surface: #171a21;
     --row-hover: rgba(255, 255, 255, 0.05);
+    --link: #6ea8ff;
   }
 }
 
@@ -39,6 +41,7 @@
   --hint: #d6b95c;
   --surface: #171a21;
   --row-hover: rgba(255, 255, 255, 0.05);
+  --link: #6ea8ff;
 }
 
 * {
@@ -51,6 +54,14 @@ body {
   color: var(--fg);
   background: var(--bg);
   line-height: 1.5;
+}
+
+/* Bare content links (e.g. the roster name). One themeable colour for both
+   normal and visited: an author rule beats the UA blue/purple defaults for
+   both states, which are unreadable on dark. More specific links — nav,
+   table headers, buttons — keep their own colours. */
+a {
+  color: var(--link);
 }
 
 header.app {
