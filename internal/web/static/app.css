@@ -7,6 +7,38 @@
   --accent-fg: #ffffff;
   --danger: #b42318;
   --hint: #8a6d00;
+  --surface: #ffffff;
+  --row-hover: rgba(0, 0, 0, 0.04);
+}
+
+/* Dark palette. Applied automatically when the OS prefers dark unless the user
+   explicitly chose light, and always when they toggle to dark (data-theme set
+   by the head script in base.html). The two blocks intentionally repeat the
+   same values: one can't live inside the media query and one outside it. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115;
+    --fg: #e6e7ea;
+    --muted: #9aa1ab;
+    --border: #2b2f36;
+    --accent: #4b8bf5;
+    --danger: #f87171;
+    --hint: #d6b95c;
+    --surface: #171a21;
+    --row-hover: rgba(255, 255, 255, 0.05);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --fg: #e6e7ea;
+  --muted: #9aa1ab;
+  --border: #2b2f36;
+  --accent: #4b8bf5;
+  --danger: #f87171;
+  --hint: #d6b95c;
+  --surface: #171a21;
+  --row-hover: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -26,7 +58,7 @@ header.app {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1.5rem;
-  background: #fff;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -47,6 +79,23 @@ header.app nav a:hover {
   color: var(--fg);
 }
 
+/* Light/dark toggle button in the nav — quiet, icon-only. */
+.theme-toggle {
+  margin-left: 1rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.theme-toggle:hover {
+  color: var(--fg);
+}
+
 main {
   max-width: 900px;
   margin: 1.5rem auto;
@@ -56,7 +105,7 @@ main {
 table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--surface);
 }
 
 th,
@@ -116,13 +165,13 @@ textarea {
 }
 
 .btn.secondary {
-  background: #fff;
+  background: var(--surface);
   color: var(--fg);
   border-color: var(--border);
 }
 
 .btn.danger {
-  background: #fff;
+  background: var(--surface);
   color: var(--danger);
   border-color: var(--danger);
 }

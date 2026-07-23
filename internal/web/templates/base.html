@@ -4,6 +4,24 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{block "title" .}}Organizer{{end}}</title>
+    {{/* Apply the saved theme before the stylesheet paints, so there is no
+         flash of the wrong palette. With no saved choice the CSS falls back to
+         the OS preference (prefers-color-scheme). */}}
+    <script>
+      (function () {
+        var saved = localStorage.getItem("theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      })();
+      function toggleTheme() {
+        var el = document.documentElement;
+        var current =
+          el.dataset.theme ||
+          (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        var next = current === "dark" ? "light" : "dark";
+        el.dataset.theme = next;
+        localStorage.setItem("theme", next);
+      }
+    </script>
     <link rel="stylesheet" href="/static/app.css" />
     <script src="/static/htmx.min.js" defer></script>
   </head>
@@ -15,6 +33,8 @@
         <a href="/athletes">Athletes</a>
         <a href="/account/password">Passwort</a>
         <a href="/logout" hx-post="/logout" hx-target="body" hx-push-url="true">Logout</a>
+        <button type="button" class="theme-toggle" onclick="toggleTheme()"
+                aria-label="Farbschema wechseln" title="Hell/Dunkel wechseln">◐</button>
       </nav>
     </header>
     {{end}}
