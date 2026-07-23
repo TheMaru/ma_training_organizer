@@ -71,6 +71,15 @@ th a {
   text-decoration: none;
 }
 
+/* Roster rows open the detail view on click. */
+tr.clickable {
+  cursor: pointer;
+}
+
+tr.clickable:hover td {
+  background: var(--row-hover, rgba(0, 0, 0, 0.04));
+}
+
 label {
   display: block;
   margin: 0.75rem 0 0.25rem;

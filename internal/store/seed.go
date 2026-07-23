@@ -49,8 +49,10 @@ func Seed(db *sql.DB) error {
 	}
 	defer tx.Rollback()
 
-	for _, sys := range seedSystems {
-		gsID, err := ensureGradingSystem(tx, sys.name)
+	// The slice order is the display order: seedSystems lists kids before adult,
+	// so its index becomes each system's sort_order (progression order).
+	for order, sys := range seedSystems {
+		gsID, err := ensureGradingSystem(tx, sys.name, order)
 		if err != nil {
 			return err
 		}
@@ -70,15 +72,20 @@ func Seed(db *sql.DB) error {
 }
 
 // ensureGradingSystem returns the id of the named system, inserting it if it
-// does not yet exist.
-func ensureGradingSystem(tx *sql.Tx, name string) (int64, error) {
+// does not yet exist. On both paths it sets sort_order to order, so re-seeding
+// after the column was added (migration 00003) corrects the display order of
+// systems that predate it.
+func ensureGradingSystem(tx *sql.Tx, name string, order int) (int64, error) {
 	var id int64
 	err := tx.QueryRow(`SELECT id FROM grading_systems WHERE name = ?`, name).Scan(&id)
 	switch {
 	case err == nil:
+		if _, err := tx.Exec(`UPDATE grading_systems SET sort_order = ? WHERE id = ?`, order, id); err != nil {
+			return 0, fmt.Errorf("update grading system order %q: %w", name, err)
+		}
 		return id, nil
 	case errors.Is(err, sql.ErrNoRows):
-		res, err := tx.Exec(`INSERT INTO grading_systems (name) VALUES (?)`, name)
+		res, err := tx.Exec(`INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, name, order)
 		if err != nil {
 			return 0, fmt.Errorf("insert grading system %q: %w", name, err)
 		}

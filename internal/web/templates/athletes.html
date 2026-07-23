@@ -17,17 +17,20 @@
   </thead>
   <tbody>
     {{range .Athletes}}
-    <tr>
+    {{/* Whole row opens the detail view; the name stays a real link for
+         keyboard/screen-reader access. The delete form stops the click from
+         bubbling to the row so deleting never navigates. */}}
+    <tr class="clickable" onclick="location.href='/athletes/{{.ID}}'">
       <td><a href="/athletes/{{.ID}}">{{.LastName}}</a></td>
       <td>{{.FirstName}}</td>
       <td>{{.BirthDate}}</td>
       <td>{{.JoinedOn}}</td>
       <td class="actions">
-        <a class="btn secondary" href="/athletes/{{.ID}}/edit">Bearbeiten</a>
         <form method="post" action="/athletes/{{.ID}}/delete"
               hx-post="/athletes/{{.ID}}/delete"
               hx-confirm="{{.FirstName}} {{.LastName}} löschen? Die Graduierungen werden mitgelöscht."
-              hx-target="body">
+              hx-target="body"
+              onclick="event.stopPropagation()">
           <button class="btn danger" type="submit">Löschen</button>
         </form>
       </td>

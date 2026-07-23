@@ -14,16 +14,17 @@ func TestListGradingSystemsGroupsRanksInOrder(t *testing.T) {
 		t.Fatalf("ListGradingSystems: %v", err)
 	}
 
-	// Both seeded systems come back, alphabetically by name.
+	// Both seeded systems come back in display order: Kids before Adult, so the
+	// promotion form lists them in progression order (kids → adult).
 	if len(systems) != 2 {
 		t.Fatalf("systems = %d, want 2", len(systems))
 	}
-	if systems[0].Name != "BJJ Adult" || systems[1].Name != "BJJ Kids" {
-		t.Errorf("system names = [%q %q], want [BJJ Adult, BJJ Kids]", systems[0].Name, systems[1].Name)
+	if systems[0].Name != "BJJ Kids" || systems[1].Name != "BJJ Adult" {
+		t.Errorf("system names = [%q %q], want [BJJ Kids, BJJ Adult]", systems[0].Name, systems[1].Name)
 	}
 
 	// Adult: 25 ranks, ordered by sort_order, carrying descriptive metadata.
-	adult := systems[0]
+	adult := systems[1]
 	if len(adult.Ranks) != 25 {
 		t.Fatalf("BJJ Adult ranks = %d, want 25", len(adult.Ranks))
 	}

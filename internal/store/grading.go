@@ -24,13 +24,14 @@ type GradingSystem struct {
 
 // ListGradingSystems returns every seeded grading system with its ranks in
 // display order, ready to populate the promotion form (system → rank). Systems
-// are ordered by name; ranks within a system by sort_order.
+// are ordered by sort_order (kids before adult), name breaking ties; ranks
+// within a system by sort_order.
 func ListGradingSystems(db *sql.DB) ([]GradingSystem, error) {
 	rows, err := db.Query(`
 		SELECT g.id, g.name, r.id, r.name, r.rank_group, r.degree
 		FROM grading_systems g
 		JOIN ranks r ON r.grading_system_id = g.id
-		ORDER BY g.name, r.sort_order`)
+		ORDER BY g.sort_order, g.name, r.sort_order`)
 	if err != nil {
 		return nil, fmt.Errorf("list grading systems: %w", err)
 	}
