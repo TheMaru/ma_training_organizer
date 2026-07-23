@@ -38,6 +38,10 @@ func run(args []string) error {
 			return cmdCreateTrainer(cfg.DBPath, args[1:])
 		case "reset-password":
 			return cmdResetPassword(cfg.DBPath, args[1:])
+		case "seed-demo":
+			return cmdSeedDemo(cfg.DBPath, args[1:])
+		case "clear-demo":
+			return cmdClearDemo(cfg.DBPath, args[1:])
 		default:
 			return fmt.Errorf("unknown command: %s", args[0])
 		}
