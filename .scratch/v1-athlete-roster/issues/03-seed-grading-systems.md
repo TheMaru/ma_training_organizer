@@ -1,6 +1,6 @@
 # 03 — Seed grading systems
 
-Status: ready-for-agent
+Status: done
 Blocked by: 02
 
 Seed the "BJJ Kids" and "BJJ Adult" grading systems with their ordered, stripe-fine ranks. Idempotent (safe to re-run). Model per ADR-0001, Option B: ranks are atomic promotion targets carrying **optional descriptive** metadata.
@@ -31,3 +31,7 @@ Stripe-fine: **each** belt gets ranks for **0–4 stripes** (`degree` 0..4). A r
 - Ranks are queryable in order per system.
 - Each rank carries `group` + `degree` (e.g. "White, 2 stripes" → `group=White`, `degree=2`).
 - Re-running the seed does not duplicate rows.
+
+## Comments
+
+Closed 2026-07-24 — implemented and merged to main (edbc25c).

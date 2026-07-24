@@ -1,0 +1,44 @@
+# 01 — Filter the roster by cohort (current-rank system)
+
+Status: needs-triage
+
+Let a trainer narrow the athlete roster (`/athletes`) to one cohort, e.g. show
+only kids or only adults, by filtering on the grading **system** of each
+athlete's current rank.
+
+Parked deliberately out of the sortable-roster feature
+([[roster-sortable-columns]]). v1 manages **kids only**, so there is no immediate
+need; the filter is noted for when adults are added. It composes cleanly on top
+of the sort work: it reuses the same derived "current rank → system" key.
+
+## Why it matters
+
+Once kids and adults share one roster, the cross-system rank sort groups the two
+cohorts into blocks (kids then adults; see roster-sortable-columns decision). A
+cohort filter removes that concern entirely — pick a cohort and every athlete
+shown is in one comparable system.
+
+## Domain subtlety
+
+An athlete is **not** bound to a single grading system (ADR-0001) — history may
+cross kids→adult. So "filter by kids/adults" means **filter by the system of the
+athlete's *current* rank** (the derived attribute), not a fixed field on the
+athlete.
+
+## Open questions (grill at triage)
+
+- **Ungraded athletes.** An athlete with no promotions has no current system.
+  Are they shown in every filter, hidden by any cohort filter, or given an
+  explicit "ungraded" filter option? Proposal: an explicit "ohne Graduierung"
+  option, and they appear only under "all" or that option.
+- **Filter surface / UI.** System dropdown vs. cohort chips/tabs; does the filter
+  compose with the column sort in the URL (`?system=…&sort=…&dir=…`)?
+- **What defines the choices.** Filter options are the seeded grading systems
+  (data-driven), not a hard-coded kids/adults pair.
+
+## Acceptance (provisional)
+
+- The roster can be narrowed to athletes whose current rank is in a chosen
+  grading system, and reset to all.
+- Ungraded athletes have a well-defined, documented place in the filter.
+- Filter and column sort compose without clobbering each other.

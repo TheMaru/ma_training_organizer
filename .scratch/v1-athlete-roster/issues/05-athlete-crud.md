@@ -1,6 +1,6 @@
 # 05 — Athlete CRUD
 
-Status: ready-for-agent
+Status: done
 Blocked by: 04
 
 Manage the shared athlete roster. HTMX-driven forms.
@@ -18,3 +18,7 @@ Manage the shared athlete roster. HTMX-driven forms.
 - Full create / read / update / delete works.
 - Deleting an athlete removes their promotions.
 - The list sorts by last name.
+
+## Comments
+
+Closed 2026-07-24 — implemented and merged to main (f251506, fix dbb4463).

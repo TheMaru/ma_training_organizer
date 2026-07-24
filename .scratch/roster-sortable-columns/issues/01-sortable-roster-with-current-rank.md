@@ -1,6 +1,6 @@
 # 01 — Sortable roster with current-rank column
 
-Status: needs-triage
+Status: ready-for-agent
 
 Introduce sortable columns on the athlete roster (`/athletes`), and add the
 derived **current rank** (graduation) as one of the sortable columns. Deferred
@@ -24,18 +24,33 @@ the toggle logic; a single generic mechanism is cleaner.
   promotions.
 - Make the current-rank column one of the sortable columns.
 
-## Open design questions (triage)
+## Resolved design questions
 
-- **Cross-system rank ordering.** Ranks carry a per-system `sort_order`, but
-  order across systems is not defined. Proposal: sort by (grading system
-  `sort_order`, rank `sort_order`) so kids ranks group before adult ones in
-  progression order. Confirm this is the desired semantics.
-- **Ungraded athletes.** Where do athletes with no promotion sort? Proposal:
-  always last, regardless of direction.
-- **Data access.** Likely a new `store.ListRoster(sort, descending)` returning
-  athletes joined with their derived current rank (one correlated-subquery
-  LEFT JOIN, portable SQL per ADR-0002), replacing the roster's current use of
-  `ListAthletes`.
+Settled in a grilling + domain-modeling session (2026-07-23). Full detail in
+[`../spec.md`](../spec.md); summary:
+
+- **Cross-system rank ordering.** ✅ Sort by (`grading_systems.sort_order`,
+  `ranks.sort_order`), ascending = beginners first — kids block then adult block,
+  each in progression. The only domain-honest ordering; no invented global rank
+  index. A cohort filter ([[roster-cohort-filter]]) is parked as the future
+  answer to mixed-cohort scanning.
+- **Ungraded athletes.** ✅ Always last, in both directions (`NULLS LAST`).
+  Ungraded is *no* rank, distinct from White belt (which is a graduation).
+- **Data access.** ✅ New `store.ListRoster(sort, descending)`, replacing
+  `ListAthletes` in the roster. Current rank selected via a **window function**
+  (`ROW_NUMBER() OVER (PARTITION BY athlete_id ORDER BY promoted_on DESC, id
+  DESC) = 1`) — standard SQL, portable to Postgres (ADR-0002), chosen over a
+  correlated `NOT EXISTS`. A pinning test asserts it matches the pure
+  `CurrentRank` on a same-date tie.
+
+## Further decisions (see spec)
+
+- Default view: **Vorname ascending** (was last name). Tie-break Vorname →
+  Nachname, always A→Z; only the primary axis reverses.
+- All five data columns sortable; first click ascending; ▲/▼ on the active
+  column only; unknown params fall back silently via a column whitelist.
+- Current-rank display: **rank name + muted system**; ungraded blank. Belt
+  graphic parked ([[rank-belt-visual]]).
 
 ## Acceptance
 

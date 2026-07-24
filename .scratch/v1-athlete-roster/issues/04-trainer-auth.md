@@ -1,6 +1,6 @@
 # 04 — Trainer authentication
 
-Status: ready-for-agent
+Status: done
 Blocked by: 02
 
 Session-based auth for trainers. No self-registration, no email (ADR-0002).
@@ -19,3 +19,7 @@ Session-based auth for trainers. No self-registration, no email (ADR-0002).
 - Correct credentials log in; wrong password fails.
 - Password change works end-to-end.
 - `create-trainer` produces a working login; `reset-password` changes it.
+
+## Comments
+
+Closed 2026-07-24 — implemented and merged to main (ace41ae).

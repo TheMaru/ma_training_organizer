@@ -1,6 +1,6 @@
 # 01 — Project scaffolding
 
-Status: ready-for-agent
+Status: done
 
 Set up the Go project skeleton so features have a home. No domain features yet.
 
@@ -16,3 +16,7 @@ Set up the Go project skeleton so features have a home. No domain features yet.
 
 - `go run ./...` starts the server.
 - Serves a base layout page with HTMX loaded and a static asset resolving.
+
+## Comments
+
+Closed 2026-07-24 — implemented and merged to main (2821b5d).

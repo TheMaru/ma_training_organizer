@@ -1,6 +1,6 @@
 # 02 — Database & migrations
 
-Status: ready-for-agent
+Status: done
 Blocked by: 01
 
 SQLite persistence with migrations. **Portable SQL only** (no SQLite-specific features) per ADR-0002.
@@ -17,3 +17,7 @@ SQLite persistence with migrations. **Portable SQL only** (no SQLite-specific fe
 
 - Migrations apply cleanly on a fresh DB.
 - Deleting an athlete row cascades to their promotions (verified).
+
+## Comments
+
+Closed 2026-07-24 — implemented and merged to main (a998142).
