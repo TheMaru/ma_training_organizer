@@ -35,3 +35,13 @@ retrofitting later.
 See spec. Key points: per-account persistent language, `Accept-Language`
 first-visit default, all chrome + user messages translated, internal/CLI stay
 English, dynamic `<html lang>`, catalog parity test.
+
+## Comments
+
+2026-07-27: [[roster-sortable-columns]] (`c8ff458`) introduced the first
+user-facing German UI strings that live in **Go code rather than a template** —
+the roster column labels in `rosterColumns` (`internal/web/roster.go`), which the
+template renders via `{{range .Headers}}`. The i18n pass must translate those
+through the Go-side lookup, not only the `{{t "key"}}` template func; the roster
+`<td data-label="…">` attributes carry the same labels a second time (mobile card
+layout) and have to stay in sync with them.
