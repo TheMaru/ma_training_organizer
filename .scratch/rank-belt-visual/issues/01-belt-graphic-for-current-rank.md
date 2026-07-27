@@ -1,6 +1,6 @@
 # 01 — Belt graphic for a rank (visual rank display)
 
-Status: ready-for-agent
+Status: done
 Blocked by: roster-sortable-columns/01 (introduces `ListRoster` + `RosterRow` and the roster's "Aktueller Rang" column, which the roster belt surface and `Group`/`Degree` plumbing build on)
 
 Render an athlete's rank as a **belt graphic** (colour + stripes) instead of, or
@@ -59,3 +59,5 @@ is a display enhancement on top and needs its own design round before build.
 2026-07-24 — Triaged: **accepted for build now** (pulled into the pre-deploy set). A small, high-delight visual-polish feature. Next step: a grill-with-docs session to settle the four open design questions, then spec + build. Text rank name stays the accessible baseline (ADR-0001).
 
 2026-07-24 — Grilled + spec'd (grill-with-docs). All four open questions resolved; full detail in [`../spec.md`](../spec.md). Summary: self-built inline SVG; belt-ness/colour = **view-layer convention** (hardcoded colour map + text fallback, no schema change) recorded in **ADR-0004**; BJJ-faithful (body + split-belt bar + friso with degree stripes); surfaces = roster (graphic only, name in aria-label), detail current-rank + Verlauf table (graphic + name); `Promotion`/roster-row gain denormalised `Group`+`Degree`; one shared render helper; unknown colour → text. QA: rework `seed-demo` to ~12 curated athletes covering both bar variants, stripe degrees 0–4, a split+stripes combo, a striped white belt, and one ungraded. Status → ready-for-agent.
+
+2026-07-27 — **Done**, shipped in `5a182c1`. Built to spec: inline SVG belt (body + split bar + black friso with `degree` stripes), colour table and parser as a view convention per ADR-0004 (no schema change), text fallback for an unmapped colour. Roster = graphic only with rank + system as `aria-label`/`<title>`; detail current rank and Verlauf = graphic + name, graphic decorative. `Promotion`/`RosterRow` carry denormalised `Group` + `Degree`; one template func `belt` backs all three surfaces, pinned by a byte-for-byte markup comparison across them. `seed-demo` reworked to 12 curated athletes covering every mapped colour, both bar variants, degrees 0–4, split+stripes, a striped white belt and one ungraded. Verified by hand in the running app (light + dark, desktop + phone card layout).

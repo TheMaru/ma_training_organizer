@@ -1,6 +1,6 @@
 # Spec — Belt graphic for a rank (visual rank display)
 
-Status: ready-for-agent
+Status: done
 
 Render an athlete's rank as a **belt graphic** (body colour + split-belt bar +
 stripes) alongside or in place of the plain rank name, wherever a rank name is
