@@ -1,6 +1,6 @@
 # Spec — Sortable roster with current-rank column
 
-Status: ready-for-agent
+Status: done
 
 Make the athlete roster (`/athletes`) sortable by any data column, and add the
 derived **current rank** as one of those columns. Replaces the current
@@ -106,3 +106,11 @@ the expected approach here, not a surprising trade-off.
 - Unknown `sort`/`dir` values render the default view without error.
 - A pinning test asserts `ListRoster`'s current rank matches `CurrentRank` on a
   same-date tie fixture.
+
+## Comments
+
+Implemented in c8ff458 (2026-07-27). Two implementation notes: `RosterRow`
+carries `RankID` instead of the raw (system, rank) sort keys — nothing outside
+SQL `ORDER BY` consumes them, and the id makes the pinning test compare rank
+identity; and `NULLS LAST` is applied to every sortable column, so blank
+birth/join dates also sort last rather than counting as the earliest date.

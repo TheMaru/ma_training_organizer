@@ -1,6 +1,6 @@
 # 01 — Sortable roster with current-rank column
 
-Status: ready-for-agent
+Status: done
 
 Introduce sortable columns on the athlete roster (`/athletes`), and add the
 derived **current rank** (graduation) as one of the sortable columns. Deferred
@@ -58,3 +58,11 @@ Settled in a grilling + domain-modeling session (2026-07-23). Full detail in
 - The roster shows each athlete's current rank; ungraded athletes render blank.
 - Sorting by the current-rank column orders athletes by graduation with a
   documented, agreed cross-system ordering.
+
+## Comments
+
+Shipped in c8ff458 (2026-07-27): generic `?sort=&dir=` roster sort over all
+five data columns, `store.ListRoster` with the window-function current rank,
+(system, rank) sort_order ordering with ungraded last, and the pinning test
+against `CurrentRank`. Belt graphic and cohort filter remain parked as their
+own tickets.
