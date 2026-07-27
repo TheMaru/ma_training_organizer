@@ -1,7 +1,7 @@
 # 01 — Roster sorting has no affordance on phone widths
 
 Status: ready-for-agent
-Blocked by: [[roster-sort-persistence]] 01
+Blocked by: — (was [[roster-sort-persistence]] 01, done in `9492af0`)
 
 The roster's sortable column headers are unreachable on a phone. Found by the
 code review of [[roster-sortable-columns]] (shipped in `c8ff458`, 2026-07-27).
