@@ -21,12 +21,17 @@ var rosterColumns = []struct {
 }
 
 // rosterHeader is one rendered column header: the label, where its link points
-// next, and the direction it currently sorts in (empty on inactive columns).
+// next, and the direction it currently sorts in (empty on inactive columns). Both
+// sort surfaces render from this — the desktop <th> links and the phone chips
+// (ADR-0005) — so Active is a field rather than each surface inferring it from
+// one of the two presentation strings.
 type rosterHeader struct {
-	Label     string
-	Href      string
-	Indicator string // ▲/▼, on the active column only
-	AriaSort  string // ascending/descending/none, for assistive tech
+	Label      string
+	Href       string
+	Active     bool   // the column the roster is currently sorted by
+	Descending bool   // its direction, meaningful while Active
+	Indicator  string // ▲/▼, on the active column only
+	AriaSort   string // ascending/descending/none; valid on a columnheader only
 }
 
 // rosterLine is one rendered roster row: the stored row plus the links leading
@@ -84,6 +89,7 @@ func rosterHeaders(view rosterView) []rosterHeader {
 			Href:     view.sortedBy(col.Key).path(rosterPath),
 		}
 		if col.Key == view.sort {
+			h.Active, h.Descending = true, view.descending
 			if view.descending {
 				h.Indicator, h.AriaSort = "▼", "descending"
 			} else {

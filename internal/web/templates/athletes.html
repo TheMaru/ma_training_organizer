@@ -5,12 +5,30 @@
   <a class="btn" href="{{.NewHref}}">Neuer Athlet</a>
 </div>
 {{if .Athletes}}
+{{/* The phone sort surface (ADR-0005). At ≤600px the table becomes a stack of
+     cards and its thead is gone, so the header links have no surface there; this
+     row of chips renders the very same header view model, into the very same
+     URLs. Only one of the two surfaces is ever rendered visually, and the CSS
+     decides which. The label is a visible line of its own so it costs vertical
+     rather than horizontal space, and it names the row via aria-labelledby. */}}
+<div class="sort-controls">
+  <span class="muted sort-controls-label" id="roster-sort-label">Sortieren</span>
+  <nav class="sort-chips" aria-labelledby="roster-sort-label">
+    {{range .Headers}}
+    {{- /* aria-sort is only meaningful on a columnheader, so the active chip says
+           its state with aria-current plus text a screen reader can read. */}}
+    <a class="chip{{if .Active}} active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span><span class="sr-only">, {{if .Descending}}absteigend{{else}}aufsteigend{{end}} sortiert</span>{{end}}</a>
+    {{end}}
+  </nav>
+</div>
 <table>
   <thead>
     <tr>
-      {{/* Every data column is a sort link; the active one carries the ▲/▼. */}}
+      {{/* Every data column is a sort link; the active one carries the ▲/▼. The
+           glyph is decorative — aria-sort already carries the direction, and a
+           bare arrow is read out as a character name. */}}
       {{range .Headers}}
-      <th aria-sort="{{.AriaSort}}"><a href="{{.Href}}">{{.Label}}{{with .Indicator}} <span class="sort-dir">{{.}}</span>{{end}}</a></th>
+      <th aria-sort="{{.AriaSort}}"><a href="{{.Href}}">{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span>{{end}}</a></th>
       {{end}}
       <th class="actions"></th>
     </tr>
