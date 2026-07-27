@@ -70,6 +70,11 @@ on `/athletes` with no parameters at all keeps working exactly as today.
 - The roster's header/view model (currently built by `rosterHeaders`) already knows
   the active column and direction — reuse that resolved state as the single source
   for building outgoing links, rather than re-reading the raw query in each spot.
+- Treat the thing being carried as **the roster's view state**, not as two named
+  parameters. [[roster-cohort-filter]] will add `?system=` to the same URLs and must
+  travel through the same links and redirects; adding it should mean one entry in
+  one whitelist, not another pass over every link. Do not implement the filter here
+  — just don't hard-wire `sort`/`dir` into every call site.
 - `store.NormalizeRosterSort` plus the `asc`/`desc` literals are the only permitted
   inputs to a redirect target or `Location` header.
 - The shared `redirect` helper serves both the HTMX path (`HX-Redirect`) and the
