@@ -28,7 +28,7 @@
            glyph is decorative — aria-sort already carries the direction, and a
            bare arrow is read out as a character name. */}}
       {{range .Headers}}
-      <th aria-sort="{{.AriaSort}}"><a href="{{.Href}}">{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span>{{end}}</a></th>
+      <th class="sortable" aria-sort="{{.AriaSort}}"><a href="{{.Href}}">{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span>{{end}}</a></th>
       {{end}}
       <th class="actions"></th>
     </tr>

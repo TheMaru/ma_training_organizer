@@ -99,6 +99,14 @@ Verified in Chrome at 375 × 812 with the `seed-demo` roster:
 - The row overflows (549px of chips in 343px) and the next chip fades out at the
   right edge, which is what makes the overflow readable.
 
+2026-07-27 — Follow-up, on request: the desktop click target is now the whole
+header cell, not just the column name. `th.sortable` gives up its padding and the
+link takes it over, so the link fills the cell (verified: clicks on the right
+edge, the top-left corner and the bottom edge all sort), and the cell highlights
+on hover like the roster rows do. The class sits on the cell rather than on a
+`th:has(a)` selector so the plain headers of the promotion history table keep
+their padding. The phone chips were already tap-sized.
+
 ![Roster at 375px](../screenshots/roster-375.png)
 ![Sort chips at 375px, Vorname ascending](../screenshots/sort-chips-375.png)
 ![Sort chips scrolled to the end, Aktueller Rang descending](../screenshots/sort-chips-375-scrolled.png)

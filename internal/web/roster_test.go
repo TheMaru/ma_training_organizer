@@ -326,6 +326,26 @@ func TestRosterSortChipRowIsALabelledNav(t *testing.T) {
 	}
 }
 
+func TestRosterSortTargetIsTheWholeHeaderCell(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	threeRosterAthletes(t, db)
+
+	// app.css hangs the cell-filling click target off this class: the cell gives
+	// up its padding and the link takes it over. Without the class a trainer is
+	// back to aiming at the few characters of the column name.
+	body := readBody(t, get(t, ts, client, "/athletes"))
+	for _, label := range rosterColumnLabels {
+		if cell := headerCell(t, body, label); !strings.Contains(cell, `class="sortable"`) {
+			t.Errorf("%s header = %q, want class=\"sortable\"", label, cell)
+		}
+	}
+	// The actions column sorts nothing, so it is not a target.
+	if got := strings.Count(body, `<th class="sortable"`); got != len(rosterColumnLabels) {
+		t.Errorf("sortable header cells = %d, want %d", got, len(rosterColumnLabels))
+	}
+}
+
 func TestRosterSortIndicatorIsHiddenFromAssistiveTech(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()

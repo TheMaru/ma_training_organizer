@@ -131,6 +131,24 @@ th a {
   text-decoration: none;
 }
 
+/* A sortable header sorts across its whole cell, not just across its label: the
+   cell hands its padding to the link, so the click target is the column head a
+   trainer aims at rather than the few characters of its name. The class is on
+   the cell (rather than a th:has(a) selector) so the plain headers of the
+   promotion history table keep their padding. */
+th.sortable {
+  padding: 0;
+}
+
+th.sortable a {
+  display: block;
+  padding: 0.5rem 0.75rem;
+}
+
+th.sortable:hover {
+  background: var(--row-hover);
+}
+
 /* Sort indicator on the active roster column: present but quiet. */
 .sort-dir {
   color: var(--muted);
