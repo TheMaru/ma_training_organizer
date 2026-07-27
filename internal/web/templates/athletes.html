@@ -2,7 +2,7 @@
 {{define "content"}}
 <div class="row-between">
   <h1>Athleten</h1>
-  <a class="btn" href="/athletes/new">Neuer Athlet</a>
+  <a class="btn" href="{{.NewHref}}">Neuer Athlet</a>
 </div>
 {{if .Athletes}}
 <table>
@@ -18,10 +18,11 @@
   <tbody>
     {{range .Athletes}}
     {{/* Whole row opens the detail view; the name stays a real link for
-         keyboard/screen-reader access. The delete form stops the click from
-         bubbling to the row so deleting never navigates. */}}
-    <tr class="clickable" onclick="location.href='/athletes/{{.ID}}'">
-      <td data-label="Nachname"><a href="/athletes/{{.ID}}">{{.LastName}}</a></td>
+         keyboard/screen-reader access. Both carry the roster's view state, so the
+         detail page can lead back to the same sorted roster. The delete form stops
+         the click from bubbling to the row so deleting never navigates. */}}
+    <tr class="clickable" onclick="location.href='{{.Href}}'">
+      <td data-label="Nachname"><a href="{{.Href}}">{{.LastName}}</a></td>
       <td data-label="Vorname">{{.FirstName}}</td>
       <td data-label="Geburtsdatum">{{.BirthDate}}</td>
       <td data-label="Eintritt">{{.JoinedOn}}</td>
@@ -29,8 +30,8 @@
            in both kids and adult); ungraded athletes stay blank. */}}
       <td data-label="Aktueller Rang">{{.RankName}}{{with .SystemName}} <span class="muted">({{.}})</span>{{end}}</td>
       <td class="actions">
-        <form method="post" action="/athletes/{{.ID}}/delete"
-              hx-post="/athletes/{{.ID}}/delete"
+        <form method="post" action="{{.DeleteAction}}"
+              hx-post="{{.DeleteAction}}"
               hx-confirm="{{.FirstName}} {{.LastName}} löschen? Die Graduierungen werden mitgelöscht."
               hx-target="body"
               onclick="event.stopPropagation()">

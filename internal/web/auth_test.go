@@ -95,6 +95,61 @@ func get(t *testing.T, ts *httptest.Server, client *http.Client, path string) *h
 	return resp
 }
 
+// post submits a form to the given path, query string included (which
+// client.PostForm cannot express), without following the redirect.
+func post(t *testing.T, ts *httptest.Server, client *http.Client, path string, form url.Values) *http.Response {
+	t.Helper()
+	return postWith(t, ts, client, path, form, nil)
+}
+
+// postHTMX submits a form the way HTMX does, so a test can assert on the
+// HX-Redirect answer rather than the 303.
+func postHTMX(t *testing.T, ts *httptest.Server, client *http.Client, path string, form url.Values) *http.Response {
+	t.Helper()
+	return postWith(t, ts, client, path, form, http.Header{"HX-Request": {"true"}})
+}
+
+func postWith(t *testing.T, ts *httptest.Server, client *http.Client, path string, form url.Values, header http.Header) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, ts.URL+path, strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for k, v := range header {
+		req.Header[k] = v
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", path, err)
+	}
+	return resp
+}
+
+// seeOtherTo asserts a plain 303 to the given target.
+func seeOtherTo(t *testing.T, resp *http.Response, want string) {
+	t.Helper()
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+	if got := resp.Header.Get("Location"); got != want {
+		t.Errorf("Location = %q, want %q", got, want)
+	}
+}
+
+// hxRedirectTo asserts the HTMX equivalent: 200 plus HX-Redirect.
+func hxRedirectTo(t *testing.T, resp *http.Response, want string) {
+	t.Helper()
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if got := resp.Header.Get("HX-Redirect"); got != want {
+		t.Errorf("HX-Redirect = %q, want %q", got, want)
+	}
+}
+
 func TestUnauthenticatedAppRouteRedirectsToLogin(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 

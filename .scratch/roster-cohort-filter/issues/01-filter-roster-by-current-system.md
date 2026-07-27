@@ -74,3 +74,12 @@ triage of [[roster-sort-on-mobile]], which produced
   label from the start.
 - **Still genuinely open here:** ungraded athletes, what defines the choices, and
   whether the filter is single- or multi-select.
+
+2026-07-27 — [[roster-sort-persistence]] 01 is done, so the carrier now exists:
+`rosterView` in `internal/web/rosterview.go`. Adding `?system=` is a field on that
+struct, a line in `rosterViewFrom` (whitelisted against the grading systems, the way
+`sort` goes through `store.NormalizeRosterSort`) and a line in `query()`. Every link
+out of the roster, every sort control and all four mutation redirects already build
+their URLs from it, so none of them need touching. Note `query()` returns `""` for
+the default view — whatever "no filter" means must stay part of that default so a
+bare `/athletes` keeps working.

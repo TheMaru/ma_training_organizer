@@ -102,10 +102,11 @@ the columns, the default or the tie-break changes.
   `Indicator`, `AriaSort`). Render the same range twice in `athletes.html` — once
   as `<th>`, once as chips. Do **not** add a parallel view model, and do not add
   fields to `rosterColumns`.
-- This ticket is **blocked by [[roster-sort-persistence]] 01**. By the time it is
-  built, `Href` should come from that ticket's view-state carrier rather than the
-  hard-wired `fmt.Sprintf` at `roster.go:69`. Chips must consume whatever that
-  builder produces, so `?system=` can join later without touching this markup.
+- This ticket was **blocked by [[roster-sort-persistence]] 01**, which is now done:
+  `rosterHeaders(view rosterView)` builds every `Href` as
+  `view.sortedBy(col.Key).path(rosterPath)`, so the chips inherit the whole view
+  state for free and `?system=` can join later without touching this markup.
+  Nothing here reads the query string or spells a URL itself.
 - The chip row is a `<nav>` labelled by a visible, muted "Sortieren" line above
   it, via `aria-labelledby` (not a separate `aria-label`, to avoid a double
   announcement). The label sits on its own line so it costs vertical, not
