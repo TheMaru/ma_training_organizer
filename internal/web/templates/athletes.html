@@ -8,10 +8,10 @@
 <table>
   <thead>
     <tr>
-      <th><a href="/athletes?dir={{.NextDir}}">Nachname</a></th>
-      <th>Vorname</th>
-      <th>Geburtsdatum</th>
-      <th>Eintritt</th>
+      {{/* Every data column is a sort link; the active one carries the ▲/▼. */}}
+      {{range .Headers}}
+      <th aria-sort="{{.AriaSort}}"><a href="{{.Href}}">{{.Label}}{{with .Indicator}} <span class="sort-dir">{{.}}</span>{{end}}</a></th>
+      {{end}}
       <th class="actions"></th>
     </tr>
   </thead>
@@ -25,6 +25,9 @@
       <td data-label="Vorname">{{.FirstName}}</td>
       <td data-label="Geburtsdatum">{{.BirthDate}}</td>
       <td data-label="Eintritt">{{.JoinedOn}}</td>
+      {{/* The system disambiguates same-named ranks across cohorts (White exists
+           in both kids and adult); ungraded athletes stay blank. */}}
+      <td data-label="Aktueller Rang">{{.RankName}}{{with .SystemName}} <span class="muted">({{.}})</span>{{end}}</td>
       <td class="actions">
         <form method="post" action="/athletes/{{.ID}}/delete"
               hx-post="/athletes/{{.ID}}/delete"

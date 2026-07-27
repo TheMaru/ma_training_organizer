@@ -131,6 +131,12 @@ th a {
   text-decoration: none;
 }
 
+/* Sort indicator on the active roster column: present but quiet. */
+.sort-dir {
+  color: var(--muted);
+  font-size: 0.75em;
+}
+
 /* Roster rows open the detail view on click. */
 tr.clickable {
   cursor: pointer;

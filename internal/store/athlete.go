@@ -60,10 +60,11 @@ func AthleteByID(db *sql.DB, id int64) (Athlete, error) {
 	return a, nil
 }
 
-// ListAthletes returns the whole roster ordered by last name (spec). descending
-// flips the direction; first name is the tie-breaker and flips with it, so a
-// descending list is a true reverse of the ascending one. ORDER BY stays plain
-// SQL (no COLLATE) to remain portable (ADR-0002).
+// ListAthletes returns every athlete ordered by last name, without their derived
+// rank. descending flips the direction; first name is the tie-breaker and flips
+// with it, so a descending list is a true reverse of the ascending one. ORDER BY
+// stays plain SQL (no COLLATE) to remain portable (ADR-0002). The roster view
+// uses ListRoster instead — this is the plain athlete listing (demo CLI, tests).
 func ListAthletes(db *sql.DB, descending bool) ([]Athlete, error) {
 	// dir is a controlled constant (never user input), so interpolating it is
 	// injection-safe. Both keys use it so the whole order reverses together.
@@ -140,12 +141,19 @@ func checkAffected(res sql.Result, id int64) error {
 func scanAthlete(scan func(dest ...any) error) (Athlete, error) {
 	var a Athlete
 	var birth, joined sql.NullTime
-	if err := scan(&a.ID, &a.FirstName, &a.LastName, &birth, &joined, &a.Notes); err != nil {
+	if err := scan(athleteDest(&a, &birth, &joined)...); err != nil {
 		return Athlete{}, err
 	}
 	a.BirthDate = formatDate(birth)
 	a.JoinedOn = formatDate(joined)
 	return a, nil
+}
+
+// athleteDest lists the scan destinations for the athlete columns, in the order
+// every athlete SELECT lists them. Shared with the roster's wider row so the
+// column list and its nullable-date handling exist once.
+func athleteDest(a *Athlete, birth, joined *sql.NullTime) []any {
+	return []any{&a.ID, &a.FirstName, &a.LastName, birth, joined, &a.Notes}
 }
 
 // formatDate renders a nullable DATE as a yyyy-mm-dd string, empty when NULL.

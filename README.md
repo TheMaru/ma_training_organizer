@@ -16,7 +16,8 @@ Trainers log in and maintain a shared roster of athletes and their graduations:
 - **Trainer login** with session auth and self-service password change. Accounts
   and password resets are provisioned via CLI — no self-registration, no email.
 - **Athlete roster** — create, edit and delete athletes (`firstName`,
-  `lastName`, `birthDate`, `joinedOn`, `notes`), list sortable by last name.
+  `lastName`, `birthDate`, `joinedOn`, `notes`), list sortable by any column
+  including the derived current rank.
 - **Graduation** — record promotions (grading system + rank + date) and show the
   derived current rank plus full history per athlete.
 - **Seeded grading systems** — "BJJ Kids" and "BJJ Adult", stripes included.

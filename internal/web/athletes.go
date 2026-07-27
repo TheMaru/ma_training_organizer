@@ -12,29 +12,6 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
-// handleAthletesList renders the shared roster ordered by last name. The list is
-// sortable: ?dir=desc flips the direction, and the column header links to the
-// opposite direction so a click toggles it.
-func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
-	descending := r.URL.Query().Get("dir") == "desc"
-
-	athletes, err := store.ListAthletes(s.db, descending)
-	if err != nil {
-		serverError(w)
-		return
-	}
-
-	nextDir := "desc"
-	if descending {
-		nextDir = "asc"
-	}
-	s.tmpl.render(w, http.StatusOK, "athletes.html", map[string]any{
-		"Authenticated": true,
-		"Athletes":      athletes,
-		"NextDir":       nextDir,
-	})
-}
-
 // handleAthleteNew renders the empty create form.
 func (s *Server) handleAthleteNew(w http.ResponseWriter, _ *http.Request) {
 	s.renderAthleteForm(w, http.StatusOK, "/athletes", "Neuer Athlet", store.Athlete{}, "")
