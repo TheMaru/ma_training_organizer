@@ -56,6 +56,29 @@ func TestCreateAndListPromotions(t *testing.T) {
 	}
 }
 
+func TestListPromotionsCarriesRankGroupAndDegree(t *testing.T) {
+	db := seededDB(t)
+
+	athleteID, err := store.CreateAthlete(db, store.Athlete{FirstName: "Mia", LastName: "Kind"})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+	striped := seedRankID(t, db, "BJJ Kids", "Grey-White, 2 stripes")
+	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: athleteID, RankID: striped, PromotedOn: "2026-02-02"}); err != nil {
+		t.Fatalf("CreatePromotion: %v", err)
+	}
+
+	got, err := store.ListPromotions(db, athleteID)
+	if err != nil {
+		t.Fatalf("ListPromotions: %v", err)
+	}
+	// The descriptive breakdown travels with the row so a view can render the rank
+	// without going back to the ranks table (ADR-0004).
+	if got[0].Group != "Grey-White" || got[0].Degree != 2 {
+		t.Errorf("promotions[0] group/degree = %q/%d, want Grey-White/2", got[0].Group, got[0].Degree)
+	}
+}
+
 func TestCurrentRankPicksMostRecentByDate(t *testing.T) {
 	// Out-of-order input, ranks skipped: the latest date wins regardless of slice
 	// order or rank ordering.

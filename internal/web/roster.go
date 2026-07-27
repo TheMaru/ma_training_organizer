@@ -43,6 +43,17 @@ type rosterLine struct {
 	DeleteAction string
 }
 
+// RankLabel is the rank as assistive tech and a tooltip get it on the roster,
+// where the belt graphic stands alone (ADR-0004): the rank name plus the system
+// that disambiguates same-named ranks across cohorts — White exists in both the
+// kids and the adult system. Empty for an ungraded athlete, who has no rank.
+func (l rosterLine) RankLabel() string {
+	if l.SystemName == "" {
+		return l.RankName
+	}
+	return l.RankName + " (" + l.SystemName + ")"
+}
+
 // handleAthletesList renders the shared roster, sorted server-side by
 // ?sort=<col>&dir=<asc|desc>. Unknown values fall back to the default view
 // (Vorname ascending) rather than erroring: sorting is a view concern.

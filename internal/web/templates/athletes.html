@@ -44,9 +44,12 @@
       <td data-label="Vorname">{{.FirstName}}</td>
       <td data-label="Geburtsdatum">{{.BirthDate}}</td>
       <td data-label="Eintritt">{{.JoinedOn}}</td>
-      {{/* The system disambiguates same-named ranks across cohorts (White exists
-           in both kids and adult); ungraded athletes stay blank. */}}
-      <td data-label="Aktueller Rang">{{.RankName}}{{with .SystemName}} <span class="muted">({{.}})</span>{{end}}</td>
+      {{/* The rank as a belt graphic alone (ADR-0004), with the name + system as
+           its accessible label — the system disambiguates same-named ranks across
+           cohorts (White exists in both kids and adult). A rank whose colour the
+           view does not know renders that same text visibly instead, and an
+           ungraded athlete has neither, so the cell stays blank. */}}
+      <td data-label="Aktueller Rang">{{with belt .Group .Degree .RankLabel}}{{.}}{{else}}{{.RankName}}{{with .SystemName}} <span class="muted">({{.}})</span>{{end}}{{end}}</td>
       <td class="actions">
         <form method="post" action="{{.DeleteAction}}"
               hx-post="{{.DeleteAction}}"

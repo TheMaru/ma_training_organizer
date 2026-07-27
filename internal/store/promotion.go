@@ -6,8 +6,10 @@ import (
 )
 
 // Promotion is the event of an athlete reaching a rank on a date (CONTEXT.md).
-// RankName and SystemName are denormalised for display; they are populated by
-// ListPromotions and ignored on insert (CreatePromotion writes only the ids).
+// RankName, SystemName and the rank's descriptive Group/Degree are denormalised
+// for display; they are populated by ListPromotions and ignored on insert
+// (CreatePromotion writes only the ids). Group and Degree let a view render the
+// rank visually — a belt graphic (ADR-0004) — without a second lookup.
 type Promotion struct {
 	ID         int64
 	AthleteID  int64
@@ -15,6 +17,8 @@ type Promotion struct {
 	PromotedOn string
 	RankName   string
 	SystemName string
+	Group      string // rank_group, the belt colour name (ADR-0001): free text
+	Degree     int    // sub-level within the group, e.g. BJJ stripes
 }
 
 // CreatePromotion records a promotion and returns its id. Only athlete, rank and
@@ -40,7 +44,8 @@ func CreatePromotion(db *sql.DB, p Promotion) (int64, error) {
 // matches CurrentRank's tie-break.
 func ListPromotions(db *sql.DB, athleteID int64) ([]Promotion, error) {
 	rows, err := db.Query(`
-		SELECT p.id, p.athlete_id, p.rank_id, p.promoted_on, r.name, g.name
+		SELECT p.id, p.athlete_id, p.rank_id, p.promoted_on, r.name, g.name,
+		       r.rank_group, r.degree
 		FROM promotions p
 		JOIN ranks r ON r.id = p.rank_id
 		JOIN grading_systems g ON g.id = r.grading_system_id
@@ -57,7 +62,7 @@ func ListPromotions(db *sql.DB, athleteID int64) ([]Promotion, error) {
 			p        Promotion
 			promoted sql.NullTime
 		)
-		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.RankName, &p.SystemName); err != nil {
+		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.RankName, &p.SystemName, &p.Group, &p.Degree); err != nil {
 			return nil, fmt.Errorf("scan promotion row: %w", err)
 		}
 		p.PromotedOn = formatDate(promoted)

@@ -197,6 +197,28 @@ func TestListRosterReportsCurrentRank(t *testing.T) {
 	}
 }
 
+func TestListRosterCarriesRankGroupAndDegree(t *testing.T) {
+	db := newTestDB(t)
+	kids := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "BJJ Kids", 0)
+	striped := mustInsert(t, db,
+		`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order) VALUES (?, ?, ?, ?, ?)`,
+		kids, "Grey-White, 2 stripes", "Grey-White", 2, 1)
+
+	addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, striped, "2026-01-01")
+	addAthlete(t, db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}, 0, "")
+
+	rows := listRoster(t, db, store.RosterSortFirstName, false)
+	// The descriptive breakdown rides along so the roster can render the rank
+	// without a second query (ADR-0004).
+	if rows[0].Group != "Grey-White" || rows[0].Degree != 2 {
+		t.Errorf("Kai's group/degree = %q/%d, want Grey-White/2", rows[0].Group, rows[0].Degree)
+	}
+	// Ungraded: the LEFT JOIN's NULLs must land as zero values, not an error.
+	if rows[1].Group != "" || rows[1].Degree != 0 {
+		t.Errorf("Uwe's group/degree = %q/%d, want empty/0", rows[1].Group, rows[1].Degree)
+	}
+}
+
 // TestListRosterCurrentRankMatchesCurrentRank pins the two encodings of "current
 // rank = latest promotion, higher id wins a tied date" together: the SQL window
 // function used by the roster and the pure CurrentRank used by the detail page.

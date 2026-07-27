@@ -229,6 +229,18 @@ textarea {
   font-weight: 700;
 }
 
+/* Belt graphic for a rank (ADR-0004). Sized in em so it tracks the surrounding
+   text; the SVG's own 64×16 attributes are the fallback if this file never
+   arrives. align-self keeps it undistorted inside the phone card layout, where
+   every table cell becomes a flex container that would otherwise stretch it. */
+.belt {
+  width: 3.5em;
+  height: auto;
+  flex: none;
+  align-self: center;
+  vertical-align: -0.15em;
+}
+
 /* Athlete detail: label/value rows for the derived rank and basic fields. */
 .meta {
   margin: 1rem 0 2rem;

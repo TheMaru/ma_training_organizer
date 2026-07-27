@@ -43,11 +43,15 @@ var rosterTieBreak = []string{"a.first_name", "a.last_name"}
 // current rank (ADR-0001), joined in SQL rather than derived per row in Go. Rank
 // fields are empty/zero for an ungraded athlete, who has no rank at all — that is
 // distinct from the lowest rank, which is a graduation.
+// Group and Degree are the rank's descriptive breakdown (ADR-0001), carried so
+// the roster can render the rank as a belt graphic (ADR-0004) from the same row.
 type RosterRow struct {
 	Athlete
 	RankID     int64
 	RankName   string
 	SystemName string
+	Group      string
+	Degree     int
 }
 
 // NormalizeRosterSort maps a requested sort column onto the whitelist, returning
@@ -74,10 +78,11 @@ func NormalizeRosterSort(sort string) string {
 func ListRoster(db *sql.DB, sort string, descending bool) ([]RosterRow, error) {
 	rows, err := db.Query(fmt.Sprintf(`
 		SELECT a.id, a.first_name, a.last_name, a.birth_date, a.joined_on, a.notes,
-		       cur.rank_id, cur.rank_name, cur.system_name
+		       cur.rank_id, cur.rank_name, cur.system_name, cur.rank_group, cur.degree
 		FROM athletes a
 		LEFT JOIN (
 			SELECT p.athlete_id, p.rank_id, r.name AS rank_name, g.name AS system_name,
+			       r.rank_group, r.degree,
 			       g.sort_order AS system_order, r.sort_order AS rank_order,
 			       ROW_NUMBER() OVER (
 			           PARTITION BY p.athlete_id ORDER BY p.promoted_on DESC, p.id DESC
@@ -136,12 +141,12 @@ func rosterOrderClause(sort string, descending bool) string {
 // land as zero values.
 func scanRosterRow(scan func(dest ...any) error) (RosterRow, error) {
 	var (
-		row                  RosterRow
-		birth, joined        sql.NullTime
-		rankID               sql.NullInt64
-		rankName, systemName sql.NullString
+		row                         RosterRow
+		birth, joined               sql.NullTime
+		rankID, degree              sql.NullInt64
+		rankName, systemName, group sql.NullString
 	)
-	dest := append(athleteDest(&row.Athlete, &birth, &joined), &rankID, &rankName, &systemName)
+	dest := append(athleteDest(&row.Athlete, &birth, &joined), &rankID, &rankName, &systemName, &group, &degree)
 	if err := scan(dest...); err != nil {
 		return RosterRow{}, err
 	}
@@ -150,5 +155,7 @@ func scanRosterRow(scan func(dest ...any) error) (RosterRow, error) {
 	row.RankID = rankID.Int64
 	row.RankName = rankName.String
 	row.SystemName = systemName.String
+	row.Group = group.String
+	row.Degree = int(degree.Int64)
 	return row, nil
 }

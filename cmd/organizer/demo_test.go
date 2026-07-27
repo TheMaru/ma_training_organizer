@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
@@ -72,6 +73,92 @@ func TestSeedDemoDerivesCrossSystemCurrentRank(t *testing.T) {
 	// Sophie has no promotion — blank current rank.
 	if got := currentRankOf(t, db, "Sophie", "Neumann"); got != "" {
 		t.Errorf("Sophie current rank = %q, want empty", got)
+	}
+}
+
+// TestSeedDemoCoversTheBeltVisuals pins the demo roster to the job it exists for:
+// a by-hand scan of the belt graphic (spec, ADR-0004). The demo data is the only
+// place that combination of belts is asserted, so an edit that quietly drops a
+// bar variant or the top stripe count would otherwise cost that confidence
+// silently. The belts are read back through the ranks table, so it checks what the
+// promotions actually resolve to rather than restating the rank names; only the
+// ungraded athlete is counted off the slice, having no promotion to read.
+func TestSeedDemoCoversTheBeltVisuals(t *testing.T) {
+	db := newTestDB(t)
+	if err := seedDemo(db); err != nil {
+		t.Fatalf("seedDemo: %v", err)
+	}
+
+	// ~12 athletes: enough to cover the belts, few enough to scan by eye.
+	if n := len(demoAthletes); n < 10 || n > 14 {
+		t.Errorf("demo athletes = %d, want roughly 12", n)
+	}
+
+	rows, err := db.Query(`
+		SELECT r.rank_group, r.degree
+		FROM promotions p JOIN ranks r ON r.id = p.rank_id`)
+	if err != nil {
+		t.Fatalf("query demo ranks: %v", err)
+	}
+	defer rows.Close()
+
+	bodies := map[string]bool{} // body colour, i.e. the part before any bar
+	bars := map[string]bool{}   // the bar colour, "" for a plain belt
+	degrees := map[int]bool{}   // stripe counts reached
+	splitStriped, whiteStriped := false, false
+	for rows.Next() {
+		var (
+			group  string
+			degree int
+		)
+		if err := rows.Scan(&group, &degree); err != nil {
+			t.Fatalf("scan demo rank: %v", err)
+		}
+		body, bar, split := strings.Cut(group, "-")
+		bodies[body] = true
+		bars[bar] = true
+		degrees[degree] = true
+		splitStriped = splitStriped || (split && degree > 0)
+		whiteStriped = whiteStriped || (body == "White" && degree > 0)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate demo ranks: %v", err)
+	}
+
+	// Every body colour the view knows how to draw.
+	for _, colour := range []string{"White", "Grey", "Yellow", "Orange", "Green", "Blue", "Purple", "Brown", "Black"} {
+		if !bodies[colour] {
+			t.Errorf("no demo promotion reaches a %s belt", colour)
+		}
+	}
+	// Both split-belt bars, plus plain belts that have none.
+	for _, bar := range []string{"White", "Black", ""} {
+		if !bars[bar] {
+			t.Errorf("no demo promotion reaches a belt with bar %q", bar)
+		}
+	}
+	// The full stripe range: 0 vs 1 vs many, up to the maximum the friso holds.
+	for degree := range 5 {
+		if !degrees[degree] {
+			t.Errorf("no demo promotion reaches degree %d", degree)
+		}
+	}
+	if !splitStriped {
+		t.Error("no demo promotion combines a split belt with stripes")
+	}
+	if !whiteStriped {
+		t.Error("no demo promotion is a white belt with stripes (friso on a light body)")
+	}
+
+	// Exactly one athlete with no graduation at all: the text/blank fallback.
+	ungraded := 0
+	for _, d := range demoAthletes {
+		if len(d.promotions) == 0 {
+			ungraded++
+		}
+	}
+	if ungraded != 1 {
+		t.Errorf("ungraded demo athletes = %d, want exactly 1", ungraded)
 	}
 }
 

@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -137,6 +138,71 @@ func rosterRow(t *testing.T, body, name string) string {
 	}
 	t.Fatalf("no roster row for %q", name)
 	return ""
+}
+
+// cellWithLabel returns the contents of the table cell carrying the given
+// data-label (the column name the phone card layout reads out of it).
+func cellWithLabel(t *testing.T, row, label string) string {
+	t.Helper()
+	open := `<td data-label="` + label + `">`
+	at := strings.Index(row, open)
+	if at < 0 {
+		t.Fatalf("no %q cell in %q", label, row)
+	}
+	rest := row[at+len(open):]
+	end := strings.Index(rest, "</td>")
+	if end < 0 {
+		t.Fatalf("unclosed %q cell in %q", label, row)
+	}
+	return rest[:end]
+}
+
+// beltIn returns the belt graphic inside a fragment of markup, and hasBelt
+// reports whether there is one at all (ADR-0004: a rank whose colour the view
+// does not know has none).
+func beltIn(t *testing.T, markup string) string {
+	t.Helper()
+	at := strings.Index(markup, `<svg class="belt"`)
+	if at < 0 {
+		t.Fatalf("no belt graphic in %q", markup)
+	}
+	end := strings.Index(markup[at:], "</svg>")
+	if end < 0 {
+		t.Fatalf("unclosed belt graphic in %q", markup)
+	}
+	return markup[at : at+end+len("</svg>")]
+}
+
+func hasBelt(markup string) bool {
+	return strings.Contains(markup, `<svg class="belt"`)
+}
+
+// beltShape returns a belt's drawing — everything after the accessibility
+// attributes, which are the one thing the surfaces legitimately differ in. Two
+// surfaces sharing this string are provably drawn by the same helper.
+func beltShape(t *testing.T, markup string) string {
+	t.Helper()
+	svg := beltIn(t, markup)
+	at := strings.Index(svg, `<rect class="belt-body"`)
+	if at < 0 {
+		t.Fatalf("belt %q has no body rect", svg)
+	}
+	return svg[at:]
+}
+
+// mustInsert runs an insert and returns the new row's id, for the reference data
+// the built-in seed does not provide.
+func mustInsert(t *testing.T, db *sql.DB, query string, args ...any) int64 {
+	t.Helper()
+	res, err := db.Exec(query, args...)
+	if err != nil {
+		t.Fatalf("insert (%s): %v", query, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("last insert id: %v", err)
+	}
+	return id
 }
 
 // rosterOrder reports the order the given names appear in the body, so a test can
@@ -363,30 +429,91 @@ func TestRosterSortIndicatorIsHiddenFromAssistiveTech(t *testing.T) {
 	}
 }
 
+// TestRosterShowsCurrentRank covers the roster's rank column: the belt graphic
+// stands alone here (ADR-0004), so the rank name has to reach a screen reader
+// through its label rather than as visible text.
 func TestRosterShowsCurrentRank(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
-	rankID := seededRankID(t, db, "BJJ Adult", "Blue")
-	graded, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
-	if err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: graded, RankID: rankID, PromotedOn: "2026-01-15"}); err != nil {
-		t.Fatalf("CreatePromotion: %v", err)
-	}
+	promoteTo(t, db, "Ada", "Lovelace", "BJJ Adult", "Blue, 2 stripes", "2026-01-15")
 	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}); err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
 
 	body := readBody(t, get(t, ts, client, "/athletes"))
-	// Rank name plus the system that disambiguates same-named ranks across cohorts.
-	row := rosterRow(t, body, "Lovelace")
-	if !strings.Contains(row, "Blue") || !strings.Contains(row, "BJJ Adult") {
-		t.Errorf("graded row = %q, want rank and system", row)
+	rank := cellWithLabel(t, rosterRow(t, body, "Lovelace"), "Aktueller Rang")
+
+	// The label carries the rank name plus the system that disambiguates same-named
+	// ranks across cohorts (White exists in both kids and adult).
+	belt := beltIn(t, rank)
+	if !strings.Contains(belt, `aria-label="Blue, 2 stripes (BJJ Adult)"`) {
+		t.Errorf("roster belt = %q, want the rank and system as its label", belt)
 	}
-	// Ungraded athletes render blank — no promotion at all is not a lowest rank.
-	if ungraded := rosterRow(t, body, "Unbelted"); strings.Contains(ungraded, "BJJ Adult") {
-		t.Errorf("ungraded row = %q, want a blank rank cell", ungraded)
+	if !strings.Contains(belt, `<title>Blue, 2 stripes (BJJ Adult)</title>`) {
+		t.Errorf("roster belt = %q, want the rank as a tooltip", belt)
+	}
+	// Nothing outside the graphic repeats the rank: the belt replaces the text here.
+	if outside := strings.Replace(rank, belt, "", 1); strings.Contains(outside, "Blue") {
+		t.Errorf("rank cell outside the graphic = %q, want no rank text", outside)
+	}
+
+	// Ungraded athletes render blank — no promotion at all is not a lowest rank, so
+	// there is nothing to draw and nothing to name.
+	ungraded := cellWithLabel(t, rosterRow(t, body, "Unbelted"), "Aktueller Rang")
+	if hasBelt(ungraded) || strings.TrimSpace(ungraded) != "" {
+		t.Errorf("ungraded rank cell = %q, want it blank", ungraded)
+	}
+}
+
+func TestRosterFallsBackToTheRankNameForAnUnknownColour(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	// A grading system the colour table knows nothing about (ADR-0004): no belt, and
+	// the plain rank name carries the meaning instead of a broken graphic.
+	gs := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "Karate", 2)
+	rankID := mustInsert(t, db,
+		`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order) VALUES (?, ?, ?, ?, ?)`,
+		gs, "7. Dan", "", 7, 0)
+	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Gichin", LastName: "Funakoshi"})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: id, RankID: rankID, PromotedOn: "2026-03-01"}); err != nil {
+		t.Fatalf("CreatePromotion: %v", err)
+	}
+
+	body := readBody(t, get(t, ts, client, "/athletes"))
+	rank := cellWithLabel(t, rosterRow(t, body, "Funakoshi"), "Aktueller Rang")
+	if hasBelt(rank) {
+		t.Errorf("rank cell = %q, want no graphic for an unmapped colour", rank)
+	}
+	if !strings.Contains(rank, "7. Dan") || !strings.Contains(rank, "Karate") {
+		t.Errorf("rank cell = %q, want the rank name and system as text", rank)
+	}
+}
+
+// TestBeltMarkupIsIdenticalAcrossSurfaces is the acceptance seam for "one render
+// helper backs all three surfaces": the same rank drawn on the roster and on the
+// detail page must produce byte-identical geometry, so the markup cannot drift.
+func TestBeltMarkupIsIdenticalAcrossSurfaces(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	id := promoteTo(t, db, "Mia", "Kind", "BJJ Kids", "Yellow-Black, 3 stripes", "2026-02-02")
+
+	roster := readBody(t, get(t, ts, client, "/athletes"))
+	detail := readBody(t, get(t, ts, client, fmt.Sprintf("/athletes/%d", id)))
+
+	want := beltShape(t, cellWithLabel(t, rosterRow(t, roster, "Kind"), "Aktueller Rang"))
+	surfaces := map[string]string{
+		"detail current rank": beltShape(t, definitionValue(t, detail, "Aktueller Rang")),
+		"detail history row":  beltShape(t, cellWithLabel(t, historyRow(t, detail, "2026-02-02"), "Rang")),
+	}
+	for name, got := range surfaces {
+		if got != want {
+			t.Errorf("%s belt = %q, want the roster's %q", name, got, want)
+		}
 	}
 }

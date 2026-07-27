@@ -13,6 +13,14 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
+// templateFuncs are the helpers every page may call.
+//
+// "belt" is the single rank renderer behind all three rank surfaces (ADR-0004).
+// It yields an empty string for a rank whose colour the view does not know, which
+// templates read as "print the plain rank name instead" via {{with}}/{{else}} —
+// so the text name is never lost.
+var templateFuncs = template.FuncMap{"belt": beltSVG}
+
 // renderer holds one fully-parsed template set per page. Every page is parsed
 // together with base.html, so a page only needs to (re)define the "title" and
 // "content" blocks that base.html invokes.
@@ -31,7 +39,7 @@ func newRenderer() (*renderer, error) {
 		if name == "base.html" {
 			continue
 		}
-		t, err := template.New(name).ParseFS(templateFS, "templates/base.html", file)
+		t, err := template.New(name).Funcs(templateFuncs).ParseFS(templateFS, "templates/base.html", file)
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", name, err)
 		}

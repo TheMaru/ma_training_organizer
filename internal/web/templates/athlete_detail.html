@@ -6,8 +6,11 @@
 </div>
 
 <dl class="meta">
+  {{/* Belt graphic *and* name here (unlike the roster): the name is right beside
+       the graphic, so `belt` is called without a label and draws a decorative
+       image rather than announcing the rank a second time. */}}
   <div><dt>Aktueller Rang</dt>
-    <dd>{{if .HasCurrent}}{{.Current.RankName}} <span class="muted">({{.Current.SystemName}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">noch keine Graduierung</span>{{end}}</dd>
+    <dd>{{if .HasCurrent}}{{belt .Current.Group .Current.Degree ""}} {{.Current.RankName}} <span class="muted">({{.Current.SystemName}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">noch keine Graduierung</span>{{end}}</dd>
   </div>
   {{if .Athlete.BirthDate}}<div><dt>Geburtsdatum</dt><dd>{{.Athlete.BirthDate}}</dd></div>{{end}}
   {{if .Athlete.JoinedOn}}<div><dt>Eintritt</dt><dd>{{.Athlete.JoinedOn}}</dd></div>{{end}}
@@ -55,7 +58,8 @@
     {{range .Promotions}}
     <tr>
       <td data-label="Datum">{{.PromotedOn}}</td>
-      <td data-label="Rang">{{.RankName}}</td>
+      {{/* Graphic + name again, so every belt can be checked against its label. */}}
+      <td data-label="Rang">{{belt .Group .Degree ""}} {{.RankName}}</td>
       <td data-label="System">{{.SystemName}}</td>
     </tr>
     {{end}}
