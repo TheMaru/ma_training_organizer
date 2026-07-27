@@ -57,3 +57,20 @@ advance: **yes, same URL, same carrier.** What still needs grilling here is the
 filter's own substance — ungraded athletes, the filter surface, and what defines the
 choices. Build order matters only in that doing this before sort-persistence would
 mean building the carrier twice.
+
+2026-07-27 — The open question **"filter surface"** is now partly pre-answered by the
+triage of [[roster-sort-on-mobile]], which produced
+[ADR-0005](../../../docs/adr/0005-table-controls-live-outside-the-table.md):
+
+- **Shape is decided: a row of links, not a form.** ADR-0005(b) — a link's `href` is
+  built server-side from the whole view state, while a `GET` form submits only its
+  own fields and silently drops anything not mirrored into a hidden input. A filter
+  built as a form would be reset by every sort, invisibly. So "system dropdown vs.
+  cohort chips/tabs" resolves to **chips/tabs**; a `<select>` is ruled out on
+  correctness grounds, not taste.
+- **The filter row will sit directly above/below the sort chip row** on phone widths.
+  That is why the sort row gets a visible muted "Sortieren" label — two unlabelled
+  chip rows stacked on a phone are indistinguishable. Give this one an equivalent
+  label from the start.
+- **Still genuinely open here:** ungraded athletes, what defines the choices, and
+  whether the filter is single- or multi-select.
