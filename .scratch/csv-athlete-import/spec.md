@@ -1,6 +1,6 @@
 # Spec — CSV athlete import (idempotent)
 
-Status: ready-for-agent
+Status: done
 
 A CLI subcommand that bulk-imports **athlete master data** from a CSV file into
 the roster. Idempotent: re-running the same file never creates duplicates. Aimed
