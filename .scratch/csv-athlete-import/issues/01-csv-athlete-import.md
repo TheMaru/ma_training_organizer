@@ -1,6 +1,6 @@
 # 01 — CSV athlete import (idempotent)
 
-Status: ready-for-agent
+Status: done
 
 Add a CLI subcommand that bulk-imports **athlete master data** from a CSV file
 into the roster, idempotently. Bootstraps a club's existing member list so the
@@ -58,3 +58,12 @@ Settled in a grilling + domain-modeling session (2026-07-24). Full detail in
   lists every offending line, and exits non-zero.
 - The core is tested without the CLI wrapper across happy path, idempotent
   re-run, both delimiters, BOM, both date formats, each error class, and rollback.
+
+## Comments
+
+**2026-07-29** — Shipped. `organizer import-athletes <file.csv>`: the testable core
+is `importAthletes(db, io.Reader)` in `cmd/organizer/import.go`, the bulk insert
+is `store.CreateAthletes` (one transaction). Two deliberate refinements to the
+report wording the spec fixed: the count uses the correct German singular
+("1 Athlet importiert"), and the `(bereits vorhanden):` clause is dropped when
+nothing was skipped, so no colon dangles over an empty list.

@@ -19,9 +19,16 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
+// errAlreadyReported marks a failure whose explanation the subcommand has
+// already printed itself (the import's German abort report), so main exits
+// non-zero without tacking a second, redundant message onto it.
+var errAlreadyReported = errors.New("already reported")
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+		if !errors.Is(err, errAlreadyReported) {
+			fmt.Fprintln(os.Stderr, "error:", err)
+		}
 		os.Exit(1)
 	}
 }
@@ -42,6 +49,8 @@ func run(args []string) error {
 			return cmdSeedDemo(cfg.DBPath, args[1:])
 		case "clear-demo":
 			return cmdClearDemo(cfg.DBPath, args[1:])
+		case "import-athletes":
+			return cmdImportAthletes(cfg.DBPath, args[1:])
 		default:
 			return fmt.Errorf("unknown command: %s", args[0])
 		}

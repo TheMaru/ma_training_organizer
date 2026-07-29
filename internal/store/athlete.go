@@ -30,7 +30,38 @@ type Athlete struct {
 // CreateAthlete inserts a new athlete and returns its id. Blank dates are stored
 // as NULL rather than empty strings (portable SQL, ADR-0002).
 func CreateAthlete(db *sql.DB, a Athlete) (int64, error) {
-	res, err := db.Exec(
+	return insertAthlete(db, a)
+}
+
+// CreateAthletes inserts every athlete in a single transaction: either all of
+// them land or none do. The CSV import is all-or-nothing by spec, so a failure
+// half-way through must not leave a partly filled roster behind.
+func CreateAthletes(db *sql.DB, athletes []Athlete) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin athlete insert tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, a := range athletes {
+		if _, err := insertAthlete(tx, a); err != nil {
+			// Name the athlete: in a bulk insert an unattributed failure says
+			// nothing about which row of the source is at fault.
+			return fmt.Errorf("%s %s: %w", a.FirstName, a.LastName, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// execer is the common subset of *sql.DB and *sql.Tx that inserting an athlete needs, so
+// the single-row and the transactional bulk path share one INSERT.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// insertAthlete writes one athlete row and returns its id.
+func insertAthlete(ex execer, a Athlete) (int64, error) {
+	res, err := ex.Exec(
 		`INSERT INTO athletes (first_name, last_name, birth_date, joined_on, notes)
 		 VALUES (?, ?, ?, ?, ?)`,
 		a.FirstName, a.LastName, nullIfEmpty(a.BirthDate), nullIfEmpty(a.JoinedOn), a.Notes,

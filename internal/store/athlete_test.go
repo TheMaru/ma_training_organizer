@@ -3,6 +3,7 @@ package store_test
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
@@ -66,6 +67,70 @@ func TestCreateAthleteStoresBlankDatesAsNull(t *testing.T) {
 	}
 	if got.BirthDate != "" || got.JoinedOn != "" {
 		t.Errorf("dates = (%q, %q), want empty", got.BirthDate, got.JoinedOn)
+	}
+}
+
+func TestCreateAthletesInsertsTheWholeBatch(t *testing.T) {
+	db := newTestDB(t)
+
+	err := store.CreateAthletes(db, []store.Athlete{
+		{FirstName: "Ada", LastName: "Lovelace", BirthDate: "1990-12-10"},
+		{FirstName: "Grace", LastName: "Hopper"},
+	})
+	if err != nil {
+		t.Fatalf("CreateAthletes: %v", err)
+	}
+
+	got, err := store.ListAthletes(db, false)
+	if err != nil {
+		t.Fatalf("ListAthletes: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("athletes = %+v, want both inserted", got)
+	}
+	if got[0].LastName != "Hopper" || got[1].BirthDate != "1990-12-10" {
+		t.Errorf("athletes = %+v, want Hopper first and Ada's date kept", got)
+	}
+}
+
+// The batch is one transaction, so a failure part-way through must leave the
+// roster exactly as it was — the CSV import relies on that for its
+// all-or-nothing guarantee. A temporary unique index is the lever: it makes the
+// third insert fail after the first two have already been written.
+func TestCreateAthletesRollsBackTheWholeBatch(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.Exec(`CREATE UNIQUE INDEX tmp_name ON athletes (first_name, last_name)`); err != nil {
+		t.Fatalf("create unique index: %v", err)
+	}
+
+	err := store.CreateAthletes(db, []store.Athlete{
+		{FirstName: "Ada", LastName: "Lovelace"},
+		{FirstName: "Grace", LastName: "Hopper"},
+		{FirstName: "Ada", LastName: "Lovelace"},
+	})
+	if err == nil {
+		t.Fatal("CreateAthletes succeeded, want the duplicate insert to fail")
+	}
+	if !strings.Contains(err.Error(), "Ada Lovelace") {
+		t.Errorf("error = %v, want it to name the offending athlete", err)
+	}
+
+	got, err := store.ListAthletes(db, false)
+	if err != nil {
+		t.Fatalf("ListAthletes: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("athletes = %+v, want none — the failed batch must roll back", got)
+	}
+}
+
+func TestCreateAthletesOfNothingIsANoOp(t *testing.T) {
+	db := newTestDB(t)
+
+	// The importer hands over an empty batch whenever every row was already on
+	// the roster; that must commit cleanly rather than error.
+	if err := store.CreateAthletes(db, nil); err != nil {
+		t.Fatalf("CreateAthletes(nil): %v", err)
 	}
 }
 
