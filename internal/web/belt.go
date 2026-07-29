@@ -53,8 +53,8 @@ var beltBarColours = []string{"White", "Black"}
 const (
 	beltWidth        = 72
 	beltHeight       = 16
-	beltFrisoX       = 42 // where the friso starts
-	beltFrisoWidth   = 20 // wide enough for beltMaxStripes; the tail is what follows
+	beltFrisoX       = 38 // where the friso starts
+	beltFrisoWidth   = 24 // it grows leftwards, so the tail past it stays put
 	beltBarY         = 6
 	beltBarHeight    = 4
 	beltStripeWidth  = 2
@@ -62,8 +62,9 @@ const (
 	beltStripeInset  = 2 // vertical inset of a stripe within the friso
 	beltStripeMargin = 3 // horizontal breathing room at each end of the friso
 
-	// beltMaxStripes is how many stripes the friso has room for — four, which is
-	// exactly the range the seeded systems grade across. A higher degree draws the
+	// beltMaxStripes is how many stripes the friso has room for — five, one more
+	// than the seeded systems grade across, which covers the rare 5th BJJ stripe
+	// seed.go leaves out but expects a club to add. A higher degree still draws the
 	// maximum rather than spilling out of the friso: the rank name always carries
 	// the true count, so the graphic clips instead of misleading.
 	beltMaxStripes = (beltFrisoWidth - 2*beltStripeMargin + beltStripeGap) /

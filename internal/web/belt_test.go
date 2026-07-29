@@ -33,8 +33,8 @@ func TestBeltSVGRendersAPlainBelt(t *testing.T) {
 		t.Errorf("stripes = %d, want 0 at degree 0", got)
 	}
 	// The friso is always there — it is what the stripes sit on.
-	if !strings.Contains(svg, `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltBlack) {
-		t.Errorf("belt = %q, want a black friso at x=42", svg)
+	if !strings.Contains(svg, `class="belt-friso" x="38" y="0" width="24" height="16" fill="`+beltBlack) {
+		t.Errorf("belt = %q, want a black friso at x=38", svg)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestBeltSVGGivesTheBlackBeltARedFriso(t *testing.T) {
 	// BJJ convention, and the only thing that makes the friso visible against a
 	// black body at all.
 	svg := string(beltSVG("Black", 0, "x"))
-	if !strings.Contains(svg, `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltRed) {
+	if !strings.Contains(svg, `class="belt-friso" x="38" y="0" width="24" height="16" fill="`+beltRed) {
 		t.Errorf("black belt = %q, want a red friso", svg)
 	}
 	// Only the friso's colour changes: the degree still shows, as white stripes on
@@ -80,7 +80,7 @@ func TestBeltSVGGivesTheBlackBeltARedFriso(t *testing.T) {
 		}
 	}
 	// A belt whose *bar* is black is not a black belt — it keeps the black friso.
-	if !strings.Contains(string(beltSVG("Yellow-Black", 0, "x")), `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltBlack) {
+	if !strings.Contains(string(beltSVG("Yellow-Black", 0, "x")), `class="belt-friso" x="38" y="0" width="24" height="16" fill="`+beltBlack) {
 		t.Error("Yellow-Black should keep a black friso — only a black body turns it red")
 	}
 }
