@@ -63,16 +63,21 @@ func TestBeltSVGGivesTheBlackBeltARedFriso(t *testing.T) {
 	if !strings.Contains(svg, `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltRed) {
 		t.Errorf("black belt = %q, want a red friso", svg)
 	}
-	// Its degree stripes are deliberately left off: a black belt's degree lives in
-	// the rank name alone, so Black and "Black, 4 stripes" draw the same belt.
-	for _, degree := range []int{1, 2, 4} {
-		if got := countStripes(string(beltSVG("Black", degree, "x"))); got != 0 {
-			t.Errorf("black belt at degree %d drew %d stripes, want 0", degree, got)
-		}
+	// Only the friso's colour changes: the degree still shows, as white stripes on
+	// the red, so Black and "Black, 4 stripes" stay tellable apart on the roster
+	// where the graphic is all there is.
+	if strings.Contains(svg, "belt-stripe") {
+		t.Errorf("black belt at degree 0 = %q, want no stripes", svg)
 	}
-	// Every other colour still gets its stripes.
-	if got := countStripes(string(beltSVG("Brown", 2, "x"))); got != 2 {
-		t.Errorf("brown belt at degree 2 drew %d stripes, want 2", got)
+	for _, degree := range []int{1, 2, beltMaxStripes} {
+		graded := string(beltSVG("Black", degree, "x"))
+		if got := countStripes(graded); got != degree {
+			t.Errorf("black belt at degree %d drew %d stripes, want %d", degree, got, degree)
+		}
+		// The x depends on how many stripes are centred, so only the fill is pinned.
+		if !strings.Contains(graded, `width="2" height="12" fill="`+beltWhite+`"`) {
+			t.Errorf("black belt at degree %d = %q, want white stripes", degree, graded)
+		}
 	}
 	// A belt whose *bar* is black is not a black belt — it keeps the black friso.
 	if !strings.Contains(string(beltSVG("Yellow-Black", 0, "x")), `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltBlack) {

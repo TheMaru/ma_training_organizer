@@ -107,10 +107,9 @@ func resolveBelt(group string, degree int) (belt, bool) {
 	}
 	if body == "Black" {
 		// A BJJ black belt's friso is red, not black — which is also the only thing
-		// that makes it visible against the body. Its degree stripes are deliberately
-		// left off (they would read as a red-and-white smear at this size), so a black
-		// belt's degree lives in the rank name alone.
-		drawn.friso, drawn.stripes = beltRed, 0
+		// that makes the end block visible against the body at all. Its degree
+		// stripes stay white and are drawn like any other belt's.
+		drawn.friso = beltRed
 	}
 	return drawn, true
 }
