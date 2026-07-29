@@ -22,7 +22,7 @@ func TestBeltSVGRendersAPlainBelt(t *testing.T) {
 	if svg == "" {
 		t.Fatal("Blue rendered nothing, want a belt")
 	}
-	if !strings.Contains(svg, `class="belt-body" x="0" y="0" width="64" height="16" fill="`+beltColours["Blue"]) {
+	if !strings.Contains(svg, `class="belt-body" x="0" y="0" width="72" height="16" fill="`+beltColours["Blue"]) {
 		t.Errorf("belt = %q, want a body rect in the blue fill", svg)
 	}
 	// A plain belt has no split bar and, at degree 0, no stripes.
@@ -32,9 +32,51 @@ func TestBeltSVGRendersAPlainBelt(t *testing.T) {
 	if got := countStripes(svg); got != 0 {
 		t.Errorf("stripes = %d, want 0 at degree 0", got)
 	}
-	// The black friso is always there — it is what the stripes sit on.
-	if !strings.Contains(svg, "belt-friso") {
-		t.Errorf("belt = %q, want a friso", svg)
+	// The friso is always there — it is what the stripes sit on.
+	if !strings.Contains(svg, `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltBlack) {
+		t.Errorf("belt = %q, want a black friso at x=42", svg)
+	}
+}
+
+func TestBeltSVGLeavesATailPastTheFriso(t *testing.T) {
+	// On a real belt the friso sits short of the end, so body colour runs on past
+	// it. That tail is what stops the graphic looking like a belt cut in half.
+	if tail := beltWidth - (beltFrisoX + beltFrisoWidth); tail <= 0 {
+		t.Fatalf("friso ends at %d of %d — no tail left", beltFrisoX+beltFrisoWidth, beltWidth)
+	}
+	// A split belt's bar is drawn across the full width and only hidden where the
+	// friso covers it, so the bar reappears in the tail for free.
+	svg := string(beltSVG("Grey-White", 0, "x"))
+	if !strings.Contains(svg, `class="belt-bar" x="0" y="6" width="72" height="4"`) {
+		t.Errorf("belt = %q, want the bar spanning the full width so it shows in the tail", svg)
+	}
+	// The friso must be drawn after the bar, or it would not cover it at all.
+	if strings.Index(svg, "belt-bar") > strings.Index(svg, "belt-friso") {
+		t.Errorf("belt = %q, want the bar drawn before the friso", svg)
+	}
+}
+
+func TestBeltSVGGivesTheBlackBeltARedFriso(t *testing.T) {
+	// BJJ convention, and the only thing that makes the friso visible against a
+	// black body at all.
+	svg := string(beltSVG("Black", 0, "x"))
+	if !strings.Contains(svg, `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltRed) {
+		t.Errorf("black belt = %q, want a red friso", svg)
+	}
+	// Its degree stripes are deliberately left off: a black belt's degree lives in
+	// the rank name alone, so Black and "Black, 4 stripes" draw the same belt.
+	for _, degree := range []int{1, 2, 4} {
+		if got := countStripes(string(beltSVG("Black", degree, "x"))); got != 0 {
+			t.Errorf("black belt at degree %d drew %d stripes, want 0", degree, got)
+		}
+	}
+	// Every other colour still gets its stripes.
+	if got := countStripes(string(beltSVG("Brown", 2, "x"))); got != 2 {
+		t.Errorf("brown belt at degree 2 drew %d stripes, want 2", got)
+	}
+	// A belt whose *bar* is black is not a black belt — it keeps the black friso.
+	if !strings.Contains(string(beltSVG("Yellow-Black", 0, "x")), `class="belt-friso" x="42" y="0" width="20" height="16" fill="`+beltBlack) {
+		t.Error("Yellow-Black should keep a black friso — only a black body turns it red")
 	}
 }
 
@@ -49,10 +91,10 @@ func TestBeltSVGRendersSplitBelts(t *testing.T) {
 	}
 	for _, c := range cases {
 		svg := string(beltSVG(c.group, 0, c.group))
-		if !strings.Contains(svg, `class="belt-body" x="0" y="0" width="64" height="16" fill="`+c.wantBody) {
+		if !strings.Contains(svg, `class="belt-body" x="0" y="0" width="72" height="16" fill="`+c.wantBody) {
 			t.Errorf("%s = %q, want body fill %s", c.group, svg, c.wantBody)
 		}
-		if !strings.Contains(svg, `class="belt-bar"`) || !strings.Contains(svg, `class="belt-bar" x="0" y="6" width="64" height="4" fill="`+c.wantBar) {
+		if !strings.Contains(svg, `class="belt-bar"`) || !strings.Contains(svg, `class="belt-bar" x="0" y="6" width="72" height="4" fill="`+c.wantBar) {
 			t.Errorf("%s = %q, want a bar in %s", c.group, svg, c.wantBar)
 		}
 	}
@@ -60,7 +102,7 @@ func TestBeltSVGRendersSplitBelts(t *testing.T) {
 
 func TestBeltSVGDrawsOneStripePerDegree(t *testing.T) {
 	for degree := 0; degree <= beltMaxStripes; degree++ {
-		if got := countStripes(string(beltSVG("Black", degree, "x"))); got != degree {
+		if got := countStripes(string(beltSVG("Blue", degree, "x"))); got != degree {
 			t.Errorf("degree %d drew %d stripes, want %d", degree, got, degree)
 		}
 	}
@@ -74,12 +116,12 @@ func TestBeltSVGDrawsOneStripePerDegree(t *testing.T) {
 func TestBeltSVGStripesStayInsideTheFriso(t *testing.T) {
 	// A degree beyond what the friso holds draws the maximum rather than spilling
 	// out of the viewBox: the rank name still carries the true count.
-	if got := countStripes(string(beltSVG("Black", beltMaxStripes+3, "x"))); got != beltMaxStripes {
+	if got := countStripes(string(beltSVG("Blue", beltMaxStripes+3, "x"))); got != beltMaxStripes {
 		t.Errorf("stripes at degree %d = %d, want %d", beltMaxStripes+3, got, beltMaxStripes)
 	}
 	// A negative degree is not a rank the seed produces, but it must not produce
 	// negative geometry either.
-	if got := countStripes(string(beltSVG("Black", -2, "x"))); got != 0 {
+	if got := countStripes(string(beltSVG("Blue", -2, "x"))); got != 0 {
 		t.Errorf("stripes at a negative degree = %d, want 0", got)
 	}
 }
@@ -158,7 +200,7 @@ func TestBeltSVGCarriesTheStylingHook(t *testing.T) {
 	// app.css sizes the graphic off this class, and the intrinsic width/height keep
 	// it sane if the stylesheet never arrives.
 	svg := string(beltSVG("Blue", 0, "x"))
-	for _, want := range []string{`class="belt"`, `viewBox="0 0 64 16"`, `width="64"`, `height="16"`} {
+	for _, want := range []string{`class="belt"`, `viewBox="0 0 72 16"`, `width="72"`, `height="16"`} {
 		if !strings.Contains(svg, want) {
 			t.Errorf("belt = %q, want %s", svg, want)
 		}

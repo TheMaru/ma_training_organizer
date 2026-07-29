@@ -20,7 +20,7 @@ import (
 // back to the rank name — matching more loosely would be guessing at input no
 // code path produces.
 var beltColours = map[string]string{
-	"White":  "#f2f2f2", // off-white, so the belt still reads on a white surface
+	"White":  beltWhite,
 	"Grey":   "#9ca3af",
 	"Yellow": "#facc15",
 	"Orange": "#f97316",
@@ -28,8 +28,16 @@ var beltColours = map[string]string{
 	"Blue":   "#2563eb",
 	"Purple": "#7e22ce",
 	"Brown":  "#78350f",
-	"Black":  "#1c1c1f",
+	"Black":  beltBlack,
 }
+
+// The three fills the renderer needs by name rather than by rank_group: the
+// stripes, the friso, and the red friso a black belt carries.
+const (
+	beltWhite = "#f2f2f2" // off-white, so the belt still reads on a white surface
+	beltBlack = "#1c1c1f"
+	beltRed   = "#b91c1c"
+)
 
 // beltBarColours are the only colours a split belt's longitudinal bar may be:
 // the kids systems split a body colour with white or black ("Grey-White",
@@ -37,12 +45,16 @@ var beltColours = map[string]string{
 var beltBarColours = []string{"White", "Black"}
 
 // Belt geometry, in the user space of the rendered viewBox. The belt is a flat
-// strip: the body across its whole width, an optional bar down its middle, and a
-// black friso (end block) at the right carrying the stripes.
+// strip: the body across its whole width, an optional bar down its middle, and
+// the friso (end block) carrying the stripes. The friso sits a little short of
+// the right edge, as it does on a real belt, so a stretch of body colour runs on
+// past it — and a split belt's bar reappears in that tail, since the bar is drawn
+// across the full width and only hidden where the friso covers it.
 const (
-	beltWidth        = 64
+	beltWidth        = 72
 	beltHeight       = 16
-	beltFrisoX       = 44 // where the friso starts; it runs to the right edge
+	beltFrisoX       = 42 // where the friso starts
+	beltFrisoWidth   = 20 // wide enough for beltMaxStripes; the tail is what follows
 	beltBarY         = 6
 	beltBarHeight    = 4
 	beltStripeWidth  = 2
@@ -52,9 +64,9 @@ const (
 
 	// beltMaxStripes is how many stripes the friso has room for — four, which is
 	// exactly the range the seeded systems grade across. A higher degree draws the
-	// maximum rather than spilling out of the viewBox: the rank name always carries
+	// maximum rather than spilling out of the friso: the rank name always carries
 	// the true count, so the graphic clips instead of misleading.
-	beltMaxStripes = (beltWidth - beltFrisoX - 2*beltStripeMargin + beltStripeGap) /
+	beltMaxStripes = (beltFrisoWidth - 2*beltStripeMargin + beltStripeGap) /
 		(beltStripeWidth + beltStripeGap)
 )
 
@@ -62,6 +74,7 @@ const (
 type belt struct {
 	body    string // hex fill of the belt body
 	bar     string // hex fill of the split-belt bar, empty on a plain belt
+	friso   string // hex fill of the end block
 	stripes int    // white stripes on the friso
 }
 
@@ -85,8 +98,21 @@ func resolveBelt(group string, degree int) (belt, bool) {
 	}
 	// The degree is clamped rather than trusted: seed.go leaves the rare 5th BJJ
 	// stripe out but says a club may add it, and that rank would otherwise draw
-	// stripes outside the viewBox.
-	return belt{body: fill, bar: bar, stripes: min(max(degree, 0), beltMaxStripes)}, true
+	// stripes outside the friso.
+	drawn := belt{
+		body:    fill,
+		bar:     bar,
+		friso:   beltBlack,
+		stripes: min(max(degree, 0), beltMaxStripes),
+	}
+	if body == "Black" {
+		// A BJJ black belt's friso is red, not black — which is also the only thing
+		// that makes it visible against the body. Its degree stripes are deliberately
+		// left off (they would read as a red-and-white smear at this size), so a black
+		// belt's degree lives in the rank name alone.
+		drawn.friso, drawn.stripes = beltRed, 0
+	}
+	return drawn, true
 }
 
 // beltSVG renders a rank as an inline SVG belt, the one helper behind all three
@@ -130,7 +156,7 @@ func beltSVG(group string, degree int, label string) template.HTML {
 			beltBarY, beltWidth, beltBarHeight, b.bar)
 	}
 	fmt.Fprintf(&svg, `<rect class="belt-friso" x="%d" y="0" width="%d" height="%d" fill="%s"/>`,
-		beltFrisoX, beltWidth-beltFrisoX, beltHeight, beltColours["Black"])
+		beltFrisoX, beltFrisoWidth, beltHeight, b.friso)
 	writeBeltStripes(&svg, b.stripes)
 	// A hairline in the current text colour, so the two belts that come within a
 	// shade of the page keep a silhouette: white on the light theme, black on the
@@ -149,10 +175,10 @@ func writeBeltStripes(svg *strings.Builder, n int) {
 		return
 	}
 	span := n*beltStripeWidth + (n-1)*beltStripeGap
-	x := beltFrisoX + (beltWidth-beltFrisoX-span)/2
+	x := beltFrisoX + (beltFrisoWidth-span)/2
 	for i := range n {
 		fmt.Fprintf(svg, `<rect class="belt-stripe" x="%d" y="%d" width="%d" height="%d" fill="%s"/>`,
 			x+i*(beltStripeWidth+beltStripeGap), beltStripeInset,
-			beltStripeWidth, beltHeight-2*beltStripeInset, beltColours["White"])
+			beltStripeWidth, beltHeight-2*beltStripeInset, beltWhite)
 	}
 }

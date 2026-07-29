@@ -102,6 +102,10 @@ var demoAthletes = []demoAthlete{
 			{"BJJ Adult", "Brown", "2020-03-14"},
 			{"BJJ Adult", "Brown, 2 stripes", "2022-06-18"},
 			{"BJJ Adult", "Black", "2024-11-30"},
+			// A graded black belt: its two stripes are deliberately not drawn, so this
+			// belt and the plain Black above render identically. Kept in the demo so
+			// that trade-off is visible in the Verlauf rather than a surprise later.
+			{"BJJ Adult", "Black, 2 stripes", "2026-06-20"},
 		},
 	},
 	{

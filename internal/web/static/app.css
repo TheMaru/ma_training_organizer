@@ -234,7 +234,7 @@ textarea {
    arrives. align-self keeps it undistorted inside the phone card layout, where
    every table cell becomes a flex container that would otherwise stretch it. */
 .belt {
-  width: 3.5em;
+  width: 4em;
   height: auto;
   flex: none;
   align-self: center;
