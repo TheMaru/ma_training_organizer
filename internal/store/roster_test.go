@@ -17,8 +17,8 @@ type rosterFixture struct {
 
 func newRosterFixture(t *testing.T, db *sql.DB) rosterFixture {
 	t.Helper()
-	kids := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "BJJ Kids", 0)
-	adult := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "BJJ Adult", 1)
+	kids := mustInsert(t, db, `INSERT INTO grading_systems (name, slug, sort_order) VALUES (?, ?, ?)`, "BJJ Kids", "bjj-kids", 0)
+	adult := mustInsert(t, db, `INSERT INTO grading_systems (name, slug, sort_order) VALUES (?, ?, ?)`, "BJJ Adult", "bjj-adult", 1)
 	rank := func(gsID int64, name string, order int) int64 {
 		return mustInsert(t, db,
 			`INSERT INTO ranks (grading_system_id, name, sort_order) VALUES (?, ?, ?)`, gsID, name, order)
@@ -197,6 +197,28 @@ func TestListRosterReportsCurrentRank(t *testing.T) {
 	}
 }
 
+// TestListRosterCarriesTheSystemSlug pins the row's side of the roster filter:
+// the filter identifies a system by its slug (ADR-0006) and derives its options
+// from the rows themselves (ADR-0007), so the slug has to ride along rather than
+// be looked up per athlete.
+func TestListRosterCarriesTheSystemSlug(t *testing.T) {
+	db := newTestDB(t)
+	f := newRosterFixture(t, db)
+
+	addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, f.kidsBeginner, "2026-01-01")
+	addAthlete(t, db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}, 0, "")
+
+	rows := listRoster(t, db, store.RosterSortFirstName, false)
+	if rows[0].SystemSlug != "bjj-kids" {
+		t.Errorf("Kai's system slug = %q, want %q", rows[0].SystemSlug, "bjj-kids")
+	}
+	// An ungraded athlete is in no system at all, which is a distinct state from
+	// being in one — not a slug the filter could match.
+	if rows[1].SystemSlug != "" {
+		t.Errorf("Uwe's system slug = %q, want empty", rows[1].SystemSlug)
+	}
+}
+
 func TestListRosterCarriesRankGroupAndDegree(t *testing.T) {
 	db := newTestDB(t)
 	kids := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "BJJ Kids", 0)
@@ -250,6 +272,123 @@ func TestListRosterCurrentRankMatchesCurrentRank(t *testing.T) {
 			t.Errorf("%s: roster rank = (%d, %q, %q), CurrentRank = (%d, %q, %q)",
 				row.FirstName, row.RankID, row.RankName, row.SystemName,
 				current.RankID, current.RankName, current.SystemName)
+		}
+	}
+}
+
+// partitionedRoster is a roster as the filter functions see it: the fields that
+// decide which cell of the partition an athlete falls into, plus a name to
+// identify them by in a failure message. One kid, one adult, one ungraded — the
+// smallest roster in which every cell is populated.
+func partitionedRoster() []store.RosterRow {
+	row := func(first, slug, system string, order int) store.RosterRow {
+		return store.RosterRow{
+			Athlete:     store.Athlete{FirstName: first},
+			SystemSlug:  slug,
+			SystemName:  system,
+			SystemOrder: order,
+		}
+	}
+	return []store.RosterRow{
+		row("Adam", "bjj-adult", "BJJ Adult", 1),
+		row("Kai", "bjj-kids", "BJJ Kids", 0),
+		row("Uwe", "", "", 0),
+		row("Kim", "bjj-kids", "BJJ Kids", 0),
+	}
+}
+
+func optionValues(options []store.RosterOption) []string {
+	values := make([]string, len(options))
+	for i, o := range options {
+		values[i] = o.Value
+	}
+	return values
+}
+
+// TestRosterFilterOptionsPartitionTheRoster checks that every athlete falls into
+// exactly one cell — their current rank's system, or ungraded — and that the
+// offered options are the cells which actually hold someone (ADR-0007a).
+func TestRosterFilterOptionsPartitionTheRoster(t *testing.T) {
+	options := store.RosterFilterOptions(partitionedRoster())
+
+	// Systems in progression order (kids before adult, the same order the rank
+	// sort blocks them in), ungraded last.
+	want := []string{"bjj-kids", "bjj-adult", store.RosterFilterUngraded}
+	if got := optionValues(options); !equal(got, want) {
+		t.Errorf("options = %v, want %v", got, want)
+	}
+	// The display name rides along; the ungraded cell is in no system and so has
+	// none to show.
+	if options[0].Name != "BJJ Kids" {
+		t.Errorf("first option name = %q, want %q", options[0].Name, "BJJ Kids")
+	}
+	if options[2].Name != "" {
+		t.Errorf("ungraded option name = %q, want empty", options[2].Name)
+	}
+}
+
+// TestRosterFilterOptionsOmitEmptyCells is the whole point of deriving the
+// options from the roster rather than from the seed: a system nobody is in gets
+// no chip, so no offered option can yield an empty roster.
+func TestRosterFilterOptionsOmitEmptyCells(t *testing.T) {
+	rows := []store.RosterRow{
+		{Athlete: store.Athlete{FirstName: "Kai"}, SystemSlug: "bjj-kids", SystemName: "BJJ Kids"},
+		{Athlete: store.Athlete{FirstName: "Kim"}, SystemSlug: "bjj-kids", SystemName: "BJJ Kids"},
+	}
+	if got := optionValues(store.RosterFilterOptions(rows)); !equal(got, []string{"bjj-kids"}) {
+		t.Errorf("options for a kids-only roster = %v, want [bjj-kids]", got)
+	}
+	// An all-ungraded roster offers only that cell — never a system nobody holds.
+	ungraded := []store.RosterRow{{Athlete: store.Athlete{FirstName: "Uwe"}}}
+	if got := optionValues(store.RosterFilterOptions(ungraded)); !equal(got, []string{store.RosterFilterUngraded}) {
+		t.Errorf("options for an ungraded roster = %v, want [none]", got)
+	}
+	if got := store.RosterFilterOptions(nil); len(got) != 0 {
+		t.Errorf("options for an empty roster = %v, want none", got)
+	}
+}
+
+// TestFilterRosterRestrictsToOneCell checks the filter's whole promise: a system
+// filter shows exactly the athletes whose current rank is in it. Ungraded athletes are hidden by it —
+// a filter reading "BJJ Kids" that showed athletes in no system would not be
+// telling the truth (ADR-0007) — and are reachable under their own option.
+func TestFilterRosterRestrictsToOneCell(t *testing.T) {
+	rows := partitionedRoster()
+
+	cases := map[string][]string{
+		"":                         {"Adam", "Kai", "Uwe", "Kim"},
+		"bjj-kids":                 {"Kai", "Kim"},
+		"bjj-adult":                {"Adam"},
+		store.RosterFilterUngraded: {"Uwe"},
+	}
+	for option, want := range cases {
+		if got := rosterFirstNames(store.FilterRoster(rows, option)); !equal(got, want) {
+			t.Errorf("FilterRoster(%q) = %v, want %v", option, got, want)
+		}
+	}
+}
+
+// TestFilterRosterKeepsTheOrderItWasGiven pins that filtering does not reorder
+// what it restricts — the sort happens in SQL, upstream of this.
+func TestFilterRosterKeepsTheOrderItWasGiven(t *testing.T) {
+	rows := []store.RosterRow{
+		{Athlete: store.Athlete{FirstName: "Zoe"}, SystemSlug: "bjj-kids"},
+		{Athlete: store.Athlete{FirstName: "Uwe"}},
+		{Athlete: store.Athlete{FirstName: "Ada"}, SystemSlug: "bjj-kids"},
+	}
+	if got := rosterFirstNames(store.FilterRoster(rows, "bjj-kids")); !equal(got, []string{"Zoe", "Ada"}) {
+		t.Errorf("filtered order = %v, want [Zoe Ada]", got)
+	}
+}
+
+// TestEveryOfferedOptionHasAthletes pins the invariant that licenses the absence
+// of a zero-hit UI: the options come from the same slice the filter restricts, so
+// no chip a trainer can click leads to an empty table.
+func TestEveryOfferedOptionHasAthletes(t *testing.T) {
+	rows := partitionedRoster()
+	for _, option := range store.RosterFilterOptions(rows) {
+		if len(store.FilterRoster(rows, option.Value)) == 0 {
+			t.Errorf("offered option %q matches no athlete", option.Value)
 		}
 	}
 }

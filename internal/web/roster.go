@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
@@ -19,6 +20,17 @@ var rosterColumns = []struct {
 	{store.RosterSortJoinedOn, "Eintritt"},
 	{store.RosterSortRank, "Aktueller Rang"},
 }
+
+// filterAllLabel is the chip for the unfiltered roster, and filterUngradedLabel
+// the one for the athletes who are in no grading system at all (CONTEXT.md's
+// Ungraded; athlete_detail.html says "noch keine Graduierung" for the same
+// state). The system chips are labelled with the raw seed name instead — it
+// already renders untranslated in four other places, and translating only the
+// chips would put "BJJ Kinder" next to "BJJ Kids" in one view ([[i18n-domain-data]]).
+const (
+	filterAllLabel      = "Alle"
+	filterUngradedLabel = "Ohne Graduierung"
+)
 
 // rosterHeader is one rendered column header: the label, where its link points
 // next, and the direction it currently sorts in (empty on inactive columns). Both
@@ -54,9 +66,26 @@ func (l rosterLine) RankLabel() string {
 	return l.RankName + " (" + l.SystemName + ")"
 }
 
+// rosterFilter is one rendered filter chip: a cell of the roster's partition (or
+// Alle, their union) and the roster it narrows to. Only one is ever Active, so
+// the unfiltered roster is a selection like any other rather than the absence of
+// one.
+type rosterFilter struct {
+	Label  string
+	Href   string
+	Active bool
+}
+
 // handleAthletesList renders the shared roster, sorted server-side by
-// ?sort=<col>&dir=<asc|desc>. Unknown values fall back to the default view
-// (Vorname ascending) rather than erroring: sorting is a view concern.
+// ?sort=<col>&dir=<asc|desc> and narrowed by ?system=<slug|none>. Unknown values
+// fall back to the default view (Vorname ascending, unfiltered) rather than
+// erroring: both are view concerns.
+//
+// This is the one handler that knows which filters are *represented* (ADR-0007b).
+// It loads the roster unfiltered once and derives both the options and the shown
+// rows from that same slice, so "every offered option matches at least one
+// athlete" holds by construction — there is no second source to drift from, and
+// hence no empty-result state for the template to apologise for.
 func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 	view := rosterViewFrom(r)
 
@@ -65,13 +94,64 @@ func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
+	options := store.RosterFilterOptions(athletes)
+	// Resolved before anything builds a URL, so a filter nobody is in cannot
+	// survive into the page's links either.
+	view.system = representedFilter(view.system, options)
 
 	s.tmpl.render(w, http.StatusOK, "athletes.html", map[string]any{
 		"Authenticated": true,
-		"Athletes":      rosterLines(athletes, view),
+		"Athletes":      rosterLines(store.FilterRoster(athletes, view.system), view),
 		"Headers":       rosterHeaders(view),
+		"Filters":       rosterFilters(view, options),
 		"NewHref":       view.path(rosterPath + "/new"),
 	})
+}
+
+// representedFilter keeps a filter only if the roster actually offers it, in the
+// spirit of store.NormalizeRosterSort: a bookmarked system the last athlete has
+// since left is not a data error, it is a view that no longer exists, so it
+// resolves to Alle.
+func representedFilter(system string, options []store.RosterOption) string {
+	offered := slices.ContainsFunc(options, func(o store.RosterOption) bool {
+		return o.Value == system
+	})
+	if offered {
+		return system
+	}
+	return ""
+}
+
+// rosterFilters builds the filter chips: Alle followed by one per non-empty cell
+// of the partition. It returns nothing below two options — Alle and a single
+// option would show the same roster, so in a homogeneous roster the row is
+// absent and surfaces by itself once there is something to partition (ADR-0007a).
+func rosterFilters(view rosterView, options []store.RosterOption) []rosterFilter {
+	if len(options) < 2 {
+		return nil
+	}
+	chips := make([]rosterFilter, 0, len(options)+1)
+	chip := func(value, label string) {
+		chips = append(chips, rosterFilter{
+			Label:  label,
+			Href:   view.filteredBy(value).path(rosterPath),
+			Active: value == view.system,
+		})
+	}
+	chip("", filterAllLabel)
+	for _, option := range options {
+		chip(option.Value, filterLabel(option))
+	}
+	return chips
+}
+
+// filterLabel names one option's chip. Only the ungraded cell needs a label of
+// its own — it is in no system, so it has no name to render.
+func filterLabel(option store.RosterOption) string {
+	if option.Value == store.RosterFilterUngraded {
+		return filterUngradedLabel
+	}
+	return option.Name
 }
 
 // rosterLines pairs each roster row with its outgoing links under the given view.

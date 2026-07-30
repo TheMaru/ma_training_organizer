@@ -517,3 +517,251 @@ func TestBeltMarkupIsIdenticalAcrossSurfaces(t *testing.T) {
 		}
 	}
 }
+
+// filterChipRow returns the markup of the roster's filter chip row. Absent from
+// a roster that has fewer than two options, so ok reports whether it is there.
+func filterChipRow(t *testing.T, body string) (string, bool) {
+	t.Helper()
+	start := strings.Index(body, `<nav class="filter-chips"`)
+	if start < 0 {
+		return "", false
+	}
+	end := strings.Index(body[start:], "</nav>")
+	if end < 0 {
+		t.Fatal("filter chip row is not closed")
+	}
+	return body[start : start+end], true
+}
+
+// filterChips returns the markup of each filter chip, in rendered order.
+func filterChips(t *testing.T, body string) []string {
+	t.Helper()
+	row, ok := filterChipRow(t, body)
+	if !ok {
+		t.Fatal("no filter chip row in body")
+	}
+	chips := make([]string, 0, 4)
+	for _, chip := range strings.Split(row, "<a")[1:] {
+		end := strings.Index(chip, "</a>")
+		if end < 0 {
+			t.Fatalf("malformed filter chip %q", chip)
+		}
+		chips = append(chips, chip[:end])
+	}
+	return chips
+}
+
+// filterChip returns the markup of the filter chip carrying the given label.
+func filterChip(t *testing.T, body, label string) string {
+	t.Helper()
+	for _, chip := range filterChips(t, body) {
+		if strings.Contains(chip, ">"+label) {
+			return chip
+		}
+	}
+	t.Fatalf("no filter chip for %q", label)
+	return ""
+}
+
+// filterChipLabels returns the filter chips' labels in rendered order.
+func filterChipLabels(t *testing.T, body string) []string {
+	t.Helper()
+	chips := filterChips(t, body)
+	labels := make([]string, 0, len(chips))
+	for _, chip := range chips {
+		open := strings.Index(chip, ">")
+		if open < 0 {
+			t.Fatalf("malformed filter chip %q", chip)
+		}
+		labels = append(labels, strings.TrimSpace(chip[open+1:]))
+	}
+	return labels
+}
+
+// mixedRoster seeds one athlete per cell of the roster's partition: a kid, an
+// adult and an ungraded athlete. That is the smallest roster on which every
+// filter option is offered.
+func mixedRoster(t *testing.T, db *sql.DB) {
+	t.Helper()
+	promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
+	promoteTo(t, db, "Adam", "Adult", "BJJ Adult", "Blue", "2026-01-01")
+	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}); err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+}
+
+// rosterNames reports which of the mixed roster's athletes the table lists.
+func rosterNames(body string) []string {
+	var listed []string
+	for _, name := range []string{"Kind", "Adult", "Unbelted"} {
+		if strings.Contains(body, ">"+name+"</a>") {
+			listed = append(listed, name)
+		}
+	}
+	return listed
+}
+
+func TestRosterFilterNarrowsToOneSystem(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	mixedRoster(t, db)
+
+	// The filter's whole promise: pick a system and every athlete shown is in it.
+	// Ungraded athletes are in no system, so a system filter hides them too.
+	body := readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
+	if got := rosterNames(body); !slices.Equal(got, []string{"Kind"}) {
+		t.Errorf("bjj-kids roster = %v, want [Kind]", got)
+	}
+
+	// Ungraded athletes are reachable as a cell of their own — "who still needs a
+	// first promotion" in one click.
+	body = readBody(t, get(t, ts, client, "/athletes?system=none"))
+	if got := rosterNames(body); !slices.Equal(got, []string{"Unbelted"}) {
+		t.Errorf("ungraded roster = %v, want [Unbelted]", got)
+	}
+
+	// Alle is the union, and a bare /athletes still renders it.
+	body = readBody(t, get(t, ts, client, "/athletes"))
+	if got := rosterNames(body); !slices.Equal(got, []string{"Kind", "Adult", "Unbelted"}) {
+		t.Errorf("unfiltered roster = %v, want all three", got)
+	}
+}
+
+func TestRosterFilterChipsOfferEveryNonEmptyCell(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	mixedRoster(t, db)
+
+	body := readBody(t, get(t, ts, client, "/athletes"))
+	// Alle first, then the systems in progression order, ungraded last. The system
+	// labels are the raw seed names, as they already render in the rank column.
+	want := []string{"Alle", "BJJ Kids", "BJJ Adult", "Ohne Graduierung"}
+	if got := filterChipLabels(t, body); !slices.Equal(got, want) {
+		t.Errorf("filter chips = %v, want %v", got, want)
+	}
+	// Exactly one chip is current at any time — the unfiltered view is Alle, not
+	// the absence of a selection.
+	if !strings.Contains(filterChip(t, body, "Alle"), `aria-current="true"`) {
+		t.Error("want aria-current on Alle in the unfiltered view")
+	}
+	if strings.Contains(filterChip(t, body, "BJJ Kids"), "aria-current") {
+		t.Error("want no aria-current on an inactive filter chip")
+	}
+
+	// Selecting one moves it, and Alle stays as the way back.
+	body = readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
+	if !strings.Contains(filterChip(t, body, "BJJ Kids"), `aria-current="true"`) {
+		t.Error("want aria-current on the selected filter chip")
+	}
+	if strings.Contains(filterChip(t, body, "Alle"), "aria-current") {
+		t.Error("want no aria-current on Alle once a filter is selected")
+	}
+	if got := attrValue(t, filterChip(t, body, "Alle"), "href"); got != "/athletes" {
+		t.Errorf("Alle href = %q, want a bare /athletes", got)
+	}
+}
+
+func TestRosterFilterChipsKeepTheSort(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	mixedRoster(t, db)
+
+	// Narrowing does not reorder: filter and sort compose in one URL.
+	body := readBody(t, get(t, ts, client, "/athletes?sort=lastName&dir=desc"))
+	want := "/athletes?sort=lastName&amp;dir=desc&amp;system=bjj-kids"
+	if got := attrValue(t, filterChip(t, body, "BJJ Kids"), "href"); got != want {
+		t.Errorf("BJJ Kids chip href = %q, want %q", got, want)
+	}
+	// And sorting a filtered roster keeps the filter.
+	body = readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
+	wantSort := "/athletes?sort=lastName&amp;dir=asc&amp;system=bjj-kids"
+	if got := attrValue(t, sortChip(t, body, "Nachname"), "href"); got != wantSort {
+		t.Errorf("Nachname sort chip href = %q, want %q", got, wantSort)
+	}
+}
+
+func TestRosterUnrepresentedFilterFallsBackToAll(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	mixedRoster(t, db)
+
+	// Slug-shaped but nobody's system: the form check passes it, the representation
+	// check in this handler alone rejects it. A bookmarked filter for a system the
+	// last athlete has left resolves to Alle rather than to an empty table.
+	resp := get(t, ts, client, "/athletes?system=bjj-elderly")
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	body := readBody(t, resp)
+	if got := rosterNames(body); !slices.Equal(got, []string{"Kind", "Adult", "Unbelted"}) {
+		t.Errorf("roster under an unrepresented filter = %v, want all three", got)
+	}
+	if !strings.Contains(filterChip(t, body, "Alle"), `aria-current="true"`) {
+		t.Error("want Alle current after falling back")
+	}
+	// The rejected value must not survive into the page's links either.
+	if strings.Contains(body, "bjj-elderly") {
+		t.Error("an unrepresented filter leaked into the rendered page")
+	}
+}
+
+func TestNoOfferedFilterYieldsAnEmptyRoster(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	mixedRoster(t, db)
+
+	// The invariant that lets the page do without a zero-hit message: every chip a
+	// trainer can click lands on at least one athlete.
+	body := readBody(t, get(t, ts, client, "/athletes"))
+	for _, chip := range filterChips(t, body) {
+		href := strings.ReplaceAll(attrValue(t, chip, "href"), "&amp;", "&")
+		if got := rosterNames(readBody(t, get(t, ts, client, href))); len(got) == 0 {
+			t.Errorf("filter %q yields an empty roster", href)
+		}
+	}
+}
+
+func TestRosterFilterRowIsAbsentWithFewerThanTwoOptions(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
+	promoteTo(t, db, "Kim", "Klein", "BJJ Kids", "White", "2026-01-01")
+
+	// A homogeneous roster has nothing to partition: Alle and the one option would
+	// show the same list, so the row does not render at all.
+	body := readBody(t, get(t, ts, client, "/athletes"))
+	if _, ok := filterChipRow(t, body); ok {
+		t.Error("want no filter row on a roster with one option")
+	}
+	// It surfaces by itself once there is a second cell.
+	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}); err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+	body = readBody(t, get(t, ts, client, "/athletes"))
+	if got := filterChipLabels(t, body); !slices.Equal(got, []string{"Alle", "BJJ Kids", "Ohne Graduierung"}) {
+		t.Errorf("filter chips = %v, want Alle + both cells", got)
+	}
+}
+
+func TestRosterFilterRowIsALabelledNavAboveTheSortRow(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	mixedRoster(t, db)
+
+	body := readBody(t, get(t, ts, client, "/athletes"))
+	row, ok := filterChipRow(t, body)
+	if !ok {
+		t.Fatal("no filter chip row in body")
+	}
+	// Two chip rows stacked on a phone are indistinguishable without labels
+	// (ADR-0005), so this one names itself the way the sort row does.
+	labelID := attrValue(t, row, "aria-labelledby")
+	if label := textOfElementWithID(t, body, labelID); !strings.Contains(label, "Filtern") {
+		t.Errorf("element id=%q reads %q, want \"Filtern\"", labelID, label)
+	}
+	// Narrow first, then order.
+	if strings.Index(body, `<nav class="filter-chips"`) > strings.Index(body, `<nav class="sort-chips"`) {
+		t.Error("want the filter row above the sort row")
+	}
+}

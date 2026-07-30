@@ -288,6 +288,57 @@ textarea {
   display: none;
 }
 
+/* The grading-system filter row (ADR-0007), by contrast, has no display gate:
+   the sort row can hide above 600px because the visible <thead> takes over
+   there, and the filter has no such desktop fallback. It is the roster's only
+   filter surface at every width. */
+.filter-controls,
+.sort-controls {
+  margin-bottom: 0.75rem;
+}
+
+/* Shared by both chip rows: the name of what the row does, on a line of its own
+   so it costs vertical rather than horizontal space. */
+.chip-row-label {
+  font-size: 0.85rem;
+}
+
+/* Chip appearance is shared by both rows and therefore lives out here — the sort
+   row is the only one that is phone-only. What stays inside the phone block is
+   the overflow behaviour, which exists because five German column labels do not
+   fit a phone; the filter's three or four chips have room on a desktop. */
+.sort-chips,
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.15rem 0 0.35rem;
+}
+
+.chip {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* The indicator inherits the active chip's colour; --muted is unreadable on the
+   accent fill. */
+.chip.active .sort-dir {
+  color: inherit;
+}
+
 /* Page header row: title on the left, primary action on the right. */
 .row-between {
   display: flex;
@@ -359,53 +410,26 @@ td.actions .btn {
 
   .sort-controls {
     display: block;
-    margin-bottom: 0.75rem;
-  }
-
-  .sort-controls-label {
-    font-size: 0.85rem;
   }
 
   /* One tap per column. Five full German labels do not fit a phone, so the row
-     scrolls sideways; the fade at the right edge and the snap points are what
-     make that overflow discoverable without a scrollbar. The fade carries the
-     -webkit- prefix as well: unprefixed mask-image needs iOS 15.4, and an older
-     iPhone is exactly the device this row exists for. Snapping still works if
-     both are unsupported. */
+     scrolls sideways instead of wrapping; the fade at the right edge and the
+     snap points are what make that overflow discoverable without a scrollbar.
+     The fade carries the -webkit- prefix as well: unprefixed mask-image needs
+     iOS 15.4, and an older iPhone is exactly the device this row exists for.
+     Snapping still works if both are unsupported. */
   .sort-chips {
-    display: flex;
-    gap: 0.4rem;
+    flex-wrap: nowrap;
     overflow-x: auto;
     scroll-snap-type: x proximity;
-    padding: 0.15rem 1.5rem 0.35rem 0;
+    padding-right: 1.5rem;
     -webkit-overflow-scrolling: touch;
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
   }
 
   .sort-chips .chip {
-    flex: 0 0 auto;
     scroll-snap-align: start;
-    padding: 0.3rem 0.7rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--fg);
-    text-decoration: none;
-    font-size: 0.9rem;
-    white-space: nowrap;
-  }
-
-  .sort-chips .chip.active {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-fg);
-  }
-
-  /* The indicator inherits the active chip's colour; --muted is unreadable on
-     the accent fill. */
-  .sort-chips .chip.active .sort-dir {
-    color: inherit;
   }
 
   tr {

@@ -92,6 +92,45 @@ func TestSeedRanksOrderedWithMetadata(t *testing.T) {
 	}
 }
 
+// TestSeedGivesEverySystemItsSlug pins ADR-0006: the slug, not the name, is what
+// identifies a system outside the database, so it must exist for every seeded
+// system and be the hand-authored value rather than anything derived.
+func TestSeedGivesEverySystemItsSlug(t *testing.T) {
+	db := seededDB(t)
+
+	want := map[string]string{"BJJ Kids": "bjj-kids", "BJJ Adult": "bjj-adult"}
+	for name, wantSlug := range want {
+		var got string
+		if err := db.QueryRow(`SELECT slug FROM grading_systems WHERE name = ?`, name).Scan(&got); err != nil {
+			t.Fatalf("read slug for %q: %v", name, err)
+		}
+		if got != wantSlug {
+			t.Errorf("slug for %q = %q, want %q", name, got, wantSlug)
+		}
+	}
+}
+
+// TestSeedFillsTheSlugOfAPreExistingSystem is the migration path: a system
+// inserted before the slug column existed carries the column default, and the
+// next boot's re-seed must correct it — the same way ensureGradingSystem already
+// corrects sort_order (migration 00003).
+func TestSeedFillsTheSlugOfAPreExistingSystem(t *testing.T) {
+	db := newTestDB(t)
+	mustInsert(t, db, `INSERT INTO grading_systems (name) VALUES (?)`, "BJJ Kids")
+
+	if err := store.Seed(db); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+
+	var got string
+	if err := db.QueryRow(`SELECT slug FROM grading_systems WHERE name = ?`, "BJJ Kids").Scan(&got); err != nil {
+		t.Fatalf("read slug: %v", err)
+	}
+	if got != "bjj-kids" {
+		t.Errorf("slug of a pre-existing system = %q, want %q", got, "bjj-kids")
+	}
+}
+
 func TestSeedIsIdempotent(t *testing.T) {
 	db := seededDB(t) // first seed
 

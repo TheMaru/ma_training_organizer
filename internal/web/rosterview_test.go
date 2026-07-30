@@ -209,3 +209,74 @@ func TestRecordingAPromotionKeepsTheViewState(t *testing.T) {
 	})
 	seeOtherTo(t, resp, fmt.Sprintf("/athletes/%d?sort=rank&dir=desc", id))
 }
+
+func TestMutationRedirectKeepsTheFilter(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+
+	// Filter and sort compose in one URL, and a mutation returns to both. The
+	// value is carried through without the database being asked whether anyone is
+	// in that system — only the roster handler checks that.
+	path := fmt.Sprintf("/athletes/%d/delete?sort=rank&dir=desc&system=bjj-adult", id)
+	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=rank&dir=desc&system=bjj-adult")
+}
+
+func TestFilterOnlyViewCarriesNoSortKeys(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+
+	// Filtering without sorting is a non-default view, so the URL spells out the
+	// whole view state — but the filter's own default (Alle) still adds nothing.
+	path := fmt.Sprintf("/athletes/%d/delete?system=none", id)
+	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=firstName&dir=asc&system=none")
+}
+
+func TestMalformedFilterIsDropped(t *testing.T) {
+	// Anything that is not slug-shaped reads as no filter at all, so no
+	// user-controlled string can reach a Location header or a rendered URL —
+	// the guarantee that lets query() render without escaping.
+	for _, junk := range []string{
+		"BJJ Kids", `bjj"onload=alert(1)`, "bjj_kids", "Bjj-Kids", "bjj-kids\r\nX: y",
+		strings.Repeat("a", 65),
+	} {
+		t.Run(junk, func(t *testing.T) {
+			ts, client, db := newAuthTestServer(t)
+			login(t, ts, client, testUsername, testPassword).Body.Close()
+			id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
+			if err != nil {
+				t.Fatalf("CreateAthlete: %v", err)
+			}
+
+			path := fmt.Sprintf("/athletes/%d/delete?system=%s", id, url.QueryEscape(junk))
+			seeOtherTo(t, post(t, ts, client, path, nil), "/athletes")
+		})
+	}
+}
+
+func TestRosterLinksCarryTheFilter(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+	id := promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
+	promoteTo(t, db, "Adam", "Adult", "BJJ Adult", "Blue", "2026-01-01")
+
+	// Every way out of a filtered roster comes back to it, without those call
+	// sites knowing the filter exists.
+	body := readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
+	for _, want := range []string{
+		fmt.Sprintf("/athletes/%d?sort=firstName&amp;dir=asc&amp;system=bjj-kids", id),
+		fmt.Sprintf("/athletes/%d/delete?sort=firstName&amp;dir=asc&amp;system=bjj-kids", id),
+		"/athletes/new?sort=firstName&amp;dir=asc&amp;system=bjj-kids",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("filtered roster is missing a link to %q", want)
+		}
+	}
+}

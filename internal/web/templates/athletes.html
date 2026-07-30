@@ -5,6 +5,22 @@
   <a class="btn" href="{{.NewHref}}">Neuer Athlet</a>
 </div>
 {{if .Athletes}}
+{{/* The grading-system filter (ADR-0007): one chip per non-empty cell of the
+     roster's partition, plus Alle. Above the sort row — narrow first, then
+     order — and rendered at every width, since unlike the sort chips it has no
+     <thead> equivalent to defer to on a desktop. Absent below two options, which
+     is why .Filters may be empty. Every chip is guaranteed to match at least one
+     athlete, so there is no empty-result branch to write. */}}
+{{with .Filters}}
+<div class="filter-controls">
+  <span class="muted chip-row-label" id="roster-filter-label">Filtern</span>
+  <nav class="filter-chips" aria-labelledby="roster-filter-label">
+    {{range .}}
+    <a class="chip{{if .Active}} active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
+    {{end}}
+  </nav>
+</div>
+{{end}}
 {{/* The phone sort surface (ADR-0005). At ≤600px the table becomes a stack of
      cards and its thead is gone, so the header links have no surface there; this
      row of chips renders the very same header view model, into the very same
@@ -12,7 +28,7 @@
      decides which. The label is a visible line of its own so it costs vertical
      rather than horizontal space, and it names the row via aria-labelledby. */}}
 <div class="sort-controls">
-  <span class="muted sort-controls-label" id="roster-sort-label">Sortieren</span>
+  <span class="muted chip-row-label" id="roster-sort-label">Sortieren</span>
   <nav class="sort-chips" aria-labelledby="roster-sort-label">
     {{range .Headers}}
     {{- /* aria-sort is only meaningful on a columnheader, so the active chip says
