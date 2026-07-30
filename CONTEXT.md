@@ -17,9 +17,13 @@ The event of an athlete reaching a rank on a date. An athlete's current rank is 
 _Avoid_: Graduation (the field/state), grading
 
 **GradingSystem**:
-An ordered set of ranks for one discipline-and-cohort, e.g. "BJJ Kids" and "BJJ Adult" are two separate systems. Data-driven and seeded, not hardcoded.
+An ordered set of ranks for one discipline-and-cohort, e.g. "BJJ Kids" and "BJJ Adult" are two separate systems. Data-driven and seeded, not hardcoded. Its identity is stable and separate from its name, which is a display label and may be renamed or localized.
 _Avoid_: Belt system, curriculum, style
 
 **Rank**:
 A single named position within a grading system, carrying its order in that system. A promotion targets exactly one rank. Order is for sorting/display only, not a mandatory path — ranks may be skipped. Current rank = the athlete's most recent promotion by date.
 _Avoid_: Belt, grade, level, degree
+
+**Ungraded**:
+An athlete with no promotions at all, and therefore with no current rank and no grading system. Distinct from an athlete at the lowest rank, which is a graduation like any other.
+_Avoid_: Beginner, white belt, unranked, rank zero

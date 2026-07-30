@@ -34,3 +34,35 @@ not covered by that and would still need their own translation.
 - How to localize system names (`BJJ Kids` → `BJJ Kinder`) — translation column
   on `grading_systems`, or leave proper-noun-ish system names untranslated?
 - Fallback when a translation is missing for the active locale.
+
+## Comments
+
+2026-07-30 — Triage of [[roster-cohort-filter]] 01 touched this ticket twice, and
+both are good news for it.
+
+**The system-name question got easier.** That triage produced
+[ADR-0006](../../../docs/adr/0006-grading-system-identity-is-a-slug.md): a
+`grading_systems.slug` (`bjj-kids`, `bjj-adult`) becomes a system's stable
+identity, and `name` becomes *purely a display label*. The reason it did was this
+ticket — a translatable name cannot also be a URL key. The consequence is that
+the open question above shrinks: with identity moved off the name, adding a
+localized name beside `name` is a display-layer change rather than a change to
+what a system *is*. That also weakens the "leave them untranslated" option, since
+the argument for it was largely that the name was load-bearing.
+
+**The call-site inventory is now five, not four.** For whichever mechanism wins,
+the places a raw system name reaches the German UI are:
+
+1. `athletes.html` — the rank cell's accessible label / muted fallback text
+2. `athlete_detail.html` — the current rank line
+3. `athlete_detail.html` — the system grouping in the promotion form
+4. `athlete_detail.html` — the "System" column of the promotion history table
+5. `athletes.html` — the roster filter chips (new, [[roster-cohort-filter]] 01)
+
+The chips render whatever `SystemName` yields, so they need no special handling —
+they are listed so the inventory is complete, not because they add work. That
+ticket deliberately ships with raw seed names: translating only the chips would
+put `BJJ Kinder` next to `BJJ Kids` in one view, which is worse than uniform
+English. Its build order is ahead of this one (it is fully specified; this is
+still `needs-triage` with a question waiting on [[rank-belt-visual]]), and nothing
+is duplicated either way.
