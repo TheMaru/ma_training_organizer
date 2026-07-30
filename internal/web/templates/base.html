@@ -1,5 +1,5 @@
 {{define "base"}}<!doctype html>
-<html lang="de">
+<html lang="{{.Lang}}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -30,11 +30,21 @@
     <header class="app">
       <a class="brand" href="/athletes">Organizer</a>
       <nav>
-        <a href="/athletes">Athletes</a>
-        <a href="/account/password">Passwort</a>
-        <a href="/logout" hx-post="/logout" hx-target="body" hx-push-url="true">Logout</a>
+        <a href="/athletes">{{t "nav.athletes"}}</a>
+        <a href="/account/password">{{t "nav.password"}}</a>
+        <a href="/logout" hx-post="/logout" hx-target="body" hx-push-url="true">{{t "nav.logout"}}</a>
+        {{/* Unlike the theme toggle beside it (client-side localStorage), the
+             language is an account setting, so switching it is a plain form POST
+             that stores the choice and returns to the page it was made on. No
+             hx-post: the response is a full-page redirect either way. */}}
+        <form class="lang-switch" method="post" action="/account/language" aria-label="{{t "nav.language.label"}}">
+          <input type="hidden" name="return" value="{{.Return}}" />
+          <button type="submit" name="locale" value="de"{{if eq .Lang "de"}} class="active" aria-current="true"{{end}}>DE</button>
+          <span aria-hidden="true">|</span>
+          <button type="submit" name="locale" value="en"{{if eq .Lang "en"}} class="active" aria-current="true"{{end}}>EN</button>
+        </form>
         <button type="button" class="theme-toggle" onclick="toggleTheme()"
-                aria-label="Farbschema wechseln" title="Hell/Dunkel wechseln">◐</button>
+                aria-label="{{t "nav.theme.label"}}" title="{{t "nav.theme.title"}}">◐</button>
       </nav>
     </header>
     {{end}}

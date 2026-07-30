@@ -52,6 +52,7 @@ func (s *Server) Handler() http.Handler {
 
 	r.Group(func(r chi.Router) {
 		r.Use(s.sessions.LoadAndSave)
+		r.Use(s.resolveLocale)
 
 		r.Get("/login", s.handleLoginForm)
 		r.Post("/login", s.handleLogin)
@@ -63,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/logout", s.handleLogout)
 			r.Get("/account/password", s.handlePasswordForm)
 			r.Post("/account/password", s.handleChangePassword)
+			r.Post(languagePath, s.handleLanguage)
 
 			r.Get("/athletes", s.handleAthletesList)
 			r.Get("/athletes/new", s.handleAthleteNew)
@@ -83,9 +85,9 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-func (s *Server) handleHome(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	// Reachable only through requireAuth, so the viewer is always authenticated.
-	s.tmpl.render(w, http.StatusOK, "home.html", map[string]any{"Authenticated": true})
+	s.tmpl.render(w, r, http.StatusOK, "home.html", map[string]any{"Authenticated": true})
 }
 
 // redirect sends the client to the target path. For an HTMX request it uses the

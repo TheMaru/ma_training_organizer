@@ -2,31 +2,31 @@
 {{define "content"}}
 <div class="row-between">
   <h1>{{.Athlete.FirstName}} {{.Athlete.LastName}}</h1>
-  <a class="btn secondary" href="{{.EditHref}}">Bearbeiten</a>
+  <a class="btn secondary" href="{{.EditHref}}">{{t "common.edit"}}</a>
 </div>
 
 <dl class="meta">
   {{/* Belt graphic *and* name here (unlike the roster): the name is right beside
        the graphic, so `belt` is called without a label and draws a decorative
        image rather than announcing the rank a second time. */}}
-  <div><dt>Aktueller Rang</dt>
-    <dd>{{if .HasCurrent}}{{belt .Current.Group .Current.Degree ""}} {{.Current.RankName}} <span class="muted">({{.Current.SystemName}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">noch keine Graduierung</span>{{end}}</dd>
+  <div><dt>{{t "athlete.rank"}}</dt>
+    <dd>{{if .HasCurrent}}{{belt .Current.Group .Current.Degree ""}} {{.Current.RankName}} <span class="muted">({{.Current.SystemName}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">{{t "athlete.noRank"}}</span>{{end}}</dd>
   </div>
-  {{if .Athlete.BirthDate}}<div><dt>Geburtsdatum</dt><dd>{{.Athlete.BirthDate}}</dd></div>{{end}}
-  {{if .Athlete.JoinedOn}}<div><dt>Eintritt</dt><dd>{{.Athlete.JoinedOn}}</dd></div>{{end}}
-  {{if .Athlete.Notes}}<div><dt>Notizen</dt><dd>{{.Athlete.Notes}}</dd></div>{{end}}
+  {{if .Athlete.BirthDate}}<div><dt>{{t "athlete.birthDate"}}</dt><dd>{{.Athlete.BirthDate}}</dd></div>{{end}}
+  {{if .Athlete.JoinedOn}}<div><dt>{{t "athlete.joinedOn"}}</dt><dd>{{.Athlete.JoinedOn}}</dd></div>{{end}}
+  {{if .Athlete.Notes}}<div><dt>{{t "athlete.notes"}}</dt><dd>{{.Athlete.Notes}}</dd></div>{{end}}
 </dl>
 
-<h2>Graduierung eintragen</h2>
+<h2>{{t "promotion.heading"}}</h2>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 {{/* The action carries the roster's view state so recording a promotion returns
      to this page still knowing the roster it was opened from. */}}
 <form method="post" action="{{.PromoteAction}}"
       hx-post="{{.PromoteAction}}" hx-target="body" class="stack">
   <label>
-    Rang
+    {{t "promotion.rank"}}
     <select name="rankId" required>
-      <option value="" selected disabled>Rang wählen …</option>
+      <option value="" selected disabled>{{t "promotion.rankPlaceholder"}}</option>
       {{range .Systems}}
       <optgroup label="{{.Name}}">
         {{range .Ranks}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
@@ -35,37 +35,37 @@
     </select>
   </label>
   <label>
-    Datum
+    {{t "promotion.date"}}
     <input type="date" name="promotedOn" required />
   </label>
   <div class="form-actions">
-    <button class="btn" type="submit">Eintragen</button>
-    <a class="btn secondary" href="{{.Back}}">Zurück</a>
+    <button class="btn" type="submit">{{t "promotion.submit"}}</button>
+    <a class="btn secondary" href="{{.Back}}">{{t "common.back"}}</a>
   </div>
 </form>
 
-<h2>Verlauf</h2>
+<h2>{{t "promotion.history"}}</h2>
 {{if .Promotions}}
 <table>
   <thead>
     <tr>
-      <th>Datum</th>
-      <th>Rang</th>
-      <th>System</th>
+      <th>{{t "promotion.date"}}</th>
+      <th>{{t "promotion.rank"}}</th>
+      <th>{{t "promotion.system"}}</th>
     </tr>
   </thead>
   <tbody>
     {{range .Promotions}}
     <tr>
-      <td data-label="Datum">{{.PromotedOn}}</td>
+      <td data-label="{{t "promotion.date"}}">{{.PromotedOn}}</td>
       {{/* Graphic + name again, so every belt can be checked against its label. */}}
-      <td data-label="Rang">{{belt .Group .Degree ""}} {{.RankName}}</td>
-      <td data-label="System">{{.SystemName}}</td>
+      <td data-label="{{t "promotion.rank"}}">{{belt .Group .Degree ""}} {{.RankName}}</td>
+      <td data-label="{{t "promotion.system"}}">{{.SystemName}}</td>
     </tr>
     {{end}}
   </tbody>
 </table>
 {{else}}
-<p class="muted">Noch keine Graduierungen eingetragen.</p>
+<p class="muted">{{t "promotion.historyEmpty"}}</p>
 {{end}}
 {{end}}

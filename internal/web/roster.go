@@ -4,32 +4,37 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/TheMaru/ma_training_organizer/internal/i18n"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
-// rosterColumns are the sortable roster columns in display order: the German
-// header label a trainer clicks, and the store sort key it selects. The actions
+// rosterColumns are the sortable roster columns in display order: the catalog key
+// of the header a trainer clicks, and the store sort key it selects. The actions
 // column is not in here — it holds no data to sort by.
+//
+// The label is a key, not text: athletes.html repeats these same keys in each
+// cell's data-label, which is what keeps the phone cards labelled exactly like
+// the desktop headers they replace (ADR-0008).
 var rosterColumns = []struct {
-	Key   string
-	Label string
+	Key      string
+	LabelKey string
 }{
-	{store.RosterSortLastName, "Nachname"},
-	{store.RosterSortFirstName, "Vorname"},
-	{store.RosterSortBirthDate, "Geburtsdatum"},
-	{store.RosterSortJoinedOn, "Eintritt"},
-	{store.RosterSortRank, "Aktueller Rang"},
+	{store.RosterSortLastName, "roster.column.lastName"},
+	{store.RosterSortFirstName, "roster.column.firstName"},
+	{store.RosterSortBirthDate, "roster.column.birthDate"},
+	{store.RosterSortJoinedOn, "roster.column.joinedOn"},
+	{store.RosterSortRank, "roster.column.rank"},
 }
 
-// filterAllLabel is the chip for the unfiltered roster, and filterUngradedLabel
-// the one for the athletes who are in no grading system at all (CONTEXT.md's
-// Ungraded; athlete_detail.html says "noch keine Graduierung" for the same
-// state). The system chips are labelled with the raw seed name instead — it
-// already renders untranslated in four other places, and translating only the
-// chips would put "BJJ Kinder" next to "BJJ Kids" in one view ([[i18n-domain-data]]).
+// filterAllKey is the chip for the unfiltered roster, and filterUngradedKey the
+// one for the athletes who are in no grading system at all (CONTEXT.md's
+// Ungraded). The
+// system chips are labelled with the raw seed name instead — it already renders
+// untranslated in four other places, and translating only the chips would put
+// "BJJ Kinder" next to "BJJ Kids" in one view ([[i18n-domain-data]]).
 const (
-	filterAllLabel      = "Alle"
-	filterUngradedLabel = "Ohne Graduierung"
+	filterAllKey      = "roster.filter.all"
+	filterUngradedKey = "roster.filter.ungraded"
 )
 
 // rosterHeader is one rendered column header: the label, where its link points
@@ -98,13 +103,17 @@ func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 	// Resolved before anything builds a URL, so a filter nobody is in cannot
 	// survive into the page's links either.
 	view.system = representedFilter(view.system, options)
+	locale := localeOf(r.Context())
 
-	s.tmpl.render(w, http.StatusOK, "athletes.html", map[string]any{
+	s.tmpl.render(w, r, http.StatusOK, "athletes.html", map[string]any{
 		"Authenticated": true,
 		"Athletes":      rosterLines(store.FilterRoster(athletes, view.system), view),
-		"Headers":       rosterHeaders(view),
-		"Filters":       rosterFilters(view, options),
+		"Headers":       rosterHeaders(locale, view),
+		"Filters":       rosterFilters(locale, view, options),
 		"NewHref":       view.path(rosterPath + "/new"),
+		// The one page whose canonical URL the request cannot supply: a filter nobody
+		// is in was just resolved away, and only the view built here knows that.
+		"Return": view.path(rosterPath),
 	})
 }
 
@@ -126,7 +135,7 @@ func representedFilter(system string, options []store.RosterOption) string {
 // of the partition. It returns nothing below two options — Alle and a single
 // option would show the same roster, so in a homogeneous roster the row is
 // absent and surfaces by itself once there is something to partition (ADR-0007a).
-func rosterFilters(view rosterView, options []store.RosterOption) []rosterFilter {
+func rosterFilters(locale i18n.Locale, view rosterView, options []store.RosterOption) []rosterFilter {
 	if len(options) < 2 {
 		return nil
 	}
@@ -138,18 +147,18 @@ func rosterFilters(view rosterView, options []store.RosterOption) []rosterFilter
 			Active: value == view.system,
 		})
 	}
-	chip("", filterAllLabel)
+	chip("", i18n.T(locale, filterAllKey))
 	for _, option := range options {
-		chip(option.Value, filterLabel(option))
+		chip(option.Value, filterLabel(locale, option))
 	}
 	return chips
 }
 
 // filterLabel names one option's chip. Only the ungraded cell needs a label of
 // its own — it is in no system, so it has no name to render.
-func filterLabel(option store.RosterOption) string {
+func filterLabel(locale i18n.Locale, option store.RosterOption) string {
 	if option.Value == store.RosterFilterUngraded {
-		return filterUngradedLabel
+		return i18n.T(locale, filterUngradedKey)
 	}
 	return option.Name
 }
@@ -171,11 +180,11 @@ func rosterLines(rows []store.RosterRow, view rosterView) []rosterLine {
 // column links to itself ascending — a first click always sorts A→Z — except the
 // active one, whose link flips the direction so a click toggles it. Only the
 // active column carries an indicator.
-func rosterHeaders(view rosterView) []rosterHeader {
+func rosterHeaders(locale i18n.Locale, view rosterView) []rosterHeader {
 	headers := make([]rosterHeader, 0, len(rosterColumns))
 	for _, col := range rosterColumns {
 		h := rosterHeader{
-			Label:    col.Label,
+			Label:    i18n.T(locale, col.LabelKey),
 			AriaSort: "none",
 			Href:     view.sortedBy(col.Key).path(rosterPath),
 		}

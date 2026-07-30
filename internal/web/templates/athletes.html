@@ -1,8 +1,8 @@
-{{define "title"}}Athleten · Organizer{{end}}
+{{define "title"}}{{t "roster.heading"}} · Organizer{{end}}
 {{define "content"}}
 <div class="row-between">
-  <h1>Athleten</h1>
-  <a class="btn" href="{{.NewHref}}">Neuer Athlet</a>
+  <h1>{{t "roster.heading"}}</h1>
+  <a class="btn" href="{{.NewHref}}">{{t "athlete.new"}}</a>
 </div>
 {{if .Athletes}}
 {{/* The grading-system filter (ADR-0007): one chip per non-empty cell of the
@@ -13,7 +13,7 @@
      athlete, so there is no empty-result branch to write. */}}
 {{with .Filters}}
 <div class="filter-controls">
-  <span class="muted chip-row-label" id="roster-filter-label">Filtern</span>
+  <span class="muted chip-row-label" id="roster-filter-label">{{t "roster.filter.label"}}</span>
   <nav class="filter-chips" aria-labelledby="roster-filter-label">
     {{range .}}
     <a class="chip{{if .Active}} active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
@@ -28,12 +28,12 @@
      decides which. The label is a visible line of its own so it costs vertical
      rather than horizontal space, and it names the row via aria-labelledby. */}}
 <div class="sort-controls">
-  <span class="muted chip-row-label" id="roster-sort-label">Sortieren</span>
+  <span class="muted chip-row-label" id="roster-sort-label">{{t "roster.sort.label"}}</span>
   <nav class="sort-chips" aria-labelledby="roster-sort-label">
     {{range .Headers}}
     {{- /* aria-sort is only meaningful on a columnheader, so the active chip says
            its state with aria-current plus text a screen reader can read. */}}
-    <a class="chip{{if .Active}} active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span><span class="sr-only">, {{if .Descending}}absteigend{{else}}aufsteigend{{end}} sortiert</span>{{end}}</a>
+    <a class="chip{{if .Active}} active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span><span class="sr-only">, {{if .Descending}}{{t "roster.sort.descending"}}{{else}}{{t "roster.sort.ascending"}}{{end}}</span>{{end}}</a>
     {{end}}
   </nav>
 </div>
@@ -54,25 +54,26 @@
     {{/* Whole row opens the detail view; the name stays a real link for
          keyboard/screen-reader access. Both carry the roster's view state, so the
          detail page can lead back to the same sorted roster. The delete form stops
-         the click from bubbling to the row so deleting never navigates. */}}
+         the click from bubbling to the row so deleting never navigates. The
+         data-labels repeat the keys rosterColumns renders .Headers from. */}}
     <tr class="clickable" onclick="location.href='{{.Href}}'">
-      <td data-label="Nachname"><a href="{{.Href}}">{{.LastName}}</a></td>
-      <td data-label="Vorname">{{.FirstName}}</td>
-      <td data-label="Geburtsdatum">{{.BirthDate}}</td>
-      <td data-label="Eintritt">{{.JoinedOn}}</td>
+      <td data-label="{{t "roster.column.lastName"}}"><a href="{{.Href}}">{{.LastName}}</a></td>
+      <td data-label="{{t "roster.column.firstName"}}">{{.FirstName}}</td>
+      <td data-label="{{t "roster.column.birthDate"}}">{{.BirthDate}}</td>
+      <td data-label="{{t "roster.column.joinedOn"}}">{{.JoinedOn}}</td>
       {{/* The rank as a belt graphic alone (ADR-0004), with the name + system as
            its accessible label — the system disambiguates same-named ranks across
            cohorts (White exists in both kids and adult). A rank whose colour the
            view does not know renders that same text visibly instead, and an
            ungraded athlete has neither, so the cell stays blank. */}}
-      <td data-label="Aktueller Rang">{{with belt .Group .Degree .RankLabel}}{{.}}{{else}}{{.RankName}}{{with .SystemName}} <span class="muted">({{.}})</span>{{end}}{{end}}</td>
+      <td data-label="{{t "roster.column.rank"}}">{{with belt .Group .Degree .RankLabel}}{{.}}{{else}}{{.RankName}}{{with .SystemName}} <span class="muted">({{.}})</span>{{end}}{{end}}</td>
       <td class="actions">
         <form method="post" action="{{.DeleteAction}}"
               hx-post="{{.DeleteAction}}"
-              hx-confirm="{{.FirstName}} {{.LastName}} löschen? Die Graduierungen werden mitgelöscht."
+              hx-confirm="{{t "roster.deleteConfirm" .FirstName .LastName}}"
               hx-target="body"
               onclick="event.stopPropagation()">
-          <button class="btn danger" type="submit">Löschen</button>
+          <button class="btn danger" type="submit">{{t "common.delete"}}</button>
         </form>
       </td>
     </tr>
@@ -80,6 +81,6 @@
   </tbody>
 </table>
 {{else}}
-<p class="muted">Noch keine Athleten. Lege den ersten an.</p>
+<p class="muted">{{t "roster.empty"}}</p>
 {{end}}
 {{end}}

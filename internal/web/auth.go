@@ -63,7 +63,7 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, "/")
 		return
 	}
-	s.renderLogin(w, http.StatusOK, "", "")
+	s.renderLogin(w, r, http.StatusOK, "", "")
 }
 
 // handleLogin verifies submitted credentials and, on success, starts a session.
@@ -77,7 +77,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, store.ErrTrainerNotFound) {
 			_, _ = auth.Verify(password, decoyHash) // equalise timing; result unused
-			s.renderLogin(w, http.StatusUnauthorized, username, msgBadCredentials)
+			s.renderLogin(w, r, http.StatusUnauthorized, username, translate(r, "login.badCredentials"))
 			return
 		}
 		serverError(w)
@@ -90,7 +90,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		s.renderLogin(w, http.StatusUnauthorized, username, msgBadCredentials)
+		s.renderLogin(w, r, http.StatusUnauthorized, username, translate(r, "login.badCredentials"))
 		return
 	}
 
@@ -113,8 +113,8 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 // handlePasswordForm renders the self-service password-change page.
-func (s *Server) handlePasswordForm(w http.ResponseWriter, _ *http.Request) {
-	s.renderPassword(w, http.StatusOK, "")
+func (s *Server) handlePasswordForm(w http.ResponseWriter, r *http.Request) {
+	s.renderPassword(w, r, http.StatusOK, "")
 }
 
 // handleChangePassword verifies the current password and applies the new one.
@@ -138,15 +138,15 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		s.renderPassword(w, http.StatusUnauthorized, "Das aktuelle Passwort ist falsch.")
+		s.renderPassword(w, r, http.StatusUnauthorized, translate(r, "password.currentWrong"))
 		return
 	}
 	if next != confirm {
-		s.renderPassword(w, http.StatusBadRequest, "Die neuen Passwörter stimmen nicht überein.")
+		s.renderPassword(w, r, http.StatusBadRequest, translate(r, "password.mismatch"))
 		return
 	}
 	if err := auth.ValidatePassword(next); err != nil {
-		s.renderPassword(w, http.StatusBadRequest, "Das neue Passwort ist zu kurz.")
+		s.renderPassword(w, r, http.StatusBadRequest, translate(r, "password.tooShort"))
 		return
 	}
 
@@ -170,20 +170,16 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	redirect(w, r, "/")
 }
 
-// msgBadCredentials is the single message shown for both a wrong password and an
-// unknown username, so the response never distinguishes the two.
-const msgBadCredentials = "Benutzername oder Passwort ist falsch."
-
-func (s *Server) renderLogin(w http.ResponseWriter, status int, username, errMsg string) {
-	s.tmpl.render(w, status, "login.html", map[string]any{
+func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, username, errMsg string) {
+	s.tmpl.render(w, r, status, "login.html", map[string]any{
 		"Authenticated": false,
 		"Username":      username,
 		"Error":         errMsg,
 	})
 }
 
-func (s *Server) renderPassword(w http.ResponseWriter, status int, errMsg string) {
-	s.tmpl.render(w, status, "password.html", map[string]any{
+func (s *Server) renderPassword(w http.ResponseWriter, r *http.Request, status int, errMsg string) {
+	s.tmpl.render(w, r, status, "password.html", map[string]any{
 		"Authenticated": true,
 		"Error":         errMsg,
 	})

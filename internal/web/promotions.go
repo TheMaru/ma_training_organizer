@@ -27,7 +27,7 @@ func (s *Server) handleAthleteDetail(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	s.renderAthleteDetail(w, http.StatusOK, rosterViewFrom(r), a, "")
+	s.renderAthleteDetail(w, r, http.StatusOK, rosterViewFrom(r), a, "")
 }
 
 // handleAthletePromote records a promotion for the athlete, then redirects back
@@ -56,7 +56,7 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 	// the garbage string and every later read would fail its NullTime scan (500).
 	// <input type="date"> guards the UI; this guards a hand-crafted POST.
 	if _, err := time.Parse("2006-01-02", date); rankID == 0 || err != nil {
-		s.renderAthleteDetail(w, http.StatusBadRequest, view, a, "Bitte Rang und Datum wählen.")
+		s.renderAthleteDetail(w, r, http.StatusBadRequest, view, a, translate(r, "promotion.required"))
 		return
 	}
 
@@ -73,7 +73,7 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 // page. errMsg is shown when re-rendering after a rejected record attempt. view
 // is the roster this page was opened from: every link and form on the page keeps
 // carrying it, so the way back stays the sorted roster.
-func (s *Server) renderAthleteDetail(w http.ResponseWriter, status int, view rosterView, a store.Athlete, errMsg string) {
+func (s *Server) renderAthleteDetail(w http.ResponseWriter, r *http.Request, status int, view rosterView, a store.Athlete, errMsg string) {
 	promotions, err := store.ListPromotions(s.db, a.ID)
 	if err != nil {
 		serverError(w)
@@ -86,7 +86,7 @@ func (s *Server) renderAthleteDetail(w http.ResponseWriter, status int, view ros
 	}
 	current, hasCurrent := store.CurrentRank(promotions)
 
-	s.tmpl.render(w, status, "athlete_detail.html", map[string]any{
+	s.tmpl.render(w, r, status, "athlete_detail.html", map[string]any{
 		"Authenticated": true,
 		"Athlete":       a,
 		"Promotions":    promotions,

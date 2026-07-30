@@ -110,3 +110,41 @@ func TestUpdateTrainerPasswordUnknownID(t *testing.T) {
 		t.Errorf("error = %v, want ErrTrainerNotFound", err)
 	}
 }
+
+func TestUpdateTrainerLocale(t *testing.T) {
+	db := newTestDB(t)
+
+	id, err := store.CreateTrainer(db, "ada", "hash-1")
+	if err != nil {
+		t.Fatalf("CreateTrainer: %v", err)
+	}
+
+	tr, err := store.TrainerByID(db, id)
+	if err != nil {
+		t.Fatalf("TrainerByID: %v", err)
+	}
+	if tr.Locale != "" {
+		t.Errorf("Locale of a fresh trainer = %q, want empty (no choice made)", tr.Locale)
+	}
+
+	if err := store.UpdateTrainerLocale(db, id, "en"); err != nil {
+		t.Fatalf("UpdateTrainerLocale: %v", err)
+	}
+
+	tr, err = store.TrainerByUsername(db, "ada")
+	if err != nil {
+		t.Fatalf("TrainerByUsername: %v", err)
+	}
+	if tr.Locale != "en" {
+		t.Errorf("Locale = %q, want %q", tr.Locale, "en")
+	}
+}
+
+func TestUpdateTrainerLocaleUnknownTrainer(t *testing.T) {
+	db := newTestDB(t)
+
+	err := store.UpdateTrainerLocale(db, 404, "en")
+	if !errors.Is(err, store.ErrTrainerNotFound) {
+		t.Errorf("error = %v, want ErrTrainerNotFound", err)
+	}
+}

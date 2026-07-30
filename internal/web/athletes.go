@@ -17,7 +17,7 @@ import (
 // roster the trainer started from.
 func (s *Server) handleAthleteNew(w http.ResponseWriter, r *http.Request) {
 	view := rosterViewFrom(r)
-	s.renderAthleteForm(w, http.StatusOK, view, rosterPath, "Neuer Athlet", store.Athlete{}, "")
+	s.renderAthleteForm(w, r, http.StatusOK, view, rosterPath, "athlete.new", store.Athlete{}, "")
 }
 
 // handleAthleteCreate validates the submitted form and inserts a new athlete,
@@ -26,7 +26,7 @@ func (s *Server) handleAthleteCreate(w http.ResponseWriter, r *http.Request) {
 	view := rosterViewFrom(r)
 	a, errMsg := athleteFromForm(r)
 	if errMsg != "" {
-		s.renderAthleteForm(w, http.StatusBadRequest, view, rosterPath, "Neuer Athlet", a, errMsg)
+		s.renderAthleteForm(w, r, http.StatusBadRequest, view, rosterPath, "athlete.new", a, errMsg)
 		return
 	}
 	if _, err := store.CreateAthlete(s.db, a); err != nil {
@@ -53,7 +53,7 @@ func (s *Server) handleAthleteEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view := rosterViewFrom(r)
-	s.renderAthleteForm(w, http.StatusOK, view, athletePath(id), "Athlet bearbeiten", a, "")
+	s.renderAthleteForm(w, r, http.StatusOK, view, athletePath(id), "athlete.edit", a, "")
 }
 
 // handleAthleteUpdate validates the form and overwrites the athlete's fields.
@@ -68,7 +68,7 @@ func (s *Server) handleAthleteUpdate(w http.ResponseWriter, r *http.Request) {
 	a, errMsg := athleteFromForm(r)
 	a.ID = id
 	if errMsg != "" {
-		s.renderAthleteForm(w, http.StatusBadRequest, view, athletePath(id), "Athlet bearbeiten", a, errMsg)
+		s.renderAthleteForm(w, r, http.StatusBadRequest, view, athletePath(id), "athlete.edit", a, errMsg)
 		return
 	}
 	err := store.UpdateAthlete(s.db, a)
@@ -114,7 +114,7 @@ func athleteFromForm(r *http.Request) (store.Athlete, string) {
 		Notes:     strings.TrimSpace(r.PostFormValue("notes")),
 	}
 	if a.FirstName == "" || a.LastName == "" {
-		return a, "Vor- und Nachname sind erforderlich."
+		return a, translate(r, "athlete.nameRequired")
 	}
 	return a, ""
 }
@@ -143,12 +143,12 @@ func promotionsPath(id int64) string { return athletePath(id) + "/promotions" }
 // reached from, and it is applied to both URLs here — to action, so submitting
 // carries the state to the handler that redirects, and to "Abbrechen", so
 // cancelling lands on the same roster. Callers pass the bare action path.
-func (s *Server) renderAthleteForm(w http.ResponseWriter, status int, view rosterView, action, heading string, a store.Athlete, errMsg string) {
-	s.tmpl.render(w, status, "athlete_form.html", map[string]any{
+func (s *Server) renderAthleteForm(w http.ResponseWriter, r *http.Request, status int, view rosterView, action, headingKey string, a store.Athlete, errMsg string) {
+	s.tmpl.render(w, r, status, "athlete_form.html", map[string]any{
 		"Authenticated": true,
 		"Action":        view.path(action),
 		"Cancel":        view.path(rosterPath),
-		"Heading":       heading,
+		"Heading":       translate(r, headingKey),
 		"Athlete":       a,
 		"Error":         errMsg,
 	})

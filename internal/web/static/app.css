@@ -90,6 +90,38 @@ header.app nav a:hover {
   color: var(--fg);
 }
 
+/* DE | EN switcher in the nav, sitting next to the theme toggle and reading like
+   the nav links rather than like buttons — it is a form only because the choice
+   is stored on the account. */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 1rem;
+  color: var(--border);
+}
+
+.lang-switch button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+}
+
+.lang-switch button:hover {
+  color: var(--fg);
+}
+
+.lang-switch button.active {
+  color: var(--fg);
+  font-weight: 700;
+  cursor: default;
+}
+
 /* Light/dark toggle button in the nav — quiet, icon-only. */
 .theme-toggle {
   margin-left: 1rem;
@@ -381,6 +413,16 @@ td.actions .btn {
     flex-wrap: wrap;
     gap: 0.5rem 0.75rem;
     padding: 0.75rem 1rem;
+  }
+
+  /* With the language switcher the nav carries five controls, which no longer
+     fit one phone-width line — so it wraps within itself rather than pushing the
+     whole page wider than the viewport. */
+  header.app nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.4rem;
   }
 
   header.app nav a:first-child {

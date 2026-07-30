@@ -4,29 +4,29 @@
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="{{.Action}}" hx-post="{{.Action}}" hx-target="body" class="stack">
   <label>
-    Vorname
+    {{t "athlete.firstName"}}
     <input name="firstName" value="{{.Athlete.FirstName}}" autocomplete="off" autofocus required />
   </label>
   <label>
-    Nachname
+    {{t "athlete.lastName"}}
     <input name="lastName" value="{{.Athlete.LastName}}" autocomplete="off" required />
   </label>
   <label>
-    Geburtsdatum
+    {{t "athlete.birthDate"}}
     <input type="date" name="birthDate" value="{{.Athlete.BirthDate}}" />
   </label>
   <label>
-    Eintrittsdatum
+    {{t "athlete.joinedOn"}}
     <input type="date" name="joinedOn" value="{{.Athlete.JoinedOn}}" />
   </label>
   <label>
-    Notizen
+    {{t "athlete.notes"}}
     <textarea name="notes" rows="4">{{.Athlete.Notes}}</textarea>
-    <span class="hint">keine Gesundheits-/Sonderdaten</span>
+    <span class="hint">{{t "athlete.notesHint"}}</span>
   </label>
   <div class="form-actions">
-    <button class="btn" type="submit">Speichern</button>
-    <a class="btn secondary" href="{{.Cancel}}">Abbrechen</a>
+    <button class="btn" type="submit">{{t "common.save"}}</button>
+    <a class="btn secondary" href="{{.Cancel}}">{{t "common.cancel"}}</a>
   </div>
 </form>
 {{end}}
