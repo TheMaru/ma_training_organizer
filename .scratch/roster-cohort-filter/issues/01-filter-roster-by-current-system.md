@@ -1,6 +1,6 @@
 # 01 — Filter the roster by current grading system
 
-Status: ready-for-agent
+Status: done
 
 Let a trainer narrow the athlete roster (`/athletes`) to one cohort, e.g. show
 only kids or only adults, by filtering on the grading **system** of each
@@ -238,3 +238,45 @@ Three notes on how the reasoning moved, for anyone re-opening this:
   [[rank-belt-visual]], and no work is duplicated either way — the slug/name split
   makes the chips i18n-agnostic. The slug column also shrinks that ticket's open
   question, since `name` becomes a display label rather than an identity.
+
+2026-07-30 — Implemented; every decision above went in as written, so this note
+only records what the ticket left to the implementation.
+
+- **`RosterRow` gained a `SystemOrder` next to the `SystemSlug` the scope names.**
+  The chips are ordered by the systems' seeded progression order — kids before
+  adult, the same order the rank sort blocks them in — and that order had to come
+  from somewhere. Without it the option order would fall out of row order and
+  reshuffle whenever the trainer changed the sort column, and ordering by name or
+  slug would put `BJJ Adult` first, against the order used everywhere else. The
+  column was **already** selected in the `ListRoster` subquery (`g.sort_order AS
+  system_order`) for the rank sort, so this costs no query change. Systems that
+  share a `sort_order` fall back to the slug, because `slices.SortFunc` is not
+  stable and `sort_order` defaults to 0 (migration 00003).
+- **The chip appearance moved further than "hoist `.chip` out of the phone
+  block".** `.sort-controls-label` became `.chip-row-label` because both rows now
+  share it, `.filter-controls`/`.sort-controls` share one `margin-bottom`, and
+  `.sort-chips, .filter-chips` share the flex row. What stayed inside
+  `@media (max-width: 600px)` is only what the ticket said should: the sort row's
+  `flex-wrap: nowrap`, its sideways scroll, the snap points and the mask fade.
+  The filter row **wraps** instead of scrolling — at 375px its four chips take two
+  lines, which keeps every option visible without a hidden overflow.
+- **The reserved `none` needs no special case in the form check.** It is
+  slug-shaped, so `[a-z0-9-]` already admits it; a separate early return would
+  have been dead code.
+
+Verified in Chrome at 375px and 1280px with the `seed-demo` roster (which spans
+all three cells — Sophie Neumann is ungraded, Elias Keller's history crosses
+kids→adult and so counts as adult):
+
+- At 375px both rows render, each under its own muted label, filter above sort.
+  The filter's chips wrap to two lines; the sort row still scrolls sideways and
+  fades at the right edge.
+- At 1280px the filter row still renders while the sort row does not — the
+  `<thead>` links carry the sort there, and `Vorname ▲` shows on the header.
+- `?system=bjj-kids` narrows 12 athletes to the 6 kids, marks `BJJ Kids` with
+  `aria-current`, and leaves `Alle` linking to a bare `/athletes`. Elias Keller is
+  correctly absent: his *current* rank is the adult one.
+
+![Filter and sort rows at 375px](../screenshots/filter-chips-375.png)
+![Filter row at 1280px, unfiltered](../screenshots/filter-chips-1280.png)
+![Roster narrowed to BJJ Kids at 1280px](../screenshots/filter-kids-1280.png)
