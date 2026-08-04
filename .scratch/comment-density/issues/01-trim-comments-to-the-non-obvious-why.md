@@ -1,102 +1,149 @@
-# 01 — Trim the code comments back to the non-obvious why
+# 01 — Write down what earns a comment in this repo
 
-Status: needs-triage
+Status: done
 
-The Go code carries a lot of comment, and a growing share of it explains *what*
-the code does rather than *why* it is the way it is. Cut it back, and settle what
-the standard actually is so the next feature does not re-inflate it.
+Settle the commenting standard in writing, so the next feature is built to it and
+the trim pass ([[comment-density]] 02) has a rule to apply. **This ticket writes
+the rule only — it deletes nothing.**
 
-## The evidence
+## The tension it resolves
 
-Comment lines as a share of each file, today:
+Two standards were in play and pointed in opposite directions:
 
-| File | Comment / total |
-| --- | --- |
-| `internal/web/rosterview.go` | 56 / 141 — **39 %** |
-| `internal/web/belt.go` | 64 / 184 — 34 % |
-| `internal/store/roster.go` | 76 / 255 — 29 % |
-| `internal/web/roster.go` | 52 / 193 — 26 % |
-| `internal/store/athlete.go` | 44 / 206 — 21 % |
-| `internal/store/seed.go` | 30 / 148 — 20 % |
+- The **global instruction** (the user's personal `CLAUDE.md`): "default to none.
+  Most code needs no comment at all. Write one only for a non-obvious *why* that
+  the code itself cannot state — never to restate what the code does. Prefer
+  deleting a comment over shortening it."
+- **The repo as it stands**: every exported *and* unexported declaration carries
+  a doc comment, often several sentences, frequently citing an ADR. Comment share
+  runs 20–39 % per file.
 
-So it is a repo-wide pattern, not one bad file. The most recent commit made it
-measurably worse: of the 262 production lines `10552df` added across
-`store/roster.go`, `web/roster.go`, `web/rosterview.go` and `store/seed.go`,
-**104 are comment — 39 %**, against the 20–34 % of the files it was written into.
+Triage settled this in favour of a **documented exception for this repo**, with
+the reasoning below. That exception has to be written down where an agent reads
+it, or the conflict returns with every feature.
 
-## The tension to settle first
+## The rule to write
 
-There are two standards in play and they point in opposite directions:
+**A comment should only contain what the surrounding code does not already
+clearly say.** (The maintainer's formulation, and the primary test.)
 
-- The **global instruction** (`~/.claude/CLAUDE.md`): "default to none. Most code
-  needs no comment at all. Write one only for a non-obvious *why* that the code
-  itself cannot state — never to restate what the code does. Prefer deleting a
-  comment over shortening it."
-- The **repo as it stands**: every exported *and* unexported function carries a
-  doc comment, usually several sentences, frequently citing an ADR or the spec.
-  A new file that followed the global instruction literally would read as foreign
-  in this codebase.
+With one carve-out the primary test does not catch on its own:
 
-That conflict is the actual open question, and it should be answered before
-anyone starts deleting. Three candidate positions:
+- **Comments about *distant* code** — "the caller in X relies on this" — pass the
+  primary test, because the surrounding code indeed does not say it, yet they are
+  the most drift-prone kind there is: they couple two files, and only one of them
+  gets read when the other changes. Rule: **one place owns a piece of reasoning**;
+  anywhere else points at it rather than restating it.
 
-1. **The global instruction wins**; the existing density is legacy to be worked
-   off. Cheapest to state, most churn, and it throws away ADR cross-references
-   that have genuinely helped — several comments are the only place a piece of
-   reasoning is reachable from the code.
-2. **Godoc-on-declarations stays, prose-in-bodies goes.** One-sentence doc
-   comment per declaration saying what it is for; the multi-paragraph rationale
-   moves to the ADR it already cites. Comments inside function bodies survive only
-   where they name a non-obvious constraint.
-3. **The repo convention wins as-is**, and this ticket becomes about the excess
-   only: comments that restate their own body, and cases where the same reasoning
-   is written out in two or three places.
+And two clarifications that keep the rule from collapsing into "delete
+everything":
 
-## What is already known to be trimmable
+- **A "why" with no ADR home stays in the comment, at whatever length it needs.**
+  The rule constrains *what* a comment says, not how long it is. Most reasoning
+  does not qualify for an ADR — that needs hard-to-reverse *and* surprising *and*
+  a real trade-off — and forcing it into one would either inflate the ADR log
+  with non-decisions or delete reasoning that is genuinely load-bearing.
+- **ADR citations in comments are navigation, not decoration.** They are how a
+  reader gets from code to the reasoning behind it without knowing which ADR to
+  open. Keep them.
 
-Found while reviewing `10552df`, whichever position wins:
+## Where it goes
 
-- `FilterRoster` (`internal/store/roster.go`) — the doc's first paragraph
-  enumerated the three branches the body shows. Already shortened in that commit;
-  the same shape exists elsewhere.
-- The ADR-0007 reasoning about the options invariant is written out three times:
-  in `RosterFilterOptions`, in `handleAthletesList`, and in the template comment
-  in `athletes.html`. One of the three is the right number.
-- `internal/web/rosterview.go` — the highest-density file in the repo, and mostly
-  narrative: the `rosterView` struct doc, `rosterViewFrom` and `query()` each
-  carry several paragraphs, with overlap between them.
-- Template comments in `athletes.html` re-explain CSS decisions that `app.css`
-  states at the rule itself.
+`docs/agents/comments.md`, plus one line in the pointer block of the repo's
+`CLAUDE.md` — the layout the repo already uses, where `CLAUDE.md` holds pointers
+and `docs/agents/` holds the content (see the issue-tracker, triage-labels and
+domain entries).
 
-## Not in scope
-
-- ADRs, `CONTEXT.md`, specs and issue files. Prose is wanted there; this is about
-  comments in code only.
-- Commit messages.
-- Test names and test doc comments — worth a look, but they document intent for a
-  reader deciding whether a failure matters, which is a different trade. Split
-  into a second ticket if it turns out to be worth doing.
+The document should state the rule, the carve-out, the two clarifications, and —
+briefly — that this is a deliberate exception to a stricter global default, with
+why. Without the "why" the next reader treats it as an oversight.
 
 ## Acceptance
 
-- The standard is written down where an agent will actually read it: a section in
-  `CLAUDE.md`, or `docs/agents/`, saying what earns a comment in this repo.
-- The trim is applied to at least `internal/web/rosterview.go`,
-  `internal/store/roster.go` and `internal/web/roster.go`, the three densest
-  files touched most recently.
-- No reasoning is *lost*: anything deleted that was the only record of a decision
-  moves into the ADR it belongs to, rather than disappearing.
-- `go test ./...` still passes, which for a comment change means the diff really
-  was comment-only — worth confirming with `git diff --stat` against the
-  behaviour being untouched.
+- `docs/agents/comments.md` exists and states the rule, the distant-code
+  carve-out, and the two clarifications.
+- The repo's `CLAUDE.md` points at it from the same block as the other agent
+  conventions.
+- **No code comment is added, changed or deleted by this ticket.** `git diff
+  --stat` touches documentation only.
 
 ## Comments
 
 2026-07-30 — Raised by the user straight after `10552df` shipped ("sehr viele und
-große Kommentare"), and the numbers above back it up: that commit's production
-diff is 39 % comment against a 20–34 % baseline. Filed as `needs-triage` rather
-than `ready-for-agent` on purpose — the global "default to none" and the repo's
-own thoroughly-commented style genuinely conflict, and an agent turned loose on
-this without that decision would either strip out load-bearing ADR pointers or
-polish the wording and change nothing. `/grill-me` or `/to-spec` on the three
-candidate positions above is the natural next step.
+große Kommentare"). That commit's production diff was 39 % comment against a
+20–34 % baseline. Filed as `needs-triage` on purpose: an agent turned loose
+without the standard settled would either strip out load-bearing ADR pointers or
+polish the wording and change nothing.
+
+2026-08-03 — > *This was generated by AI during triage.*
+
+**Triaged and settled.** Of the three candidate positions the ticket offered, and
+a fourth raised at triage, **position 2 won** — godoc-style intent on
+declarations stays, narrative prose does not — but restated as the maintainer's
+test rather than as a per-declaration quota, because a quota measures the wrong
+thing.
+
+*Why not the others.* Position 1 (global rule wins) was rejected on concrete
+evidence: this triage session navigated the codebase largely through those
+comments — `resolveBelt`'s doc gave ADR-0004's fallback rule without opening the
+ADR, `beltColours`' comment explained why the spelling match is exact. In a repo
+deliberately worked by agents, ADR pointers in code are navigation
+infrastructure. Position 3 (repo wins, trim dubletten only) decides nothing and
+lets the next feature re-inflate. Position 4 (draw the line at exported vs.
+unexported) was tempting — the two densest files, `rosterview.go` at 39 % and
+`belt.go` at 34 %, contain **no exported identifiers at all**, so Go's own
+convention would exempt them — but that line is a *library* distinction and this
+is an application. Nobody consumes `internal/web` from outside. It would delete
+most heavily exactly where the non-obvious reasoning sits.
+
+*On the drift concern, which is the real motivation for the strict global rule.*
+The maintainer's worry is that comments go stale, and that it is not yet clear
+whether agents make that better or worse. This repo has evidence. All three belt
+follow-up commits (`2e0f1cf`, `82c692d`, `6366a19`) changed comments along with
+the code — 17, 5 and 5 comment lines. The sharpest case is `6366a19`: the friso
+widened from 20 to 24, `beltMaxStripes` derives from it, and the prose saying
+"four" was corrected to "five" with a new justification. That is the highest-risk
+comment species there is — prose asserting a computed value — and it did not
+drift.
+
+The README, meanwhile, was badly stale (it claimed the app was "not yet built"),
+and ADR-0008 carried a claim that was outright wrong until it was corrected on
+2026-08-03. **Drift tracks distance from the code, not the medium.** An agent
+editing a function reads its comment by construction; nobody reads the README
+when they touch `belt.go`. That is the opposite of the pre-agent failure mode,
+and it is the evidential basis for keeping comments *in* the code and being
+strict about comments that describe code elsewhere.
+
+The failure mode that does get worse with agents is different and is worth
+stating in the document: writing *inferred* intent as though it were decided.
+That is not stale — it is confidently wrong from day one, and it reads exactly as
+authoritative as a correct comment.
+
+2026-08-04 — Shipped as `29dc8bd`: `docs/agents/comments.md` plus a fourth entry in
+`CLAUDE.md`'s pointer block. No `.go` file was touched; the trim itself remains
+[[comment-density]] 02's job. Two things the ticket left open, and one correction to
+the triage record:
+
+- **The exported/unexported argument had to be narrowed to hold.** The triage note
+  rejects position 4 on the grounds that "the two densest files … contain **no
+  exported identifiers at all**". Measured across the whole repo rather than the
+  six files in the ticket's table, that is not true: the densest file is
+  `internal/auth/password.go` at 42 % comment share, and every identifier in it is
+  exported (`MinPasswordLength`, `ErrPasswordTooShort`, `ValidatePassword`, `Hash`,
+  `Verify`). `rosterview.go` (39 %) and `belt.go` (34 %) are second and third. The
+  document therefore makes the claim about the densest files *in `internal/web`*,
+  which is where it was always doing its work — the point is that nothing consumes
+  that package from outside, and `internal/auth` is not a counter-example to that,
+  it just is not covered by it. The conclusion survives; the evidence for it is
+  narrower than triage recorded.
+- **The drift paragraph names its evidence instead of summarising it.** The
+  `beltMaxStripes` "four" → "five" correction is cited inline, because a claim that
+  comments *have* tracked the code here is exactly the sort of assertion that
+  invites checking, and a reader who cannot check it has to take it on faith.
+- **The "briefly" in the ticket's last section was read as binding.** A first draft
+  of the exception rationale was the longest section in the file and the most
+  essayistic, against three sibling documents in `docs/agents/` that run 21–52
+  lines and put their rules in bullets. It was cut to two short paragraphs and the
+  heading fixed: it had said "stricter-than-default", which inverts the very
+  relationship the section exists to explain — the repo standard is *looser* than
+  the global default, and the exception is what buys the extra room.
