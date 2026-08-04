@@ -1,59 +1,106 @@
-# 02 — Invalidate a trainer's other sessions, and time sessions out
+# 02 — Revoke a trainer's sessions, from the app and from the CLI
 
-Status: needs-triage
+Status: ready-for-agent
 
-A trainer's session survives everything except that session's own logout. A
-password change — self-service (`handleChangePassword`) or CLI
-(`reset-password`) — rotates the caller's token and leaves every other session
-row in the `sessions` table untouched. `internal/web/auth.go` already concedes
-this in a comment. With `SessionLifetime` at 30 days and no idle timeout, a
-captured cookie stays valid for up to a month no matter what the account owner
-does about it.
+Give a trainer a way to end their sessions on every other device, and give an
+operator a way to end someone's sessions entirely. One mechanism, two callers.
+
+Timeouts and session configuration were split out into
+[[pre-deploy-hardening]] 04; offboarding into [[trainer-offboarding]] 01.
 
 ## The state of play
 
-The capability is not missing: sessions are server-side rows in SQLite
-(ADR-0002's "revocable" is about that, as against stateless JWTs), so an operator
-with access to the volume can already `DELETE FROM sessions`. What is missing is
-any supported way to do it — no `revoke-sessions`, no `delete-trainer`, and no
-automatic invalidation on the one event that obviously implies it.
+A trainer's session survives everything except that session's own logout. A
+password change — self-service or CLI `reset-password` — rotates the caller's
+token and leaves every other session row untouched; `internal/web/auth.go`
+already concedes this in a comment. Sessions are server-side rows in SQLite
+(ADR-0002's "revocable"), so an operator with volume access can already
+`DELETE FROM sessions`. What is missing is any *supported* way to do it.
 
-The pre-deployment security review (2026-08-03) dropped this as a hardening gap
-rather than a vulnerability: every path to it presupposes the attacker already
-holds a cookie or the device. That does not make it a non-issue — it makes it a
-containment question rather than an entry-point question.
+The pre-deployment security review (2026-08-03) classed this as a hardening gap,
+not a vulnerability: every route to it presupposes the attacker already holds a
+cookie or the device. That makes it a containment question, not an entry-point
+one.
 
-## What needs deciding before anyone writes code
+## Decisions (triage, 2026-08-03)
 
-1. **Does a password change kill the other sessions?** The intuitive answer is
-   yes, and it is what "I think someone has my session" pushes a person to do. But
-   the current behaviour is deliberate enough to be written down in a comment, so
-   the reversal should be a decision, not a drive-by. `scs` exposes
-   `SessionManager.Iterate`, so walking the store and destroying every session
-   whose `trainerID` matches (skipping the current token on the self-service path)
-   is a dozen lines.
-2. **Is there an idle timeout, and how long?** A 30-day absolute lifetime with no
-   idle timeout is generous for a tool holding personal data of minors (ADR-0003).
-   But trainers use this from a phone at the side of a mat; a 30-minute timeout
-   would be actively hostile. Something like 24 hours idle inside the 30-day
-   absolute lifetime is the shape to argue about.
-3. **Is offboarding a feature?** There is no `delete-trainer` and no way to
-   deactivate an account — a trainer who leaves the club keeps working
-   credentials. That is a real gap in a tool whose accounts are provisioned
-   out-of-band, but it is a feature question (what happens to the athletes they
-   entered? is deactivation different from deletion?) rather than a fix, and it
-   may deserve its own ticket rather than riding along here.
+**A password change does *not* revoke other sessions.** The current behaviour
+stands, deliberately. Revocation becomes an explicit, separate action instead of
+a side effect — which is both clearer in intent and how the large providers do
+it. The comment at the `RenewToken` call in `handleChangePassword` must be
+extended to say this is a decision, not an oversight, and to point at the two
+controls below.
+
+**Self-service: a "log out on all devices" control in the trainer's own account
+area.** This is the recovery path for "I think someone has my session", and it is
+what makes the decision above defensible — without it the app would have no
+supported recovery at all. It revokes every session for the trainer **except the
+calling one**, which has just authenticated.
+
+**Operator: a CLI subcommand** that revokes every session for a named trainer,
+with no exception. This is the locked-out and suspected-takeover path, and it
+sits alongside `reset-password` in the same operator role — accounts here are
+provisioned out-of-band already (`CONTEXT.md`), so session revocation belonging
+to the operator is consistent rather than novel.
+
+**Granularity is per trainer, not per session.** An operator has no way to tell
+one token from another, and tokens are secrets that should not be listed into a
+terminal to be picked from.
+
+## Implementation notes
+
+- `scs.SessionManager.Iterate` exists in the pinned `scs/v2 v2.9.0`, and the
+  `sqlite3store` implements the `All()` it needs — checked at triage. Walking the
+  store and destroying every session whose stored trainer id matches is the whole
+  mechanism.
+- **One core function, two thin callers.** Something shaped like
+  `revokeSessions(ctx, trainerID, exceptToken)`; the self-service handler passes
+  the current token, the CLI passes none. Splitting the two callers into separate
+  tickets would have duplicated this core, which is why they are here together.
+- The CLI path has no request context and no "current session", so it needs a
+  background context — and revoking everything is the correct behaviour there.
+- The self-service control is a POST with the usual protections of this app's
+  mutations, and it needs catalog keys in **both** locales (ADR-0008), plus a
+  confirmation step — it logs the trainer out of their phone at the mat side, and
+  that should not happen on a stray tap.
 
 ## Acceptance
 
-Once triaged, whatever is decided needs a test that a second session goes dead:
-log in with two clients, change the password on one, assert the other's next
-request lands on `/login`. `newAuthTestServer` plus a second `newClient` already
-makes that a short test — `TestLanguageChoicePersistsOnTheAccount` does the
-two-client dance already.
+- A trainer can revoke their other sessions from their own account area; the
+  session they did it from keeps working.
+- An operator can revoke all of a named trainer's sessions from the CLI.
+- The password-change paths are unchanged in behaviour, and the comment there
+  records why, pointing at both controls.
+- **Test that a second session actually goes dead:** log in with two clients,
+  revoke from one, assert the other's next request lands on `/login`.
+  `newAuthTestServer` plus a second client already makes this short —
+  `TestLanguageChoicePersistsOnTheAccount` does the two-client dance today.
+- A test that the revoking session survives.
+- A test for the CLI path revoking every session including what would have been
+  the caller's.
+- The new UI strings exist in both catalogs; `TestCatalogsHaveIdenticalKeys` and
+  `TestEveryPageRendersInEnglish` still pass.
 
 ## Comments
 
-2026-08-03: Filed from the pre-deployment security review. Filed as
-`needs-triage` because all three questions above are policy calls with real UX
-cost, not implementation details.
+2026-08-03: Filed from the pre-deployment security review, as `needs-triage`
+because all of it was policy with real UX cost rather than implementation detail.
+
+2026-08-04 — > *This was generated by AI during triage.*
+
+**Triaged.** Of the three shapes considered for the password-change question —
+revoke others, leave it, revoke everything including the caller — the maintainer
+chose **leave it**, then added the self-service control, which is a better
+resolution than any of the three on their own. Splitting "change my password"
+from "log me out everywhere" means neither action has to guess at the other's
+intent, and the residual objection to leaving the password path alone (that a
+trainer would have to reach an operator to recover) disappears.
+
+Revoking the caller's own session too was rejected: it punishes the routine
+password change without touching an attacker who is already covered.
+
+**Split.** This ticket originally carried four separate pieces of work — the
+password-change decision, timeouts, configuration, and offboarding. Timeouts and
+configuration moved to [[pre-deploy-hardening]] 04 (no UI, no new routes, all in
+`config` and the boot path). Offboarding moved to [[trainer-offboarding]] 01,
+because it is a feature question that a hardening ticket must not pre-decide.
