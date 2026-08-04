@@ -28,7 +28,7 @@ var rosterColumns = []struct {
 
 // filterAllKey is the chip for the unfiltered roster, and filterUngradedKey the
 // one for the athletes who are in no grading system at all (CONTEXT.md's
-// Ungraded). A system's chip is named by systemLabel instead, keyed on its slug.
+// Ungraded).
 const (
 	filterAllKey      = "roster.filter.all"
 	filterUngradedKey = "roster.filter.ungraded"
@@ -68,15 +68,12 @@ type rosterFilter struct {
 }
 
 // handleAthletesList renders the shared roster, sorted server-side by
-// ?sort=<col>&dir=<asc|desc> and narrowed by ?system=<slug|none>. Unknown values
-// fall back to the default view (Vorname ascending, unfiltered) rather than
-// erroring: both are view concerns.
+// ?sort=<col>&dir=<asc|desc> and narrowed by ?system=<slug|none>.
 //
-// This is the one handler that knows which filters are *represented* (ADR-0007b).
-// It loads the roster unfiltered once and derives both the options and the shown
-// rows from that same slice, so "every offered option matches at least one
-// athlete" holds by construction — there is no second source to drift from, and
-// hence no empty-result state for the template to apologise for.
+// This is the one handler that knows which filters are *represented* (ADR-0007b):
+// it loads the roster unfiltered once and derives both the options and the shown
+// rows from that same slice, which is what store.RosterFilterOptions asks of its
+// caller and what the absent empty-result state rests on.
 func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 	view := rosterViewFrom(r)
 
@@ -103,10 +100,9 @@ func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// representedFilter keeps a filter only if the roster actually offers it, in the
-// spirit of store.NormalizeRosterSort: a bookmarked system the last athlete has
-// since left is not a data error, it is a view that no longer exists, so it
-// resolves to Alle.
+// representedFilter keeps a filter only if the roster actually offers it. A
+// bookmarked system the last athlete has since left is not a data error, it is a
+// view that no longer exists, so it resolves to Alle.
 func representedFilter(system string, options []store.RosterOption) string {
 	offered := slices.ContainsFunc(options, func(o store.RosterOption) bool {
 		return o.Value == system
@@ -118,9 +114,9 @@ func representedFilter(system string, options []store.RosterOption) string {
 }
 
 // rosterFilters builds the filter chips: Alle followed by one per non-empty cell
-// of the partition. It returns nothing below two options — Alle and a single
-// option would show the same roster, so in a homogeneous roster the row is
-// absent and surfaces by itself once there is something to partition (ADR-0007a).
+// of the partition. Below two options it builds none — Alle and a single option
+// would show the same roster, so in a homogeneous roster the row is absent and
+// surfaces by itself once there is something to partition (ADR-0007a).
 func rosterFilters(locale i18n.Locale, view rosterView, options []store.RosterOption) []rosterFilter {
 	if len(options) < 2 {
 		return nil
@@ -151,7 +147,6 @@ func filterLabel(locale i18n.Locale, option store.RosterOption) string {
 	return systemLabel(locale, option.Value, option.Name)
 }
 
-// rosterLines pairs each roster row with its outgoing links under the given view.
 func rosterLines(rows []store.RosterRow, view rosterView) []rosterLine {
 	lines := make([]rosterLine, 0, len(rows))
 	for _, row := range rows {
@@ -164,10 +159,9 @@ func rosterLines(rows []store.RosterRow, view rosterView) []rosterLine {
 	return lines
 }
 
-// rosterHeaders builds the clickable column headers for the active view. Every
-// column links to itself ascending — a first click always sorts A→Z — except the
-// active one, whose link flips the direction so a click toggles it. Only the
-// active column carries an indicator.
+// rosterHeaders builds the clickable column headers for the active view. Each
+// links to the view rosterView.sortedBy produces, which is where the rule for
+// what a click does lives.
 func rosterHeaders(locale i18n.Locale, view rosterView) []rosterHeader {
 	headers := make([]rosterHeader, 0, len(rosterColumns))
 	for _, col := range rosterColumns {

@@ -1,7 +1,7 @@
 # 02 — Apply the trim to the densest files
 
-Status: ready-for-agent
-Blocked by: comment-density/01 (writes the rule this applies), i18n-domain-data/01 (rewrites comments in `belt.go` and `roster.go`, two of the files trimmed here)
+Status: done
+Blocked by: comment-density/01 (writes the rule this applies), i18n-domain-data/01 (rewrites comments in `belt.go` and `roster.go`, two of the files trimmed here) — both landed
 
 Apply the standard from [[comment-density]] 01 to the code. Comment changes only
 — no behaviour, no renames, no restructuring.
@@ -87,6 +87,38 @@ ticket is not a repo-wide sweep.
   behaviour, no renames.
 
 ## Comments
+
+2026-08-04 — **Done.** [[i18n-domain-data]] 01 landed (`8d4b0e7`), which unblocked
+the deferred half: `internal/web/belt.go` and `internal/web/roster.go` are trimmed,
+and all four files in scope are now under the rule.
+
+Comment share: `belt.go` 34 % → 31 %, `web/roster.go` 26 % → 26 %. Flat again, and
+for the same reason as the first half — both files carry a lot of genuine "why", so
+what went was restatement rather than length. Three kinds again: an enumeration of
+the body (`splitRankGroup`'s parse rule, which `strings.Cut` and
+`slices.Contains` already state; `rosterLines` and `writeBeltStripes`, whose docs
+said exactly what their four lines said), an invariant stated more than once (the
+unknown-colour fallback, now owned by `beltSVG` where the templates meet it; the
+degree clamp, owned by `beltMaxStripes`), and a comment about another file
+(`rosterHeaders` restating what `rosterView.sortedBy` decides, `handleAthletesList`
+restating ADR-0007).
+
+**The ADR-0007 invariant is two thirds resolved and stops there by design.**
+`RosterFilterOptions` owns it; `FilterRoster` and now `handleAthletesList` point at
+it. The third copy is the `athletes.html` template comment, which was never in this
+ticket's four-file scope — it gets trimmed as the template is next touched.
+
+Review found three things, all fixed before the commit. Two are the same failure
+mode the first half hit, from the opposite direction: trimming the belt geometry
+doc deleted the only statement that a split belt's bar reappears in the tail past
+the friso, which left the drawing-order comment below it ("the friso covers its
+end") the sole account — and wrong, since the friso covers the bar's middle. The
+fact moved down to the rect that enacts it and the wrong clause went. Second,
+`representedFilter` was left pointing at `NormalizeRosterSort` for a
+view-concern-not-a-data-error trade that lives on `ListRoster`, not there; the
+pointer went rather than being redirected, because the local "why" stands on its
+own. Third, `resolveBelt`'s doc was redundant three ways after the trim and was
+deleted outright. **Check the target before you point at it** — that is now twice.
 
 2026-08-04 — **Half done.** `internal/web/rosterview.go` and
 `internal/store/roster.go` are trimmed. The other two files in scope wait, because

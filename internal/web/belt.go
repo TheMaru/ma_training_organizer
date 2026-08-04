@@ -11,14 +11,11 @@ import (
 // beltColours maps a rank's `rank_group` onto the fill that draws it. This is
 // the hardcoded, view-layer colour table of ADR-0004: the domain model keeps
 // rank_group as free text and declares nothing about belts, so a rank becomes
-// belt-renderable purely by having an entry here. Extending a belt system means
-// adding colours; a grading system with none (numbered dan grades, say) has no
-// entries and renders as its plain rank name instead.
+// belt-renderable purely by having an entry here.
 //
 // The keys are spelled exactly as store.Seed writes them, which is the only
-// thing that writes rank_group today. A variant spelling simply misses and falls
-// back to the rank name — matching more loosely would be guessing at input no
-// code path produces.
+// thing that writes rank_group today. Lookup is exact — matching more loosely
+// would be guessing at input no code path produces.
 var beltColours = map[string]string{
 	"White":  beltWhite,
 	"Grey":   "#9ca3af",
@@ -31,8 +28,7 @@ var beltColours = map[string]string{
 	"Black":  beltBlack,
 }
 
-// The three fills the renderer needs by name rather than by rank_group: the
-// stripes, the friso, and the red friso a black belt carries.
+// The three fills the renderer needs by name rather than by rank_group.
 const (
 	beltWhite = "#f2f2f2" // off-white, so the belt still reads on a white surface
 	beltBlack = "#1c1c1f"
@@ -48,8 +44,7 @@ var beltBarColours = []string{"White", "Black"}
 // strip: the body across its whole width, an optional bar down its middle, and
 // the friso (end block) carrying the stripes. The friso sits a little short of
 // the right edge, as it does on a real belt, so a stretch of body colour runs on
-// past it — and a split belt's bar reappears in that tail, since the bar is drawn
-// across the full width and only hidden where the friso covers it.
+// past it.
 const (
 	beltWidth        = 72
 	beltHeight       = 16
@@ -85,10 +80,8 @@ type belt struct {
 // label (ADR-0009) treat as "unresolvable" — so the two degrade together on one
 // definition of a known colour rather than on two lists that could drift.
 //
-// The parsing rule (spec): split rank_group on "-"; two parts whose second is
-// White or Black are a body colour plus a bar, and otherwise the whole string is
-// a single body colour — so a colour name that itself contains a "-" is looked up
-// intact rather than mistaken for a split belt.
+// Only a second part that is White or Black makes a split belt, so a colour name
+// that itself contains a "-" is looked up intact rather than mistaken for one.
 func splitRankGroup(group string) (body, bar string, ok bool) {
 	body, bar = group, ""
 	if before, after, split := strings.Cut(group, "-"); split && slices.Contains(beltBarColours, after) {
@@ -100,18 +93,11 @@ func splitRankGroup(group string) (body, bar string, ok bool) {
 	return body, bar, true
 }
 
-// resolveBelt parses a rank_group and degree into a drawable belt, reporting
-// false when the colour is not in beltColours. The caller then falls back to the
-// plain rank name (ADR-0004), so the graphic is never the sole carrier of
-// meaning and an unmapped system degrades gracefully instead of breaking.
 func resolveBelt(group string, degree int) (belt, bool) {
 	body, bar, ok := splitRankGroup(group)
 	if !ok {
 		return belt{}, false
 	}
-	// The degree is clamped rather than trusted: seed.go leaves the rare 5th BJJ
-	// stripe out but says a club may add it, and that rank would otherwise draw
-	// stripes outside the friso.
 	drawn := belt{
 		body:    beltColours[body],
 		bar:     beltColours[bar],
@@ -129,8 +115,10 @@ func resolveBelt(group string, degree int) (belt, bool) {
 
 // beltSVG renders a rank as an inline SVG belt, the one helper behind all three
 // rank surfaces (roster, detail current rank, promotion history) so their markup
-// cannot drift apart. It returns an empty string when the rank's colour is
-// unknown; templates treat that as "render the plain rank name instead".
+// cannot drift apart. It returns an empty string for a rank resolveBelt cannot
+// draw, and the templates print the plain rank name instead — the graphic is
+// never the sole carrier of meaning, so a grading system with no colours degrades
+// gracefully rather than breaking (ADR-0004).
 //
 // label is the rank as assistive tech should hear it. Pass it where the graphic
 // stands alone (the roster) and it becomes the graphic's accessible name and its
@@ -162,8 +150,9 @@ func beltSVG(group string, degree int, label string) template.HTML {
 	fmt.Fprintf(&svg, `<rect class="belt-body" x="0" y="0" width="%d" height="%d" fill="%s"/>`,
 		beltWidth, beltHeight, b.body)
 	if b.bar != "" {
-		// Drawn before the friso, which covers its end — a real split belt's bar runs
-		// the belt's length and disappears under the friso.
+		// Drawn before the friso, which hides the stretch of bar it covers — a real
+		// split belt's bar runs the belt's whole length, so it disappears under the
+		// friso and reappears in the tail past it.
 		fmt.Fprintf(&svg, `<rect class="belt-bar" x="0" y="%d" width="%d" height="%d" fill="%s"/>`,
 			beltBarY, beltWidth, beltBarHeight, b.bar)
 	}
@@ -181,7 +170,6 @@ func beltSVG(group string, degree int, label string) template.HTML {
 	return template.HTML(svg.String())
 }
 
-// writeBeltStripes draws n white stripes centred on the friso, evenly spaced.
 func writeBeltStripes(svg *strings.Builder, n int) {
 	if n == 0 {
 		return
