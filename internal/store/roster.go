@@ -7,9 +7,7 @@ import (
 	"strings"
 )
 
-// Roster sort columns, as they appear in the ?sort= query parameter. They are the
-// whitelist keys of rosterOrderBy: anything else falls back to the default, so a
-// sort column never reaches the SQL as user input.
+// Roster sort columns, as they appear in the ?sort= query parameter.
 const (
 	RosterSortLastName  = "lastName"
 	RosterSortFirstName = "firstName"
@@ -22,8 +20,8 @@ const (
 	RosterSortDefault = RosterSortFirstName
 )
 
-// rosterOrderBy maps each sortable column onto the ORDER BY keys it sorts by.
-// The rank column has two: (system order, rank order) is the only domain-honest
+// rosterOrderBy is the sort whitelist, mapping each column onto its ORDER BY keys.
+// The rank column takes two: (system order, rank order) is the only domain-honest
 // cross-system ordering — there is no meaningful "how advanced" comparison
 // between a kids and an adult rank (spec, ADR-0001).
 var rosterOrderBy = map[string][]string{
@@ -34,20 +32,21 @@ var rosterOrderBy = map[string][]string{
 	RosterSortRank:      {"cur.system_order", "cur.rank_order"},
 }
 
-// rosterTieBreak is the fixed secondary order for every sort: alphabetical by
-// first then last name. It never reverses — within "all blue belts" A→Z is more
-// natural than Z→A whichever way the primary axis points (spec).
+// rosterTieBreak is the fixed secondary order for every sort. It never reverses —
+// within "all blue belts" A→Z is more natural than Z→A whichever way the primary
+// axis points (spec).
 var rosterTieBreak = []string{"a.first_name", "a.last_name"}
 
 // RosterRow is one line of the athlete roster: the athlete plus their derived
 // current rank (ADR-0001), joined in SQL rather than derived per row in Go. Rank
 // fields are empty/zero for an ungraded athlete, who has no rank at all — that is
 // distinct from the lowest rank, which is a graduation.
-// Group and Degree are the rank's descriptive breakdown (ADR-0001), carried so
-// the roster can render the rank as a belt graphic (ADR-0004) from the same row.
-// SystemSlug is the system's stable identity (ADR-0006), carried so the roster
-// filter can partition these rows without a second query (ADR-0007); SystemName
-// remains the display label.
+//
+// Group, Degree and SystemSlug are carried for the view: group and degree are the
+// rank's descriptive breakdown (ADR-0001), which the belt graphic composes from
+// (ADR-0004), and the roster filter partitions on the slug without a second query
+// (ADR-0007). The slug is the system's identity, SystemName only its display label
+// (ADR-0006).
 type RosterRow struct {
 	Athlete
 	RankID      int64
@@ -66,8 +65,7 @@ const RosterFilterUngraded = "none"
 
 // RosterOption is one cell of the roster's partition and one chip in the filter
 // row: the value that identifies it in ?system=, and the system's display name —
-// empty on the ungraded cell, which is in no system and so has no name of its
-// own to show.
+// empty on the ungraded cell, which is in no system and so has no name of its own.
 type RosterOption struct {
 	Value string
 	Name  string
@@ -75,9 +73,9 @@ type RosterOption struct {
 
 // RosterFilterOptions returns the cells of the roster's partition that actually
 // hold someone: one per grading system present among the current ranks, plus the
-// ungraded cell if anyone is ungraded. Callers must pass the *unfiltered* roster
-// — deriving the options from an already filtered one would leave only the
-// active option standing and delete the way back to Alle (ADR-0007a).
+// ungraded cell if anyone is ungraded. Callers must pass the *unfiltered* roster,
+// or only the active option is left standing and the way back to Alle disappears
+// (ADR-0007a).
 //
 // Because every returned option matches at least one of the rows it was derived
 // from, no offered filter can produce an empty roster. That is what licenses the
@@ -124,9 +122,8 @@ func RosterFilterOptions(rows []RosterRow) []RosterOption {
 // is Alle. The given order is preserved — the roster is sorted in SQL, and
 // narrowing it is not allowed to reorder it.
 //
-// An option nobody holds yields nothing; the roster handler keeps that state
-// unreachable by offering only RosterFilterOptions and falling back to Alle for
-// anything else.
+// An option nobody holds yields nothing; see RosterFilterOptions for why no
+// offered option can reach that state.
 func FilterRoster(rows []RosterRow, option string) []RosterRow {
 	if option == "" {
 		return rows
@@ -145,8 +142,7 @@ func FilterRoster(rows []RosterRow, option string) []RosterRow {
 }
 
 // NormalizeRosterSort maps a requested sort column onto the whitelist, returning
-// RosterSortDefault for anything unknown. Callers use it to learn which column is
-// actually active (for the header indicator) before passing it to ListRoster.
+// RosterSortDefault for anything unknown.
 func NormalizeRosterSort(sort string) string {
 	if _, ok := rosterOrderBy[sort]; ok {
 		return sort
@@ -156,15 +152,12 @@ func NormalizeRosterSort(sort string) string {
 
 // ListRoster returns the whole roster with each athlete's current rank, ordered
 // by the named column. An unknown column silently sorts by RosterSortDefault:
-// sorting is a view concern, not a data error. descending reverses the primary
-// axis only; the first/last-name tie-break stays ascending.
+// sorting is a view concern, not a data error.
 //
-// The current rank comes from a window function that ranks each athlete's
-// promotions by date (higher id winning a tied date) and keeps the first — the
-// same rule CurrentRank applies in Go, pinned to it by a test. The LEFT JOIN
-// keeps ungraded athletes on the roster with NULL rank keys, which NULLS LAST
-// then sorts to the end in both directions. Window functions and NULLS LAST are
-// standard SQL, so the Postgres escape hatch stays open (ADR-0002).
+// The window function applies the same recency rule as CurrentRank does in Go,
+// pinned to it by a test. The LEFT JOIN keeps ungraded athletes on the roster with
+// NULL rank keys. Both the window function and NULLS LAST are standard SQL, so the
+// Postgres escape hatch stays open (ADR-0002).
 func ListRoster(db *sql.DB, sort string, descending bool) ([]RosterRow, error) {
 	rows, err := db.Query(fmt.Sprintf(`
 		SELECT a.id, a.first_name, a.last_name, a.birth_date, a.joined_on, a.notes,
@@ -205,7 +198,6 @@ func ListRoster(db *sql.DB, sort string, descending bool) ([]RosterRow, error) {
 // rosterOrderClause builds the ORDER BY body for one column and direction. Both
 // the column keys and the direction come from fixed sets (the rosterOrderBy
 // whitelist and the two literals), so interpolating them is injection-safe.
-// A tie-break key that is already the primary key is dropped as redundant.
 func rosterOrderClause(sort string, descending bool) string {
 	dir := "ASC"
 	if descending {
