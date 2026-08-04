@@ -1,6 +1,6 @@
 # Spec — UI internationalization (German + English)
 
-Status: ready-for-agent
+Status: done
 
 Make the app bilingual (German + English) at the **UI level**: a trainer can use
 the tool in either language, chosen per account. Motivated by non-native-German

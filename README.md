@@ -4,10 +4,11 @@ A self-hosted tool for martial-arts trainers to organize the people they train.
 Discipline-agnostic (not tied to BJJ), unified by the concept of graduation.
 The first capability is a shared roster of athletes and their graduation history.
 
-> **Status: early development.** The project skeleton (HTTP server, templating,
-> static assets) is in place. Persistence, authentication, athlete management,
-> promotions and deployment are specified and tracked under
-> [`.scratch/v1-athlete-roster/`](.scratch/v1-athlete-roster/) and not yet built.
+> **Status: v1 built, not yet deployed.** Persistence, authentication, athlete
+> management and promotions are done, along with a sortable and filterable
+> roster, belt graphics, a bilingual UI and CSV import. Deployment is the one
+> remaining v1 issue. Work is tracked under [`.scratch/`](.scratch/) — see
+> [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
 
 ## What it does (v1 goal)
 
@@ -21,6 +22,10 @@ Trainers log in and maintain a shared roster of athletes and their graduations:
 - **Graduation** — record promotions (grading system + rank + date) and show the
   derived current rank plus full history per athlete.
 - **Seeded grading systems** — "BJJ Kids" and "BJJ Adult", stripes included.
+- **Belt graphics** — a rank renders as an inline SVG belt where its colour is
+  known, with the rank name always available as the accessible label.
+- **Bilingual UI** — German and English, chosen per trainer account.
+- **CSV athlete import** via the CLI.
 
 See [`.scratch/v1-athlete-roster/spec.md`](.scratch/v1-athlete-roster/spec.md)
 for the full v1 specification and scope boundaries.
@@ -51,15 +56,15 @@ Everything ships as one binary plus one SQLite file.
 ## Project layout
 
 ```
-cmd/organizer/      Entry point: HTTP server + (planned) CLI subcommands
+cmd/organizer/      Entry point: HTTP server + CLI subcommands
 internal/
   config/           Environment-variable configuration
   web/              Router, handlers, html/templates, static assets (HTMX, CSS)
-  db/               SQLite open + goose migrations        (issue 02)
-  store/            Data-access layer                     (issue 02+)
-  seed/             Grading-system seeding                (issue 03)
-  auth/             Password hashing, sessions            (issue 04)
+  store/            Data-access layer, goose migrations, grading-system seeding
+  auth/             Password hashing
+  i18n/             Embedded translation catalogs (de, en)
 docs/adr/           Architecture Decision Records
+docs/agents/        Conventions for agents: issue tracker, triage, domain docs
 .scratch/           Feature specs and issue tracker (see docs/agents/)
 ```
 

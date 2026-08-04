@@ -1,5 +1,7 @@
 # Spec — v1: Athlete Roster with Graduation
 
+Status: shipped except deployment (issue 07, `ready-for-human`)
+
 Foundation for the martial-arts organizer. Grounded in `CONTEXT.md` (glossary) and `docs/adr/0001`–`0003`.
 
 ## Goal
