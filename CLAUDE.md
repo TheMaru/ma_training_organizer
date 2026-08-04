@@ -11,3 +11,7 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 ### Domain docs
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Code comments
+
+A comment says only what the surrounding code does not already clearly say — a documented exception to the stricter global default. See `docs/agents/comments.md`.
