@@ -39,6 +39,12 @@ grading-system names) still renders raw — localizing it is a model change
 ([[i18n-domain-data]], and cheaper since ADR-0006) — and internal errors and CLI
 output stay English.
 
+> **Superseded in part by ADR-0009.** The claim that localizing rank and
+> grading-system names is a model change turned out to be wrong: a rank's name is
+> derivable from `rank_group` + `degree`, and a system's name has been a mere
+> display label since ADR-0006, so both are localized in the view with no schema
+> change. Everything else in this ADR stands.
+
 ## Considered Options
 
 - **URL prefixes `/de/…` (rejected):** the SEO standard for public sites, and

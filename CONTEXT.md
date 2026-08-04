@@ -21,7 +21,7 @@ An ordered set of ranks for one discipline-and-cohort, e.g. "BJJ Kids" and "BJJ 
 _Avoid_: Belt system, curriculum, style
 
 **Rank**:
-A single named position within a grading system, carrying its order in that system. A promotion targets exactly one rank. Order is for sorting/display only, not a mandatory path — ranks may be skipped. Current rank = the athlete's most recent promotion by date.
+A single named position within a grading system, carrying its order in that system. A promotion targets exactly one rank. Order is for sorting/display only, not a mandatory path — ranks may be skipped. Current rank = the athlete's most recent promotion by date. Its identity is separate from its name, which is a display label and may be localized.
 _Avoid_: Belt, grade, level, degree
 
 **Ungraded**:
