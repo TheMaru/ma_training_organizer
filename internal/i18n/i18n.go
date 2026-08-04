@@ -2,8 +2,9 @@
 // supported locale, a lookup for templates and handlers, and Accept-Language
 // matching for visitors whose account language is not known yet.
 //
-// Scope is the UI only (ADR-0008): domain data renders raw, and internal errors
-// and CLI output stay English.
+// Scope is what a trainer reads in the browser: UI chrome (ADR-0008) plus the
+// rank and grading-system names composed from the keys ADR-0009 added. Internal
+// errors and CLI output stay English.
 package i18n
 
 import (
@@ -91,18 +92,34 @@ func T(locale Locale, key string, args ...any) string {
 	return translate(catalogs, locale, key, args...)
 }
 
+// Lookup translates key like T but reports whether any catalog carried it, for a
+// caller that has a better answer than the key itself. The composed rank and
+// system names use it: they fall back to the stored English name (ADR-0009), and
+// "rank.degree.7" as an athlete's rank would be worse than "White, 7 stripes".
+func Lookup(locale Locale, key string, args ...any) (string, bool) {
+	return lookup(catalogs, locale, key, args...)
+}
+
 func translate(cs map[Locale]catalog, locale Locale, key string, args ...any) string {
+	text, ok := lookup(cs, locale, key, args...)
+	if !ok {
+		return key
+	}
+	return text
+}
+
+func lookup(cs map[Locale]catalog, locale Locale, key string, args ...any) (string, bool) {
 	text, ok := cs[locale][key]
 	if !ok {
 		text, ok = cs[Default][key]
 	}
 	if !ok {
-		return key
+		return "", false
 	}
 	if len(args) == 0 {
-		return text
+		return text, true
 	}
-	return fmt.Sprintf(text, args...)
+	return fmt.Sprintf(text, args...), true
 }
 
 func supportedTags() []language.Tag {

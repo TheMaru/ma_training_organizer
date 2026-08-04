@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // gradingSystemSeed describes a built-in grading system as a list of belts and
@@ -41,6 +42,23 @@ var seedSystems = []gradingSystemSeed{
 		belts:     []string{"White", "Blue", "Purple", "Brown", "Black"},
 		maxDegree: 4,
 	},
+}
+
+// SeededRankGroups lists every rank_group the built-in systems use, in seed
+// order and deduplicated (White appears in both systems). It is exported for the
+// view's guards: both the belt colour table and the localized colour words must
+// cover every group the seed writes, and deriving both from here is what keeps a
+// colour added below from being missed by either (ADR-0009).
+func SeededRankGroups() []string {
+	var groups []string
+	for _, sys := range seedSystems {
+		for _, belt := range sys.belts {
+			if !slices.Contains(groups, belt) {
+				groups = append(groups, belt)
+			}
+		}
+	}
+	return groups
 }
 
 // Seed inserts the built-in grading systems and their ranks where absent. It is
@@ -133,9 +151,15 @@ func ensureRank(tx *sql.Tx, gsID int64, belt string, degree, order int) error {
 	}
 }
 
-// rankName renders a human display name for a belt at a given stripe degree,
-// e.g. "White" (plain belt), "White, 1 stripe", "White, 2 stripes". The name is
-// what a promotion targets; group/degree are the descriptive breakdown.
+// rankName renders a name for a belt at a given stripe degree, e.g. "White"
+// (plain belt), "White, 1 stripe", "White, 2 stripes". The name is what a
+// promotion targets; group/degree are the descriptive breakdown.
+//
+// It stays English, and must not be localized (ADR-0009): what a trainer reads is
+// composed in the view from group and degree, while this string is ensureRank's
+// idempotency key — respelling it makes the lookup miss and inserts a second row
+// for a rank existing promotions already point at. It is also the fallback shown
+// for a rank the view cannot compose.
 func rankName(belt string, degree int) string {
 	switch degree {
 	case 0:

@@ -1,6 +1,6 @@
 # Spec — Localized rank and grading-system names
 
-Status: ready-for-agent
+Status: done
 
 Localize the domain data a trainer reads — rank names and grading-system names —
 so a German UI says `Weiß, 2 Streifen` and `BJJ Kinder` where it currently says

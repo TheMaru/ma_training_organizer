@@ -50,10 +50,13 @@ blocks.** Nothing localized is ever stored.
   needs `i18n.Lookup(locale, key) (string, bool)`, because `i18n.T` returns the
   key itself on a miss and `rank.degree.7` as an athlete's rank would be worse
   than `White, 7 stripes`.
-- Composition happens in **template functions that take whole structs**
-  (`{{rankLabel .}}`) with their logic in Go. `templateFuncs(locale)` already
-  closes over the locale, so nothing new is threaded through handlers or store
-  types.
+- Composition happens in **template functions whose logic lives in Go**.
+  `templateFuncs(locale)` already closes over the locale, so nothing new is
+  threaded through handlers or store types. Their signatures mirror `belt`, which
+  takes the colour group and the degree as plain arguments: three call sites carry
+  a rank on three different types (a roster row, a promotion, a rank), and only the
+  roster's label — which has a conditional, the parenthesised system an ungraded
+  athlete does not get — takes the whole struct.
 
 The line this draws: **hex values stay in Go, human-readable text goes to the
 catalog.** `beltColours` maps a colour name to a fill, which is not language and

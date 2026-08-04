@@ -447,14 +447,14 @@ func TestRosterShowsCurrentRank(t *testing.T) {
 	// The label carries the rank name plus the system that disambiguates same-named
 	// ranks across cohorts (White exists in both kids and adult).
 	belt := beltIn(t, rank)
-	if !strings.Contains(belt, `aria-label="Blue, 2 stripes (BJJ Adult)"`) {
+	if !strings.Contains(belt, `aria-label="Blau, 2 Streifen (BJJ Erwachsene)"`) {
 		t.Errorf("roster belt = %q, want the rank and system as its label", belt)
 	}
-	if !strings.Contains(belt, `<title>Blue, 2 stripes (BJJ Adult)</title>`) {
+	if !strings.Contains(belt, `<title>Blau, 2 Streifen (BJJ Erwachsene)</title>`) {
 		t.Errorf("roster belt = %q, want the rank as a tooltip", belt)
 	}
 	// Nothing outside the graphic repeats the rank: the belt replaces the text here.
-	if outside := strings.Replace(rank, belt, "", 1); strings.Contains(outside, "Blue") {
+	if outside := strings.Replace(rank, belt, "", 1); strings.Contains(outside, "Blau") {
 		t.Errorf("rank cell outside the graphic = %q, want no rank text", outside)
 	}
 
@@ -581,10 +581,15 @@ func filterChipLabels(t *testing.T, body string) []string {
 // mixedRoster seeds one athlete per cell of the roster's partition: a kid, an
 // adult and an ungraded athlete. That is the smallest roster on which every
 // filter option is offered.
+//
+// Their ranks are a split belt with stripes and a single-striped plain belt, so
+// every piece a localized rank name is composed of (ADR-0009) — colour word, split
+// pattern, singular and plural stripe phrase — is exercised by the tests that
+// render this fixture.
 func mixedRoster(t *testing.T, db *sql.DB) {
 	t.Helper()
-	promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
-	promoteTo(t, db, "Adam", "Adult", "BJJ Adult", "Blue", "2026-01-01")
+	promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "Grey-White, 2 stripes", "2026-01-01")
+	promoteTo(t, db, "Adam", "Adult", "BJJ Adult", "Blue, 1 stripe", "2026-01-01")
 	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}); err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
@@ -633,9 +638,8 @@ func TestRosterFilterChipsOfferEveryNonEmptyCell(t *testing.T) {
 	mixedRoster(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes"))
-	// Alle first, then the systems in progression order, ungraded last. The system
-	// labels are the raw seed names, as they already render in the rank column.
-	want := []string{"Alle", "BJJ Kids", "BJJ Adult", "Ohne Graduierung"}
+	// Alle first, then the systems in progression order, ungraded last.
+	want := []string{"Alle", "BJJ Kinder", "BJJ Erwachsene", "Ohne Graduierung"}
 	if got := filterChipLabels(t, body); !slices.Equal(got, want) {
 		t.Errorf("filter chips = %v, want %v", got, want)
 	}
@@ -644,13 +648,13 @@ func TestRosterFilterChipsOfferEveryNonEmptyCell(t *testing.T) {
 	if !strings.Contains(filterChip(t, body, "Alle"), `aria-current="true"`) {
 		t.Error("want aria-current on Alle in the unfiltered view")
 	}
-	if strings.Contains(filterChip(t, body, "BJJ Kids"), "aria-current") {
+	if strings.Contains(filterChip(t, body, "BJJ Kinder"), "aria-current") {
 		t.Error("want no aria-current on an inactive filter chip")
 	}
 
 	// Selecting one moves it, and Alle stays as the way back.
 	body = readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
-	if !strings.Contains(filterChip(t, body, "BJJ Kids"), `aria-current="true"`) {
+	if !strings.Contains(filterChip(t, body, "BJJ Kinder"), `aria-current="true"`) {
 		t.Error("want aria-current on the selected filter chip")
 	}
 	if strings.Contains(filterChip(t, body, "Alle"), "aria-current") {
@@ -669,8 +673,8 @@ func TestRosterFilterChipsKeepTheSort(t *testing.T) {
 	// Narrowing does not reorder: filter and sort compose in one URL.
 	body := readBody(t, get(t, ts, client, "/athletes?sort=lastName&dir=desc"))
 	want := "/athletes?sort=lastName&amp;dir=desc&amp;system=bjj-kids"
-	if got := attrValue(t, filterChip(t, body, "BJJ Kids"), "href"); got != want {
-		t.Errorf("BJJ Kids chip href = %q, want %q", got, want)
+	if got := attrValue(t, filterChip(t, body, "BJJ Kinder"), "href"); got != want {
+		t.Errorf("BJJ Kinder chip href = %q, want %q", got, want)
 	}
 	// And sorting a filtered roster keeps the filter.
 	body = readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
@@ -739,7 +743,7 @@ func TestRosterFilterRowIsAbsentWithFewerThanTwoOptions(t *testing.T) {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
 	body = readBody(t, get(t, ts, client, "/athletes"))
-	if got := filterChipLabels(t, body); !slices.Equal(got, []string{"Alle", "BJJ Kids", "Ohne Graduierung"}) {
+	if got := filterChipLabels(t, body); !slices.Equal(got, []string{"Alle", "BJJ Kinder", "Ohne Graduierung"}) {
 		t.Errorf("filter chips = %v, want Alle + both cells", got)
 	}
 }

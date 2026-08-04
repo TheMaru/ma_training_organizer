@@ -302,7 +302,7 @@ func TestAthleteDetailShowsTheBeltBesideTheRankName(t *testing.T) {
 	body := readBody(t, get(t, ts, client, fmt.Sprintf("/athletes/%d", id)))
 
 	current := definitionValue(t, body, "Aktueller Rang")
-	if !strings.Contains(current, "Grey-White, 2 stripes") {
+	if !strings.Contains(current, "Grau-Weiß, 2 Streifen") {
 		t.Errorf("current rank = %q, want the rank name spelled out", current)
 	}
 	belt := beltIn(t, current)
@@ -315,7 +315,7 @@ func TestAthleteDetailShowsTheBeltBesideTheRankName(t *testing.T) {
 
 	// Every history row too, so a belt can be checked against its own label.
 	rank := cellWithLabel(t, historyRow(t, body, "2026-02-02"), "Rang")
-	if !strings.Contains(rank, "Grey-White, 2 stripes") {
+	if !strings.Contains(rank, "Grau-Weiß, 2 Streifen") {
 		t.Errorf("history rank cell = %q, want the rank name", rank)
 	}
 	if !strings.Contains(beltIn(t, rank), `aria-hidden="true"`) {

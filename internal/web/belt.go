@@ -79,21 +79,33 @@ type belt struct {
 	stripes int    // white stripes on the friso
 }
 
-// resolveBelt parses a rank_group and degree into a drawable belt, reporting
-// false when the colour is not in beltColours. The caller then falls back to the
-// plain rank name (ADR-0004), so the graphic is never the sole carrier of
-// meaning and an unmapped system degrades gracefully instead of breaking.
+// splitRankGroup parses a rank_group into the colour *names* it is made of: a
+// body colour and, on a split belt, the bar's. It reports false for a colour that
+// has no entry in beltColours, which is what both the graphic and the composed
+// label (ADR-0009) treat as "unresolvable" — so the two degrade together on one
+// definition of a known colour rather than on two lists that could drift.
 //
 // The parsing rule (spec): split rank_group on "-"; two parts whose second is
 // White or Black are a body colour plus a bar, and otherwise the whole string is
 // a single body colour — so a colour name that itself contains a "-" is looked up
 // intact rather than mistaken for a split belt.
-func resolveBelt(group string, degree int) (belt, bool) {
-	body, bar := group, ""
+func splitRankGroup(group string) (body, bar string, ok bool) {
+	body, bar = group, ""
 	if before, after, split := strings.Cut(group, "-"); split && slices.Contains(beltBarColours, after) {
-		body, bar = before, beltColours[after]
+		body, bar = before, after
 	}
-	fill, ok := beltColours[body]
+	if _, known := beltColours[body]; !known {
+		return "", "", false
+	}
+	return body, bar, true
+}
+
+// resolveBelt parses a rank_group and degree into a drawable belt, reporting
+// false when the colour is not in beltColours. The caller then falls back to the
+// plain rank name (ADR-0004), so the graphic is never the sole carrier of
+// meaning and an unmapped system degrades gracefully instead of breaking.
+func resolveBelt(group string, degree int) (belt, bool) {
+	body, bar, ok := splitRankGroup(group)
 	if !ok {
 		return belt{}, false
 	}
@@ -101,8 +113,8 @@ func resolveBelt(group string, degree int) (belt, bool) {
 	// stripe out but says a club may add it, and that rank would otherwise draw
 	// stripes outside the friso.
 	drawn := belt{
-		body:    fill,
-		bar:     bar,
+		body:    beltColours[body],
+		bar:     beltColours[bar],
 		friso:   beltBlack,
 		stripes: min(max(degree, 0), beltMaxStripes),
 	}

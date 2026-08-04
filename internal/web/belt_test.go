@@ -1,15 +1,17 @@
 package web
 
-// Unit tests for the belt renderer. This is the one in-package test file in
-// internal/web: the colour table and the parser are deliberately unexported
-// view-layer detail (ADR-0004), and testing the geometry through rendered pages
-// would say much less about it. Which surface draws a belt, and how it is
-// labelled, is tested black-box like everything else — roster_test.go for the
-// roster, promotions_test.go for the two athlete-detail surfaces.
+// Unit tests for the belt renderer. In-package, like ranklabel_test.go beside
+// it: the colour table and the parser are deliberately unexported view-layer
+// detail (ADR-0004), and testing the geometry through rendered pages would say
+// much less about it. Which surface draws a belt, and how it is labelled, is
+// tested black-box like everything else — roster_test.go for the roster,
+// promotions_test.go for the two athlete-detail surfaces.
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
 // countStripes counts the stripe rects in a rendered belt.
@@ -213,15 +215,10 @@ func TestBeltSVGCarriesTheStylingHook(t *testing.T) {
 }
 
 func TestBeltSVGCoversEverySeededColour(t *testing.T) {
-	// The seeded systems' belts (store.seedSystems) must all render — a missing
-	// entry would silently downgrade a real rank to text.
-	for _, group := range []string{
-		"White", "Grey-White", "Grey", "Grey-Black",
-		"Yellow-White", "Yellow", "Yellow-Black",
-		"Orange-White", "Orange", "Orange-Black",
-		"Green-White", "Green", "Green-Black",
-		"Blue", "Purple", "Brown", "Black",
-	} {
+	// The seeded systems' belts must all render — a missing entry would silently
+	// downgrade a real rank to text. The list comes from the seed itself, so a
+	// colour added there cannot be missed here.
+	for _, group := range store.SeededRankGroups() {
 		if beltSVG(group, 0, "x") == "" {
 			t.Errorf("seeded group %q renders no belt, want one", group)
 		}

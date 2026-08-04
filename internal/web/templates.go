@@ -22,12 +22,28 @@ var templateFS embed.FS
 // templates read as "print the plain rank name instead" via {{with}}/{{else}} —
 // so the text name is never lost.
 //
+// "rankLabel", "systemLabel" and "rosterRankLabel" name a rank and its grading
+// system in the trainer's language, composed from catalog pieces (ADR-0009). Their
+// last argument is what the database stored, which is what a name the catalog
+// cannot compose falls back to.
+//
 // "t" looks a translation up in that locale. A template func cannot see the
 // request, so the locale is baked into the parsed template set — one per locale
-// — rather than passed at every call site (ADR-0008).
+// — rather than passed at every call site (ADR-0008). The label funcs close over
+// the same locale, which is why the composition needs nothing threaded through
+// handlers or store types.
 func templateFuncs(locale i18n.Locale) template.FuncMap {
 	return template.FuncMap{
 		"belt": beltSVG,
+		"rankLabel": func(group string, degree int, stored string) string {
+			return rankLabel(locale, group, degree, stored)
+		},
+		"systemLabel": func(slug, stored string) string {
+			return systemLabel(locale, slug, stored)
+		},
+		"rosterRankLabel": func(line rosterLine) string {
+			return rosterRankLabel(locale, line)
+		},
 		"t": func(key string, args ...any) string {
 			return i18n.T(locale, key, args...)
 		},

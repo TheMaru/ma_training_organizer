@@ -28,10 +28,7 @@ var rosterColumns = []struct {
 
 // filterAllKey is the chip for the unfiltered roster, and filterUngradedKey the
 // one for the athletes who are in no grading system at all (CONTEXT.md's
-// Ungraded). The
-// system chips are labelled with the raw seed name instead — it already renders
-// untranslated in four other places, and translating only the chips would put
-// "BJJ Kinder" next to "BJJ Kids" in one view ([[i18n-domain-data]]).
+// Ungraded). A system's chip is named by systemLabel instead, keyed on its slug.
 const (
 	filterAllKey      = "roster.filter.all"
 	filterUngradedKey = "roster.filter.ungraded"
@@ -58,17 +55,6 @@ type rosterLine struct {
 	store.RosterRow
 	Href         string // the athlete's detail page
 	DeleteAction string
-}
-
-// RankLabel is the rank as assistive tech and a tooltip get it on the roster,
-// where the belt graphic stands alone (ADR-0004): the rank name plus the system
-// that disambiguates same-named ranks across cohorts — White exists in both the
-// kids and the adult system. Empty for an ungraded athlete, who has no rank.
-func (l rosterLine) RankLabel() string {
-	if l.SystemName == "" {
-		return l.RankName
-	}
-	return l.RankName + " (" + l.SystemName + ")"
 }
 
 // rosterFilter is one rendered filter chip: a cell of the roster's partition (or
@@ -154,13 +140,15 @@ func rosterFilters(locale i18n.Locale, view rosterView, options []store.RosterOp
 	return chips
 }
 
-// filterLabel names one option's chip. Only the ungraded cell needs a label of
-// its own — it is in no system, so it has no name to render.
+// filterLabel names one option's chip: the ungraded cell has a label of its own,
+// since it is in no system and so has no name to render, and a system cell carries
+// the same localized name as the rows it filters. The option's value is the slug
+// the label is keyed on (ADR-0009).
 func filterLabel(locale i18n.Locale, option store.RosterOption) string {
 	if option.Value == store.RosterFilterUngraded {
 		return i18n.T(locale, filterUngradedKey)
 	}
-	return option.Name
+	return systemLabel(locale, option.Value, option.Name)
 }
 
 // rosterLines pairs each roster row with its outgoing links under the given view.

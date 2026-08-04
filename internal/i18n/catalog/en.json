@@ -66,5 +66,26 @@
   "promotion.rankPlaceholder": "Choose a rank …",
   "promotion.required": "Please choose a rank and a date.",
   "promotion.submit": "Record",
-  "promotion.system": "System"
+  "promotion.system": "System",
+
+  "rank.colour.black": "Black",
+  "rank.colour.blue": "Blue",
+  "rank.colour.brown": "Brown",
+  "rank.colour.green": "Green",
+  "rank.colour.grey": "Grey",
+  "rank.colour.orange": "Orange",
+  "rank.colour.purple": "Purple",
+  "rank.colour.white": "White",
+  "rank.colour.yellow": "Yellow",
+
+  "rank.degree.1": "%s, 1 stripe",
+  "rank.degree.2": "%s, 2 stripes",
+  "rank.degree.3": "%s, 3 stripes",
+  "rank.degree.4": "%s, 4 stripes",
+  "rank.degree.5": "%s, 5 stripes",
+
+  "rank.split": "%s-%s",
+
+  "system.bjj-adult": "BJJ Adult",
+  "system.bjj-kids": "BJJ Kids"
 }

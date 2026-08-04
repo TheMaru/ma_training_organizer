@@ -47,3 +47,27 @@ func TestMissingKeyFallsBackToTheDefaultLocale(t *testing.T) {
 		t.Errorf("key missing everywhere = %q, want the key itself", got)
 	}
 }
+
+// Lookup is the variant for a caller with a better fallback than the key itself
+// (ADR-0009: a composed rank name falls back to the stored English one). It needs
+// the same synthetic pair, for the same reason.
+func TestLookupReportsAMiss(t *testing.T) {
+	cs := map[Locale]catalog{
+		German:  {"greeting": "Hallo", "only.de": "nur Deutsch"},
+		English: {"greeting": "Hello"},
+	}
+
+	if got, ok := lookup(cs, English, "greeting"); got != "Hello" || !ok {
+		t.Errorf("present key = %q, %v; want %q, true", got, ok, "Hello")
+	}
+	// A key only the default locale has is still a hit — the fallback chain is the
+	// one T already walks.
+	if got, ok := lookup(cs, English, "only.de"); got != "nur Deutsch" || !ok {
+		t.Errorf("missing English key = %q, %v; want %q, true", got, ok, "nur Deutsch")
+	}
+	// The whole point: no catalog has it, so the caller is told rather than handed
+	// the key to render as an athlete's rank.
+	if got, ok := lookup(cs, English, "absent.everywhere"); got != "" || ok {
+		t.Errorf("key missing everywhere = %q, %v; want %q, false", got, ok, "")
+	}
+}
