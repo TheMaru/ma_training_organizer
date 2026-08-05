@@ -9,30 +9,13 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
-
-// seededRankID seeds the built-in grading systems and returns one rank's id, so
-// promotion handler tests can target a real rank.
-func seededRankID(t *testing.T, db *sql.DB, system, name string) int64 {
-	t.Helper()
-	if err := store.Seed(db); err != nil {
-		t.Fatalf("Seed: %v", err)
-	}
-	var id int64
-	err := db.QueryRow(`
-		SELECT r.id FROM ranks r
-		JOIN grading_systems g ON g.id = r.grading_system_id
-		WHERE g.name = ? AND r.name = ?`, system, name).Scan(&id)
-	if err != nil {
-		t.Fatalf("lookup rank %q/%q: %v", system, name, err)
-	}
-	return id
-}
 
 // promoteTo creates an athlete promoted to one seeded rank, returning their id.
 func promoteTo(t *testing.T, db *sql.DB, first, last, system, rank, date string) int64 {
 	t.Helper()
-	rankID := seededRankID(t, db, system, rank)
+	rankID := storetest.RankID(t, db, system, rank)
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: first, LastName: last})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -130,7 +113,7 @@ func TestRecordPromotionEndToEnd(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
-	rankID := seededRankID(t, db, "BJJ Adult", "White")
+	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -166,8 +149,8 @@ func TestRecordPromotionUpdatesCurrentRank(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
-	kidsGreen := seededRankID(t, db, "BJJ Kids", "Green")
-	adultWhite := seededRankID(t, db, "BJJ Adult", "White")
+	kidsGreen := storetest.RankID(t, db, "BJJ Kids", "Green")
+	adultWhite := storetest.RankID(t, db, "BJJ Adult", "White")
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -229,7 +212,7 @@ func TestRecordPromotionRejectsMalformedDate(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
-	rankID := seededRankID(t, db, "BJJ Adult", "White")
+	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -253,7 +236,7 @@ func TestRecordPromotionRejectsMalformedDate(t *testing.T) {
 func TestRecordPromotionRequiresAuth(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 
-	rankID := seededRankID(t, db, "BJJ Adult", "White")
+	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -278,7 +261,7 @@ func TestRecordPromotionUnknownAthleteReturns404(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
-	rankID := seededRankID(t, db, "BJJ Adult", "White")
+	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 
 	resp, err := client.PostForm(ts.URL+"/athletes/999/promotions", promoteForm(rankID, "2026-01-15"))
 	if err != nil {

@@ -8,23 +8,41 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
-func newTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "cli.db"))
+// TestCLIDatabaseCarriesTheGradingSystems is the defect the one-call open closes:
+// every subcommand goes through withDB, which used to migrate without seeding, so
+// a Trainer provisioned on a fresh database logged in to a promotion form with no
+// GradingSystem to pick.
+func TestCLIDatabaseCarriesTheGradingSystems(t *testing.T) {
+	err := withDB(filepath.Join(t.TempDir(), "cli.db"), func(db *sql.DB) error {
+		if err := createTrainer(db, "ada", "correct-horse"); err != nil {
+			return err
+		}
+		systems, err := store.ListGradingSystems(db)
+		if err != nil {
+			return err
+		}
+		if len(systems) == 0 {
+			t.Error("no grading systems on the database create-trainer opened")
+		}
+		// A system the form could offer but with no Rank in it is no Promotion a
+		// Trainer could record.
+		for _, s := range systems {
+			if len(s.Ranks) == 0 {
+				t.Errorf("grading system %q has no ranks", s.Name)
+			}
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("withDB: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
-	if err := store.Migrate(db); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
-	return db
 }
 
 func TestCreateTrainerProducesWorkingLogin(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if err := createTrainer(db, "ada", "correct-horse"); err != nil {
 		t.Fatalf("createTrainer: %v", err)
@@ -44,7 +62,7 @@ func TestCreateTrainerProducesWorkingLogin(t *testing.T) {
 }
 
 func TestCreateTrainerRejectsShortPassword(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := createTrainer(db, "ada", "short")
 	if !errors.Is(err, auth.ErrPasswordTooShort) {
@@ -56,7 +74,7 @@ func TestCreateTrainerRejectsShortPassword(t *testing.T) {
 }
 
 func TestCreateTrainerRejectsDuplicate(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if err := createTrainer(db, "dup", "correct-horse"); err != nil {
 		t.Fatalf("first createTrainer: %v", err)
@@ -68,7 +86,7 @@ func TestCreateTrainerRejectsDuplicate(t *testing.T) {
 }
 
 func TestResetPasswordChangesLogin(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if err := createTrainer(db, "grace", "old-secret-1"); err != nil {
 		t.Fatalf("createTrainer: %v", err)
@@ -90,7 +108,7 @@ func TestResetPasswordChangesLogin(t *testing.T) {
 }
 
 func TestResetPasswordUnknownTrainer(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := resetPassword(db, "ghost", "some-secret-9")
 	if !errors.Is(err, store.ErrTrainerNotFound) {
@@ -99,7 +117,7 @@ func TestResetPasswordUnknownTrainer(t *testing.T) {
 }
 
 func TestResetPasswordRejectsShortPassword(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if err := createTrainer(db, "grace", "old-secret-1"); err != nil {
 		t.Fatalf("createTrainer: %v", err)

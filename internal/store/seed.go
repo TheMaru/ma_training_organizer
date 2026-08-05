@@ -61,12 +61,12 @@ func SeededRankGroups() []string {
 	return groups
 }
 
-// Seed inserts the built-in grading systems and their ranks where absent. It is
-// idempotent — existing systems and ranks are left untouched — so it is safe to
-// call on every boot. Reference data only: it never touches athletes or
+// seed inserts the built-in grading systems and their ranks where absent. It is
+// idempotent — existing systems and ranks are left untouched — which is what lets
+// Open run it on every open. Reference data only: it never touches athletes or
 // promotions. The whole seed runs in one transaction so a failure leaves no
 // half-seeded system behind.
-func Seed(db *sql.DB) error {
+func seed(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin seed tx: %w", err)

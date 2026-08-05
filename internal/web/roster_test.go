@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 // readBody returns the response body as a string, closing it.
@@ -188,21 +189,6 @@ func beltShape(t *testing.T, markup string) string {
 		t.Fatalf("belt %q has no body rect", svg)
 	}
 	return svg[at:]
-}
-
-// mustInsert runs an insert and returns the new row's id, for the reference data
-// the built-in seed does not provide.
-func mustInsert(t *testing.T, db *sql.DB, query string, args ...any) int64 {
-	t.Helper()
-	res, err := db.Exec(query, args...)
-	if err != nil {
-		t.Fatalf("insert (%s): %v", query, err)
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		t.Fatalf("last insert id: %v", err)
-	}
-	return id
 }
 
 // rosterOrder reports the order the given names appear in the body, so a test can
@@ -472,8 +458,8 @@ func TestRosterFallsBackToTheRankNameForAnUnknownColour(t *testing.T) {
 
 	// A grading system the colour table knows nothing about (ADR-0004): no belt, and
 	// the plain rank name carries the meaning instead of a broken graphic.
-	gs := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "Karate", 2)
-	rankID := mustInsert(t, db,
+	gs := storetest.MustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "Karate", 2)
+	rankID := storetest.MustInsert(t, db,
 		`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order) VALUES (?, ?, ?, ?, ?)`,
 		gs, "7. Dan", "", 7, 0)
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Gichin", LastName: "Funakoshi"})

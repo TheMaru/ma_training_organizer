@@ -39,16 +39,35 @@ Spec: [[spec]].
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Opening a fresh database yields one that is both migrated and seeded, in one call
-- [ ] Opening an already-prepared database again changes nothing
-- [ ] The migrate and seed steps are no longer callable from outside the store
-- [ ] A database path containing a query separator does not corrupt the connection settings
-- [ ] A Trainer created through the CLI on a fresh database finds the seeded GradingSystems available when recording a Promotion
-- [ ] All three test suites — store, web and CLI — get their database from one shared fixture module
-- [ ] The two verbatim copies of the insert helper are reduced to one
-- [ ] The two database fixtures that differed only by filename are reduced to one, and the seeded-versus-unseeded distinction between fixtures is gone
-- [ ] The coverage command is in the README's development block; the profile output is git-ignored
-- [ ] The Trainer CRUD duplication carries its reasoning as a comment
-- [ ] Coverage recorded before and after as absolute statement counts
+- [x] Opening a fresh database yields one that is both migrated and seeded, in one call
+- [x] Opening an already-prepared database again changes nothing
+- [x] The migrate and seed steps are no longer callable from outside the store
+- [x] A database path containing a query separator does not corrupt the connection settings
+- [x] A Trainer created through the CLI on a fresh database finds the seeded GradingSystems available when recording a Promotion
+- [x] All three test suites — store, web and CLI — get their database from one shared fixture module
+- [x] The two verbatim copies of the insert helper are reduced to one
+- [x] The two database fixtures that differed only by filename are reduced to one, and the seeded-versus-unseeded distinction between fixtures is gone
+- [x] The coverage command is in the README's development block; the profile output is git-ignored
+- [x] The Trainer CRUD duplication carries its reasoning as a comment
+- [x] Coverage recorded before and after as absolute statement counts
+
+## Comments
+
+**Coverage, before and after.** Before: **787 of 1061** statements (74.2%). After:
+**793 of 1060** statements (74.8%), counting the packages that existed before —
+covered up six from the new `Open` tests, total down one because the deleted
+duplicate helpers were statements too. Measured over everything `./...` reports,
+the after figure is **793 of 1081** (73.4%): the new `storetest` package
+contributes 21 statements that no test targets directly, since it is the fixture
+the other suites run *through* rather than a package with tests of its own. That
+gap between 74.8% and 73.4% is the reason the absolute counts are what get
+recorded.
+
+**One deviation from the plan, recorded.** `storetest` also holds a seeded-rank
+lookup, which the ticket did not list. Once the seed stopped being callable, the
+store and web copies of that lookup became byte-identical to each other — the same
+condition that put the insert helper in the module. The grading-system lookup in
+`internal/web/i18n_domain_test.go` stayed local: one caller, and moving it would
+be a shared helper for nothing.

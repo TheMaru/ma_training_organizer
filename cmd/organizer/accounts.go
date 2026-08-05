@@ -47,9 +47,9 @@ func resetPassword(db *sql.DB, username, password string) error {
 	return store.UpdateTrainerPassword(db, tr.ID, hash)
 }
 
-// cmdCreateTrainer wires the create-trainer subcommand: it opens and migrates
-// the database, reads the username from args and the password from an
-// interactive prompt, then provisions the account.
+// cmdCreateTrainer wires the create-trainer subcommand: it opens the database,
+// reads the username from args and the password from an interactive prompt, then
+// provisions the account.
 func cmdCreateTrainer(dbPath string, args []string) error {
 	username, err := singleUsernameArg("create-trainer", args)
 	if err != nil {
@@ -88,17 +88,14 @@ func cmdResetPassword(dbPath string, args []string) error {
 	})
 }
 
-// withDB opens the database at dbPath, applies migrations so the schema exists
-// even on a first run, invokes fn, and always closes the connection.
+// withDB opens the database at dbPath — ready even on a first run, since Open
+// migrates and seeds — invokes fn, and always closes the connection.
 func withDB(dbPath string, fn func(*sql.DB) error) error {
 	db, err := store.Open(dbPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	if err := store.Migrate(db); err != nil {
-		return err
-	}
 	return fn(db)
 }
 

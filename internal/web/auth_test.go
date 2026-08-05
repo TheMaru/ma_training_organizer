@@ -6,13 +6,13 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
@@ -21,22 +21,14 @@ const (
 	testPassword = "correct-horse"
 )
 
-// newAuthTestServer starts an httptest server backed by a migrated database that
+// newAuthTestServer starts an httptest server backed by a ready database that
 // already holds one trainer (testUsername/testPassword), and returns a client
 // whose cookie jar carries the session across requests. Redirects are not
 // followed, so tests can assert on the 303/Location and HX-Redirect responses.
 func newAuthTestServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "test.db")
-	db, err := store.Open(path)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	if err := store.Migrate(db); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
+	db := storetest.NewDB(t)
 
 	hash, err := auth.Hash(testPassword)
 	if err != nil {

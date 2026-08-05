@@ -1,24 +1,15 @@
 package store_test
 
 import (
-	"database/sql"
+	"path/filepath"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
-// seededDB returns a migrated database with the built-in grading systems seeded.
-func seededDB(t *testing.T) *sql.DB {
-	t.Helper()
-	db := newTestDB(t)
-	if err := store.Seed(db); err != nil {
-		t.Fatalf("Seed: %v", err)
-	}
-	return db
-}
-
 func TestSeedCreatesSystemsAndRanks(t *testing.T) {
-	db := seededDB(t)
+	db := storetest.NewDB(t)
 
 	// Kids: 13 belts × 4 ranks (0–3 stripes); Adult: 5 belts × 5 (0–4 stripes).
 	wantCounts := map[string]int{
@@ -43,7 +34,7 @@ func TestSeedCreatesSystemsAndRanks(t *testing.T) {
 // TestSeedRanksOrderedWithMetadata checks the seam the acceptance calls out:
 // ranks are queryable in order per system and each carries group + degree.
 func TestSeedRanksOrderedWithMetadata(t *testing.T) {
-	db := seededDB(t)
+	db := storetest.NewDB(t)
 
 	type rank struct {
 		name   string
@@ -96,7 +87,7 @@ func TestSeedRanksOrderedWithMetadata(t *testing.T) {
 // identifies a system outside the database, so it must exist for every seeded
 // system and be the hand-authored value rather than anything derived.
 func TestSeedGivesEverySystemItsSlug(t *testing.T) {
-	db := seededDB(t)
+	db := storetest.NewDB(t)
 
 	want := map[string]string{"BJJ Kids": "bjj-kids", "BJJ Adult": "bjj-adult"}
 	for name, wantSlug := range want {
@@ -110,45 +101,33 @@ func TestSeedGivesEverySystemItsSlug(t *testing.T) {
 	}
 }
 
-// TestSeedFillsTheSlugOfAPreExistingSystem is the migration path: a system
-// inserted before the slug column existed carries the column default, and the
-// next boot's re-seed must correct it — the same way ensureGradingSystem already
-// corrects sort_order (migration 00003).
-func TestSeedFillsTheSlugOfAPreExistingSystem(t *testing.T) {
-	db := newTestDB(t)
-	mustInsert(t, db, `INSERT INTO grading_systems (name) VALUES (?)`, "BJJ Kids")
-
-	if err := store.Seed(db); err != nil {
-		t.Fatalf("Seed: %v", err)
+// TestSeedFillsTheSlugOfASystemThatHasNone is the migration path: a system that
+// predates the slug column carries the column default, and the next boot must
+// correct it — the same way ensureGradingSystem already corrects sort_order
+// (migration 00003). Blanking the slug is how that state is reached now that
+// every open seeds; reopening the file is the boot.
+func TestSeedFillsTheSlugOfASystemThatHasNone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	db, err := store.Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
 	}
+	if _, err := db.Exec(`UPDATE grading_systems SET slug = '' WHERE name = ?`, "BJJ Kids"); err != nil {
+		t.Fatalf("blank the slug: %v", err)
+	}
+	db.Close()
+
+	db, err = store.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
 
 	var got string
 	if err := db.QueryRow(`SELECT slug FROM grading_systems WHERE name = ?`, "BJJ Kids").Scan(&got); err != nil {
 		t.Fatalf("read slug: %v", err)
 	}
 	if got != "bjj-kids" {
-		t.Errorf("slug of a pre-existing system = %q, want %q", got, "bjj-kids")
-	}
-}
-
-func TestSeedIsIdempotent(t *testing.T) {
-	db := seededDB(t) // first seed
-
-	if err := store.Seed(db); err != nil {
-		t.Fatalf("second Seed: %v", err)
-	}
-
-	var systems, ranks int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM grading_systems`).Scan(&systems); err != nil {
-		t.Fatalf("count systems: %v", err)
-	}
-	if err := db.QueryRow(`SELECT COUNT(*) FROM ranks`).Scan(&ranks); err != nil {
-		t.Fatalf("count ranks: %v", err)
-	}
-	if systems != 2 {
-		t.Errorf("grading_systems after re-seed = %d, want 2", systems)
-	}
-	if ranks != 13*4+5*5 {
-		t.Errorf("ranks after re-seed = %d, want %d", ranks, 13*4+5*5)
+		t.Errorf("slug after reopen = %q, want %q", got, "bjj-kids")
 	}
 }

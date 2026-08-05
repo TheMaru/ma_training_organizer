@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
-// rosterFixture seeds two grading systems in a known order (kids before adult)
-// with a beginner and an advanced rank each, so the cross-system rank ordering
-// can be asserted without depending on the built-in seed data.
+// rosterFixture names a beginner and an advanced rank in each of the two grading
+// systems the seed writes, in the order seedSystems lists them.
 type rosterFixture struct {
 	kidsBeginner, kidsAdvanced   int64
 	adultBeginner, adultAdvanced int64
@@ -17,17 +17,11 @@ type rosterFixture struct {
 
 func newRosterFixture(t *testing.T, db *sql.DB) rosterFixture {
 	t.Helper()
-	kids := mustInsert(t, db, `INSERT INTO grading_systems (name, slug, sort_order) VALUES (?, ?, ?)`, "BJJ Kids", "bjj-kids", 0)
-	adult := mustInsert(t, db, `INSERT INTO grading_systems (name, slug, sort_order) VALUES (?, ?, ?)`, "BJJ Adult", "bjj-adult", 1)
-	rank := func(gsID int64, name string, order int) int64 {
-		return mustInsert(t, db,
-			`INSERT INTO ranks (grading_system_id, name, sort_order) VALUES (?, ?, ?)`, gsID, name, order)
-	}
 	return rosterFixture{
-		kidsBeginner:  rank(kids, "White", 0),
-		kidsAdvanced:  rank(kids, "Green", 12),
-		adultBeginner: rank(adult, "White", 0),
-		adultAdvanced: rank(adult, "Black", 4),
+		kidsBeginner:  storetest.RankID(t, db, "BJJ Kids", "White"),
+		kidsAdvanced:  storetest.RankID(t, db, "BJJ Kids", "Green"),
+		adultBeginner: storetest.RankID(t, db, "BJJ Adult", "White"),
+		adultAdvanced: storetest.RankID(t, db, "BJJ Adult", "Black"),
 	}
 }
 
@@ -74,7 +68,7 @@ func threeAthletes(t *testing.T, db *sql.DB) {
 }
 
 func TestListRosterSortsByEachColumn(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	threeAthletes(t, db)
 
 	cases := []struct {
@@ -98,7 +92,7 @@ func TestListRosterSortsByEachColumn(t *testing.T) {
 }
 
 func TestListRosterFallsBackToFirstNameAscending(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	threeAthletes(t, db)
 
 	// An unknown column is not an error — sorting is a view concern, so it falls
@@ -112,7 +106,7 @@ func TestListRosterFallsBackToFirstNameAscending(t *testing.T) {
 }
 
 func TestListRosterSortsMissingDatesLast(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	addAthlete(t, db, store.Athlete{FirstName: "Alice", LastName: "Adler"}, 0, "")
 	addAthlete(t, db, store.Athlete{FirstName: "Bob", LastName: "Baum", BirthDate: "2000-01-01"}, 0, "")
 
@@ -127,7 +121,7 @@ func TestListRosterSortsMissingDatesLast(t *testing.T) {
 }
 
 func TestListRosterRankSortUsesSystemThenRankOrder(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	f := newRosterFixture(t, db)
 
 	addAthlete(t, db, store.Athlete{FirstName: "Adam", LastName: "Adult"}, f.adultBeginner, "2026-01-01")
@@ -150,7 +144,7 @@ func TestListRosterRankSortUsesSystemThenRankOrder(t *testing.T) {
 }
 
 func TestListRosterTieBreakStaysAlphabetical(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	f := newRosterFixture(t, db)
 
 	addAthlete(t, db, store.Athlete{FirstName: "Carol", LastName: "Adler"}, f.kidsBeginner, "2026-01-01")
@@ -173,7 +167,7 @@ func TestListRosterTieBreakStaysAlphabetical(t *testing.T) {
 }
 
 func TestListRosterReportsCurrentRank(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	f := newRosterFixture(t, db)
 
 	graded := addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, f.kidsBeginner, "2024-01-01")
@@ -202,7 +196,7 @@ func TestListRosterReportsCurrentRank(t *testing.T) {
 // from the rows themselves (ADR-0007), so the slug has to ride along rather than
 // be looked up per athlete.
 func TestListRosterCarriesTheSystemSlug(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	f := newRosterFixture(t, db)
 
 	addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, f.kidsBeginner, "2026-01-01")
@@ -220,11 +214,8 @@ func TestListRosterCarriesTheSystemSlug(t *testing.T) {
 }
 
 func TestListRosterCarriesRankGroupAndDegree(t *testing.T) {
-	db := newTestDB(t)
-	kids := mustInsert(t, db, `INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "BJJ Kids", 0)
-	striped := mustInsert(t, db,
-		`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order) VALUES (?, ?, ?, ?, ?)`,
-		kids, "Grey-White, 2 stripes", "Grey-White", 2, 1)
+	db := storetest.NewDB(t)
+	striped := storetest.RankID(t, db, "BJJ Kids", "Grey-White, 2 stripes")
 
 	addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, striped, "2026-01-01")
 	addAthlete(t, db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}, 0, "")
@@ -246,7 +237,7 @@ func TestListRosterCarriesRankGroupAndDegree(t *testing.T) {
 // function used by the roster and the pure CurrentRank used by the detail page.
 // The fixture includes a same-date tie, which is exactly where they could drift.
 func TestListRosterCurrentRankMatchesCurrentRank(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	f := newRosterFixture(t, db)
 
 	tied := addAthlete(t, db, store.Athlete{FirstName: "Tina", LastName: "Tie"}, f.kidsBeginner, "2026-01-01")

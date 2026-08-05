@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 func TestListGradingSystemsGroupsRanksInOrder(t *testing.T) {
-	db := seededDB(t)
+	db := storetest.NewDB(t)
 
 	systems, err := store.ListGradingSystems(db)
 	if err != nil {

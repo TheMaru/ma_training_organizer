@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 // rosterSortQuery is one roster query as a trainer's URL carries it.
@@ -199,7 +200,7 @@ func TestRecordingAPromotionKeepsTheQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
-	rankID := seededRankID(t, db, "BJJ Adult", "Blue")
+	rankID := storetest.RankID(t, db, "BJJ Adult", "Blue")
 
 	// The detail page is reached from the roster, so its own form must not drop the
 	// state either — otherwise the way back is lost after recording a promotion.

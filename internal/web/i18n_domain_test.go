@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 func TestRosterRankLabelFollowsTheLocale(t *testing.T) {
@@ -143,7 +144,7 @@ func TestUnresolvableRankKeepsItsNameBesideALocalizedSystem(t *testing.T) {
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
 	kids := seededSystemID(t, db, "BJJ Kids")
-	rankID := mustInsert(t, db,
+	rankID := storetest.MustInsert(t, db,
 		`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order) VALUES (?, ?, ?, ?, ?)`,
 		kids, "Rainbow", "Rainbow", 0, 99)
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Robin", LastName: "Regenbogen"})
@@ -163,13 +164,9 @@ func TestUnresolvableRankKeepsItsNameBesideALocalizedSystem(t *testing.T) {
 	}
 }
 
-// seededSystemID returns a seeded grading system's id, for the reference data a
-// club would add to it.
+// seededSystemID returns a seeded grading system's id by name.
 func seededSystemID(t *testing.T, db *sql.DB, name string) int64 {
 	t.Helper()
-	if err := store.Seed(db); err != nil {
-		t.Fatalf("Seed: %v", err)
-	}
 	var id int64
 	if err := db.QueryRow(`SELECT id FROM grading_systems WHERE name = ?`, name).Scan(&id); err != nil {
 		t.Fatalf("lookup grading system %q: %v", name, err)

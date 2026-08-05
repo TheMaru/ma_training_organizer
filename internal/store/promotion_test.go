@@ -1,37 +1,22 @@
 package store_test
 
 import (
-	"database/sql"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
-// seedRankID looks up a seeded rank's id within a named system, so promotion
-// tests can target real ranks without hardcoding auto-increment ids.
-func seedRankID(t *testing.T, db *sql.DB, system, name string) int64 {
-	t.Helper()
-	var id int64
-	err := db.QueryRow(`
-		SELECT r.id FROM ranks r
-		JOIN grading_systems g ON g.id = r.grading_system_id
-		WHERE g.name = ? AND r.name = ?`, system, name).Scan(&id)
-	if err != nil {
-		t.Fatalf("lookup rank %q/%q: %v", system, name, err)
-	}
-	return id
-}
-
 func TestCreateAndListPromotions(t *testing.T) {
-	db := seededDB(t)
+	db := storetest.NewDB(t)
 
 	athleteID, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
 
-	white := seedRankID(t, db, "BJJ Adult", "White")
-	blue := seedRankID(t, db, "BJJ Adult", "Blue")
+	white := storetest.RankID(t, db, "BJJ Adult", "White")
+	blue := storetest.RankID(t, db, "BJJ Adult", "Blue")
 
 	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: athleteID, RankID: white, PromotedOn: "2025-01-10"}); err != nil {
 		t.Fatalf("CreatePromotion white: %v", err)
@@ -57,13 +42,13 @@ func TestCreateAndListPromotions(t *testing.T) {
 }
 
 func TestListPromotionsCarriesRankGroupAndDegree(t *testing.T) {
-	db := seededDB(t)
+	db := storetest.NewDB(t)
 
 	athleteID, err := store.CreateAthlete(db, store.Athlete{FirstName: "Mia", LastName: "Kind"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
-	striped := seedRankID(t, db, "BJJ Kids", "Grey-White, 2 stripes")
+	striped := storetest.RankID(t, db, "BJJ Kids", "Grey-White, 2 stripes")
 	if _, err := store.CreatePromotion(db, store.Promotion{AthleteID: athleteID, RankID: striped, PromotedOn: "2026-02-02"}); err != nil {
 		t.Fatalf("CreatePromotion: %v", err)
 	}

@@ -65,12 +65,6 @@ func serve(cfg config.Config) error {
 		return err
 	}
 	defer db.Close()
-	if err := store.Migrate(db); err != nil {
-		return err
-	}
-	if err := store.Seed(db); err != nil {
-		return err
-	}
 
 	sessions := web.NewSessionManager(db, cfg.SessionLifetime, cfg.Secure)
 

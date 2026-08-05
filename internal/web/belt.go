@@ -13,8 +13,8 @@ import (
 // rank_group as free text and declares nothing about belts, so a rank becomes
 // belt-renderable purely by having an entry here.
 //
-// The keys are spelled exactly as store.Seed writes them, which is the only
-// thing that writes rank_group today. Lookup is exact — matching more loosely
+// The keys are spelled exactly as the store's seed writes them (see
+// store.SeededRankGroups), which is the only thing that writes rank_group today. Lookup is exact — matching more loosely
 // would be guessing at input no code path produces.
 var beltColours = map[string]string{
 	"White":  beltWhite,

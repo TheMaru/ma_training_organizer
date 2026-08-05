@@ -147,15 +147,11 @@ var demoAthletes = []demoAthlete{
 	},
 }
 
-// seedDemo populates the database with the demo roster for hands-on testing. It
-// first seeds the grading systems (so the demo promotions have ranks to target),
-// then inserts each demo athlete and their promotions. It is idempotent: an
-// athlete whose (firstName, lastName) already exists is skipped entirely, so
-// re-running never creates duplicates.
+// seedDemo populates the database with the demo roster for hands-on testing: each
+// demo athlete and their promotions, which target the reference ranks Open has
+// already seeded. It is idempotent: an athlete whose (firstName, lastName) already
+// exists is skipped entirely, so re-running never creates duplicates.
 func seedDemo(db *sql.DB) error {
-	if err := store.Seed(db); err != nil {
-		return err
-	}
 	ranks, err := rankIndex(db)
 	if err != nil {
 		return err
@@ -250,8 +246,8 @@ func nameKey(first, last string) string {
 	return first + "\x00" + last
 }
 
-// cmdSeedDemo wires the seed-demo subcommand: open+migrate the database, then
-// populate the demo roster.
+// cmdSeedDemo wires the seed-demo subcommand: open the database, then populate
+// the demo roster.
 func cmdSeedDemo(dbPath string, args []string) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: organizer seed-demo")

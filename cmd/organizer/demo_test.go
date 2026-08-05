@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 // currentRankOf looks up an athlete by name and returns their derived current
@@ -32,7 +33,7 @@ func currentRankOf(t *testing.T, db *sql.DB, first, last string) string {
 }
 
 func TestSeedDemoIsIdempotent(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if err := seedDemo(db); err != nil {
 		t.Fatalf("first seedDemo: %v", err)
@@ -60,7 +61,7 @@ func TestSeedDemoIsIdempotent(t *testing.T) {
 }
 
 func TestSeedDemoDerivesCrossSystemCurrentRank(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	if err := seedDemo(db); err != nil {
 		t.Fatalf("seedDemo: %v", err)
 	}
@@ -84,7 +85,7 @@ func TestSeedDemoDerivesCrossSystemCurrentRank(t *testing.T) {
 // promotions actually resolve to rather than restating the rank names; only the
 // ungraded athlete is counted off the slice, having no promotion to read.
 func TestSeedDemoCoversTheBeltVisuals(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	if err := seedDemo(db); err != nil {
 		t.Fatalf("seedDemo: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestSeedDemoCoversTheBeltVisuals(t *testing.T) {
 }
 
 func TestClearDemoRemovesOnlyDemoAthletes(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	// A real athlete that is not part of the demo set must survive a clear.
 	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Real", LastName: "Person"}); err != nil {
@@ -195,7 +196,7 @@ func TestClearDemoRemovesOnlyDemoAthletes(t *testing.T) {
 }
 
 func TestClearDemoIsIdempotent(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	// Clearing when nothing was seeded must be a clean no-op.
 	if err := clearDemo(db); err != nil {
 		t.Fatalf("clearDemo on empty db: %v", err)

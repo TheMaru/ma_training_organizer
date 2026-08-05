@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 func TestCreateAndGetAthlete(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	want := store.Athlete{
 		FirstName: "Ada",
@@ -38,7 +39,7 @@ func TestCreateAndGetAthlete(t *testing.T) {
 }
 
 func TestCreateAthleteStoresBlankDatesAsNull(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "No", LastName: "Dates"})
 	if err != nil {
@@ -71,7 +72,7 @@ func TestCreateAthleteStoresBlankDatesAsNull(t *testing.T) {
 }
 
 func TestCreateAthletesInsertsTheWholeBatch(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := store.CreateAthletes(db, []store.Athlete{
 		{FirstName: "Ada", LastName: "Lovelace", BirthDate: "1990-12-10"},
@@ -98,7 +99,7 @@ func TestCreateAthletesInsertsTheWholeBatch(t *testing.T) {
 // all-or-nothing guarantee. A temporary unique index is the lever: it makes the
 // third insert fail after the first two have already been written.
 func TestCreateAthletesRollsBackTheWholeBatch(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	if _, err := db.Exec(`CREATE UNIQUE INDEX tmp_name ON athletes (first_name, last_name)`); err != nil {
 		t.Fatalf("create unique index: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestCreateAthletesRollsBackTheWholeBatch(t *testing.T) {
 }
 
 func TestCreateAthletesOfNothingIsANoOp(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	// The importer hands over an empty batch whenever every row was already on
 	// the roster; that must commit cleanly rather than error.
@@ -135,7 +136,7 @@ func TestCreateAthletesOfNothingIsANoOp(t *testing.T) {
 }
 
 func TestAthleteByIDNotFound(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	_, err := store.AthleteByID(db, 404)
 	if !errors.Is(err, store.ErrAthleteNotFound) {
@@ -144,7 +145,7 @@ func TestAthleteByIDNotFound(t *testing.T) {
 }
 
 func TestListAthletesSortsByLastName(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	// Insert deliberately out of order.
 	for _, a := range []store.Athlete{
@@ -178,7 +179,7 @@ func TestListAthletesSortsByLastName(t *testing.T) {
 }
 
 func TestListAthletesTieBreakerFlipsWithDirection(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	// Same last name: the first-name tie-breaker decides order, and must flip
 	// with the direction so descending is a true reverse of ascending.
@@ -210,7 +211,7 @@ func TestListAthletesTieBreakerFlipsWithDirection(t *testing.T) {
 }
 
 func TestUpdateAthlete(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -238,7 +239,7 @@ func TestUpdateAthlete(t *testing.T) {
 }
 
 func TestUpdateAthleteUnknownID(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := store.UpdateAthlete(db, store.Athlete{ID: 999, FirstName: "Ghost", LastName: "Rider"})
 	if !errors.Is(err, store.ErrAthleteNotFound) {
@@ -247,7 +248,7 @@ func TestUpdateAthleteUnknownID(t *testing.T) {
 }
 
 func TestDeleteAthlete(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -264,7 +265,7 @@ func TestDeleteAthlete(t *testing.T) {
 }
 
 func TestDeleteAthleteUnknownID(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := store.DeleteAthlete(db, 999)
 	if !errors.Is(err, store.ErrAthleteNotFound) {
@@ -273,15 +274,14 @@ func TestDeleteAthleteUnknownID(t *testing.T) {
 }
 
 func TestDeleteAthleteViaStoreCascadesToPromotions(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
-	gsID := mustInsert(t, db, `INSERT INTO grading_systems (name) VALUES (?)`, "BJJ Adult")
-	rankID := mustInsert(t, db, `INSERT INTO ranks (grading_system_id, name, sort_order) VALUES (?, ?, ?)`, gsID, "White", 0)
+	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 	athleteID, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
-	mustInsert(t, db, `INSERT INTO promotions (athlete_id, rank_id, promoted_on) VALUES (?, ?, ?)`, athleteID, rankID, "2026-01-01")
+	storetest.MustInsert(t, db, `INSERT INTO promotions (athlete_id, rank_id, promoted_on) VALUES (?, ?, ?)`, athleteID, rankID, "2026-01-01")
 
 	if err := store.DeleteAthlete(db, athleteID); err != nil {
 		t.Fatalf("DeleteAthlete: %v", err)

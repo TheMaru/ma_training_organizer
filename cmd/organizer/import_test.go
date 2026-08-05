@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 // importCSV runs the import core over a literal CSV body, failing the test on an
@@ -60,7 +61,7 @@ func countAthletes(t *testing.T, db *sql.DB) int {
 }
 
 func TestImportAthletesInsertsEveryRow(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSV(t, db, `
 Vorname,Nachname,Geburtsdatum,Beitritt,Notizen
@@ -82,7 +83,7 @@ Jonas,Fischer,1988-11-30,2022-01-10,
 }
 
 func TestImportAthletesIsIdempotent(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	const csv = `
 Vorname,Nachname
 Lena,Bergmann
@@ -106,7 +107,7 @@ Jonas,Fischer
 // A hand-edit in the web UI must survive a re-import: an existing athlete is
 // skipped, never overwritten from the (possibly stale) CSV.
 func TestImportAthletesSkipsRatherThanUpdates(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 	if _, err := store.CreateAthlete(db, store.Athlete{
 		FirstName: "Lena", LastName: "Bergmann", Notes: "im Web gepflegt",
 	}); err != nil {
@@ -130,7 +131,7 @@ Lena,Bergmann,aus der alten Tabelle
 // dates, columns in a different order, and an extra column the tool knows
 // nothing about.
 func TestImportAthletesReadsGermanExcelExport(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSV(t, db, "\ufeffNachname;Mitgliedsnummer;Vorname;Beitritt;Geburtsdatum\r\n"+
 		"Bergmann;4711;Lena;01.09.2023;18.04.1992\r\n")
@@ -149,7 +150,7 @@ func TestImportAthletesReadsGermanExcelExport(t *testing.T) {
 }
 
 func TestImportAthletesMatchesHeadersLoosely(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	importCSV(t, db, `
  VORNAME , nachname
@@ -161,7 +162,7 @@ Lena, Bergmann
 }
 
 func TestImportAthletesStoresBlankDatesAsUnset(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	importCSV(t, db, `
 Vorname,Nachname,Geburtsdatum,Beitritt
@@ -177,7 +178,7 @@ Lena,Bergmann,,
 // One bad row poisons the whole file: every problem is reported together and
 // nothing at all is written (all-or-nothing, spec).
 func TestImportAthletesWritesNothingWhenAnyRowIsBad(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSVErr(t, db, `
 Vorname,Nachname,Geburtsdatum
@@ -206,7 +207,7 @@ Lena,Bergmann,1992-04-18
 // it not to, fixing that row would only reveal the duplicate on the next run —
 // the row-by-row fix loop all-or-nothing exists to prevent.
 func TestImportAthletesSeesDuplicatesBehindOtherErrors(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSVErr(t, db, `
 Vorname,Nachname,Geburtsdatum
@@ -228,7 +229,7 @@ Lena,Bergmann,1992-04-18
 // Two rows both missing a Vorname are two missing-name errors, not a duplicate:
 // a blank name is no identity to collide on.
 func TestImportAthletesDoesNotPairUpNamelessRows(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSVErr(t, db, `
 Vorname,Nachname
@@ -245,7 +246,7 @@ Vorname,Nachname
 }
 
 func TestImportAthletesRejectsBlankFirstName(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSVErr(t, db, `
 Vorname,Nachname
@@ -258,7 +259,7 @@ Vorname,Nachname
 }
 
 func TestImportAthletesRejectsAnUnparseableJoinDate(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSVErr(t, db, `
 Vorname,Nachname,Beitritt
@@ -273,7 +274,7 @@ Lena,Bergmann,September 2023
 // A missing required column is fatal before any row is looked at, so the trainer
 // gets one clear message instead of a per-row error avalanche.
 func TestImportAthletesRequiresTheNameColumns(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	report := importCSVErr(t, db, `
 Nachname,Geburtsdatum
@@ -289,7 +290,7 @@ Bergmann,1992-04-18
 }
 
 func TestImportAthletesRejectsAFileWithoutAHeader(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if report := importCSVErr(t, db, ""); !strings.Contains(report, "Kopfzeile") {
 		t.Errorf("abort report = %q, want a missing-header message", report)
@@ -297,7 +298,7 @@ func TestImportAthletesRejectsAFileWithoutAHeader(t *testing.T) {
 }
 
 func TestImportAthletesReportsAsAnImportError(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	_, err := importAthletes(db, strings.NewReader("Vorname,Nachname\n,\n"))
 

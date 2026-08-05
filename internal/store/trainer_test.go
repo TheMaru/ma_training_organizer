@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 func TestCreateAndGetTrainerByUsername(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateTrainer(db, "ada", "hash-1")
 	if err != nil {
@@ -34,7 +35,7 @@ func TestCreateAndGetTrainerByUsername(t *testing.T) {
 }
 
 func TestTrainerByIDRoundTrips(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateTrainer(db, "grace", "hash-g")
 	if err != nil {
@@ -51,7 +52,7 @@ func TestTrainerByIDRoundTrips(t *testing.T) {
 }
 
 func TestTrainerByUsernameNotFound(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	_, err := store.TrainerByUsername(db, "ghost")
 	if !errors.Is(err, store.ErrTrainerNotFound) {
@@ -60,7 +61,7 @@ func TestTrainerByUsernameNotFound(t *testing.T) {
 }
 
 func TestTrainerByIDNotFound(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	_, err := store.TrainerByID(db, 404)
 	if !errors.Is(err, store.ErrTrainerNotFound) {
@@ -69,7 +70,7 @@ func TestTrainerByIDNotFound(t *testing.T) {
 }
 
 func TestCreateTrainerRejectsDuplicateUsername(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	if _, err := store.CreateTrainer(db, "dup", "h1"); err != nil {
 		t.Fatalf("first CreateTrainer: %v", err)
@@ -82,7 +83,7 @@ func TestCreateTrainerRejectsDuplicateUsername(t *testing.T) {
 }
 
 func TestUpdateTrainerPassword(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateTrainer(db, "changeme", "old-hash")
 	if err != nil {
@@ -103,7 +104,7 @@ func TestUpdateTrainerPassword(t *testing.T) {
 }
 
 func TestUpdateTrainerPasswordUnknownID(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := store.UpdateTrainerPassword(db, 999, "whatever")
 	if !errors.Is(err, store.ErrTrainerNotFound) {
@@ -112,7 +113,7 @@ func TestUpdateTrainerPasswordUnknownID(t *testing.T) {
 }
 
 func TestUpdateTrainerLocale(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	id, err := store.CreateTrainer(db, "ada", "hash-1")
 	if err != nil {
@@ -141,7 +142,7 @@ func TestUpdateTrainerLocale(t *testing.T) {
 }
 
 func TestUpdateTrainerLocaleUnknownTrainer(t *testing.T) {
-	db := newTestDB(t)
+	db := storetest.NewDB(t)
 
 	err := store.UpdateTrainerLocale(db, 404, "en")
 	if !errors.Is(err, store.ErrTrainerNotFound) {
