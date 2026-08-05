@@ -51,6 +51,13 @@ func CreateTrainer(db *sql.DB, username, passwordHash string) (int64, error) {
 	return id, nil
 }
 
+// The four functions below are near-copies in pairs — the lookups differ only in
+// their WHERE clause, the updates only in the column they SET — and that stays.
+// Deleting them moves their SQL into the handlers rather than concentrating it
+// anywhere: the complexity moves, it does not reduce. Recorded here rather than as
+// an ADR because it is reversible in an afternoon, and the reader who needs it has
+// this file open already.
+
 // TrainerByUsername looks up a trainer by username, returning ErrTrainerNotFound
 // if none matches. Used by the login handler.
 func TrainerByUsername(db *sql.DB, username string) (Trainer, error) {
