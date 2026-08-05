@@ -51,7 +51,7 @@ output stay English.
   the rationale evaporates behind a login. It would mean reworking routing and
   every HTMX URL for a benefit we do not collect.
 - **A query parameter (rejected):** same rework, and it collides with the
-  roster's own view state, which `rosterView` deliberately keeps closed
+  roster's own query, which `rosterQuery` deliberately keeps closed
   (ADR-0005, ADR-0007).
 - **A session value rather than an account column (rejected):** would not follow
   a trainer to a second device, and sessions are already revocable server-side —
@@ -77,7 +77,7 @@ output stay English.
   app's scale (one SQLite connection, a handful of trainers) that is cheaper than
   a cache that has to be invalidated when the switcher writes.
 - The switcher needs somewhere to return to, and that target travels through the
-  client. It is rebuilt from the normalised view state rather than echoed from
+  client. It is rebuilt from the normalised query rather than echoed from
   the request, and validated to be an in-app path before it reaches a `Location`
   header.
 - The German UI lost its stray English strings (`Athletes` in the nav) on the way

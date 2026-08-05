@@ -14,7 +14,7 @@ cannot; a comment that restates the line beneath it is not, however short.
 
 ## The carve-out: reasoning about distant code
 
-A comment describing code in *another* file — "the caller in `rosterview.go` relies
+A comment describing code in *another* file — "the caller in `rosterquery.go` relies
 on this ordering" — passes the primary test, because the surrounding code genuinely
 does not say it. It still doesn't belong. Comments like that couple two files, and
 when one changes, only the other gets read.
@@ -62,7 +62,7 @@ reader who has never opened `docs/adr/` finds the reasoning at all.
 
 Going by Go's exported/unexported line would not substitute: this is an
 application, not a library, nothing consumes `internal/web` from outside, and the
-densest files there (`rosterview.go`, `belt.go`) export nothing at all — so that
+densest files there (`rosterquery.go`, `belt.go`) export nothing at all — so that
 line would delete hardest exactly where the non-obvious reasoning sits.
 
 An exception with a reason, not an oversight.

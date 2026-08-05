@@ -9,40 +9,40 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
-// rosterViewState is one view state as a trainer's URL carries it.
-type rosterViewState struct{ sort, dir string }
+// rosterSortQuery is one roster query as a trainer's URL carries it.
+type rosterSortQuery struct{ sort, dir string }
 
-// sortedRosterViews are all the roster views a trainer can be looking at: every
-// sortable column in both directions. The default view is deliberately among them
+// sortedRosterQueries are all the sort queries a trainer's URL can carry: every
+// sortable column in both directions. The default query is deliberately among them
 // — it must round-trip as a bare /athletes.
-func sortedRosterViews() []rosterViewState {
-	var views []rosterViewState
+func sortedRosterQueries() []rosterSortQuery {
+	var queries []rosterSortQuery
 	for _, sort := range []string{
 		store.RosterSortLastName, store.RosterSortFirstName,
 		store.RosterSortBirthDate, store.RosterSortJoinedOn, store.RosterSortRank,
 	} {
-		views = append(views, rosterViewState{sort, "asc"}, rosterViewState{sort, "desc"})
+		queries = append(queries, rosterSortQuery{sort, "asc"}, rosterSortQuery{sort, "desc"})
 	}
-	return views
+	return queries
 }
 
-// query is the view state as it arrives on a request.
-func (v rosterViewState) query() string {
-	return fmt.Sprintf("sort=%s&dir=%s", v.sort, v.dir)
+// params is the query as it arrives on a request.
+func (q rosterSortQuery) params() string {
+	return fmt.Sprintf("sort=%s&dir=%s", q.sort, q.dir)
 }
 
-// rosterURL is the roster URL this view state must produce. The default view
-// carries no query at all — a bare /athletes is what renders it.
-func (v rosterViewState) rosterURL() string {
-	if v.sort == store.RosterSortDefault && v.dir == "asc" {
+// rosterURL is the roster URL this query must produce. The default query carries
+// no parameters at all — a bare /athletes is what renders it.
+func (q rosterSortQuery) rosterURL() string {
+	if q.sort == store.RosterSortDefault && q.dir == "asc" {
 		return "/athletes"
 	}
-	return "/athletes?" + v.query()
+	return "/athletes?" + q.params()
 }
 
 func TestDeleteReturnsToSortedRoster(t *testing.T) {
-	for _, view := range sortedRosterViews() {
-		t.Run(view.sort+"-"+view.dir, func(t *testing.T) {
+	for _, query := range sortedRosterQueries() {
+		t.Run(query.sort+"-"+query.dir, func(t *testing.T) {
 			ts, client, db := newAuthTestServer(t)
 			login(t, ts, client, testUsername, testPassword).Body.Close()
 			id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -50,8 +50,8 @@ func TestDeleteReturnsToSortedRoster(t *testing.T) {
 				t.Fatalf("CreateAthlete: %v", err)
 			}
 
-			path := fmt.Sprintf("/athletes/%d/delete?%s", id, view.query())
-			seeOtherTo(t, post(t, ts, client, path, nil), view.rosterURL())
+			path := fmt.Sprintf("/athletes/%d/delete?%s", id, query.params())
+			seeOtherTo(t, post(t, ts, client, path, nil), query.rosterURL())
 		})
 	}
 }
@@ -92,7 +92,7 @@ func TestUpdateReturnsToSortedRoster(t *testing.T) {
 	seeOtherTo(t, resp, "/athletes?sort=lastName&dir=desc")
 }
 
-func TestMutationWithJunkViewStateRedirectsToWhitelistedRoster(t *testing.T) {
+func TestMutationWithJunkQueryRedirectsToWhitelistedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -100,13 +100,13 @@ func TestMutationWithJunkViewStateRedirectsToWhitelistedRoster(t *testing.T) {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
 
-	// Junk normalises to the default view, which carries no query — so nothing
+	// Junk normalises to the default query, which carries no parameters — so nothing
 	// user-controlled can reach the Location header.
 	path := fmt.Sprintf("/athletes/%d/delete?sort=bogus&dir=sideways", id)
 	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes")
 }
 
-func TestMutationRedirectCarriesNormalisedViewState(t *testing.T) {
+func TestMutationRedirectCarriesNormalisedQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -121,7 +121,7 @@ func TestMutationRedirectCarriesNormalisedViewState(t *testing.T) {
 	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=firstName&dir=desc")
 }
 
-func TestRosterLinksCarryTheViewState(t *testing.T) {
+func TestRosterLinksCarryTheQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -164,7 +164,7 @@ func TestEditFormReturnsToSortedRoster(t *testing.T) {
 	}
 
 	body := readBody(t, get(t, ts, client, fmt.Sprintf("/athletes/%d/edit?sort=rank&dir=asc", id)))
-	// Saving posts the view state back, so the update's own redirect can use it …
+	// Saving posts the query back, so the update's own redirect can use it …
 	if want := fmt.Sprintf(`action="/athletes/%d?sort=rank&amp;dir=asc"`, id); !strings.Contains(body, want) {
 		t.Errorf("edit form is missing %s", want)
 	}
@@ -192,7 +192,7 @@ func TestAthleteDetailOffersAWayBackToTheSortedRoster(t *testing.T) {
 	}
 }
 
-func TestRecordingAPromotionKeepsTheViewState(t *testing.T) {
+func TestRecordingAPromotionKeepsTheQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -225,7 +225,7 @@ func TestMutationRedirectKeepsTheFilter(t *testing.T) {
 	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=rank&dir=desc&system=bjj-adult")
 }
 
-func TestFilterOnlyViewCarriesNoSortKeys(t *testing.T) {
+func TestFilterOnlyQueryCarriesNoSortKeys(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -233,8 +233,8 @@ func TestFilterOnlyViewCarriesNoSortKeys(t *testing.T) {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
 
-	// Filtering without sorting is a non-default view, so the URL spells out the
-	// whole view state — but the filter's own default (Alle) still adds nothing.
+	// Filtering without sorting is a non-default query, so the URL spells out the
+	// whole query — but the filter's own default (Alle) still adds nothing.
 	path := fmt.Sprintf("/athletes/%d/delete?system=none", id)
 	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=firstName&dir=asc&system=none")
 }
@@ -242,7 +242,7 @@ func TestFilterOnlyViewCarriesNoSortKeys(t *testing.T) {
 func TestMalformedFilterIsDropped(t *testing.T) {
 	// Anything that is not slug-shaped reads as no filter at all, so no
 	// user-controlled string can reach a Location header or a rendered URL —
-	// the guarantee that lets query() render without escaping.
+	// the guarantee that lets params() render without escaping.
 	for _, junk := range []string{
 		"BJJ Kids", `bjj"onload=alert(1)`, "bjj_kids", "Bjj-Kids", "bjj-kids\r\nX: y",
 		strings.Repeat("a", 65),

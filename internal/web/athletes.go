@@ -12,28 +12,28 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
-// handleAthleteNew renders the empty create form. The roster's view state travels
+// handleAthleteNew renders the empty create form. The roster's query travels
 // through the form (in its action) so the created athlete lands back in the
 // roster the trainer started from.
 func (s *Server) handleAthleteNew(w http.ResponseWriter, r *http.Request) {
-	view := rosterViewFrom(r)
-	s.renderAthleteForm(w, r, http.StatusOK, view, rosterPath, "athlete.new", store.Athlete{}, "")
+	query := rosterQueryFrom(r)
+	s.renderAthleteForm(w, r, http.StatusOK, query, rosterPath, "athlete.new", store.Athlete{}, "")
 }
 
 // handleAthleteCreate validates the submitted form and inserts a new athlete,
 // re-rendering the form with a 400 when required fields are missing.
 func (s *Server) handleAthleteCreate(w http.ResponseWriter, r *http.Request) {
-	view := rosterViewFrom(r)
+	query := rosterQueryFrom(r)
 	a, errMsg := athleteFromForm(r)
 	if errMsg != "" {
-		s.renderAthleteForm(w, r, http.StatusBadRequest, view, rosterPath, "athlete.new", a, errMsg)
+		s.renderAthleteForm(w, r, http.StatusBadRequest, query, rosterPath, "athlete.new", a, errMsg)
 		return
 	}
 	if _, err := store.CreateAthlete(s.db, a); err != nil {
 		serverError(w)
 		return
 	}
-	redirect(w, r, view.path(rosterPath))
+	redirect(w, r, query.path(rosterPath))
 }
 
 // handleAthleteEdit renders the edit form pre-filled from the stored athlete.
@@ -52,8 +52,8 @@ func (s *Server) handleAthleteEdit(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	view := rosterViewFrom(r)
-	s.renderAthleteForm(w, r, http.StatusOK, view, athletePath(id), "athlete.edit", a, "")
+	query := rosterQueryFrom(r)
+	s.renderAthleteForm(w, r, http.StatusOK, query, athletePath(id), "athlete.edit", a, "")
 }
 
 // handleAthleteUpdate validates the form and overwrites the athlete's fields.
@@ -64,11 +64,11 @@ func (s *Server) handleAthleteUpdate(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	view := rosterViewFrom(r)
+	query := rosterQueryFrom(r)
 	a, errMsg := athleteFromForm(r)
 	a.ID = id
 	if errMsg != "" {
-		s.renderAthleteForm(w, r, http.StatusBadRequest, view, athletePath(id), "athlete.edit", a, errMsg)
+		s.renderAthleteForm(w, r, http.StatusBadRequest, query, athletePath(id), "athlete.edit", a, errMsg)
 		return
 	}
 	err := store.UpdateAthlete(s.db, a)
@@ -80,7 +80,7 @@ func (s *Server) handleAthleteUpdate(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	redirect(w, r, view.path(rosterPath))
+	redirect(w, r, query.path(rosterPath))
 }
 
 // handleAthleteDelete hard-deletes an athlete (cascading to their promotions).
@@ -99,7 +99,7 @@ func (s *Server) handleAthleteDelete(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	redirect(w, r, rosterViewFrom(r).path(rosterPath))
+	redirect(w, r, rosterQueryFrom(r).path(rosterPath))
 }
 
 // athleteFromForm reads and trims the athlete form fields. It returns a non-empty
@@ -131,7 +131,7 @@ func athleteID(r *http.Request) (int64, bool) {
 
 // The athlete URLs, spelled once. athletePath is both the detail page and — as a
 // POST — the update target. They are all bare paths: a caller runs them through
-// rosterView.path before they reach a template or a Location header.
+// rosterQuery.path before they reach a template or a Location header.
 const rosterPath = "/athletes"
 
 func athletePath(id int64) string    { return fmt.Sprintf("%s/%d", rosterPath, id) }
@@ -139,15 +139,15 @@ func editPath(id int64) string       { return athletePath(id) + "/edit" }
 func deletePath(id int64) string     { return athletePath(id) + "/delete" }
 func promotionsPath(id int64) string { return athletePath(id) + "/promotions" }
 
-// renderAthleteForm renders the create/edit form. view is the roster the form was
+// renderAthleteForm renders the create/edit form. query is the roster the form was
 // reached from, and it is applied to both URLs here — to action, so submitting
 // carries the state to the handler that redirects, and to "Abbrechen", so
 // cancelling lands on the same roster. Callers pass the bare action path.
-func (s *Server) renderAthleteForm(w http.ResponseWriter, r *http.Request, status int, view rosterView, action, headingKey string, a store.Athlete, errMsg string) {
+func (s *Server) renderAthleteForm(w http.ResponseWriter, r *http.Request, status int, query rosterQuery, action, headingKey string, a store.Athlete, errMsg string) {
 	s.tmpl.render(w, r, status, "athlete_form.html", map[string]any{
 		"Authenticated": true,
-		"Action":        view.path(action),
-		"Cancel":        view.path(rosterPath),
+		"Action":        query.path(action),
+		"Cancel":        query.path(rosterPath),
 		"Heading":       translate(r, headingKey),
 		"Athlete":       a,
 		"Error":         errMsg,

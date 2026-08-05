@@ -49,7 +49,7 @@ type rosterHeader struct {
 }
 
 // rosterLine is one rendered roster row: the stored row plus the links leading
-// out of it. Those links are built from the view state, so opening or deleting an
+// out of it. Those links are built from the query, so opening or deleting an
 // athlete comes back to the roster the trainer was actually looking at.
 type rosterLine struct {
 	store.RosterRow
@@ -75,9 +75,9 @@ type rosterFilter struct {
 // rows from that same slice, which is what store.RosterFilterOptions asks of its
 // caller and what the absent empty-result state rests on.
 func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
-	view := rosterViewFrom(r)
+	query := rosterQueryFrom(r)
 
-	athletes, err := store.ListRoster(s.db, view.sort, view.descending)
+	athletes, err := store.ListRoster(s.db, query.sort, query.descending)
 	if err != nil {
 		serverError(w)
 		return
@@ -85,18 +85,18 @@ func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 	options := store.RosterFilterOptions(athletes)
 	// Resolved before anything builds a URL, so a filter nobody is in cannot
 	// survive into the page's links either.
-	view.system = representedFilter(view.system, options)
+	query.system = representedFilter(query.system, options)
 	locale := localeOf(r.Context())
 
 	s.tmpl.render(w, r, http.StatusOK, "athletes.html", map[string]any{
 		"Authenticated": true,
-		"Athletes":      rosterLines(store.FilterRoster(athletes, view.system), view),
-		"Headers":       rosterHeaders(locale, view),
-		"Filters":       rosterFilters(locale, view, options),
-		"NewHref":       view.path(rosterPath + "/new"),
+		"Athletes":      rosterLines(store.FilterRoster(athletes, query.system), query),
+		"Headers":       rosterHeaders(locale, query),
+		"Filters":       rosterFilters(locale, query, options),
+		"NewHref":       query.path(rosterPath + "/new"),
 		// The one page whose canonical URL the request cannot supply: a filter nobody
-		// is in was just resolved away, and only the view built here knows that.
-		"Return": view.path(rosterPath),
+		// is in was just resolved away, and only the query built here knows that.
+		"Return": query.path(rosterPath),
 	})
 }
 
@@ -117,7 +117,7 @@ func representedFilter(system string, options []store.RosterOption) string {
 // of the partition. Below two options it builds none — Alle and a single option
 // would show the same roster, so in a homogeneous roster the row is absent and
 // surfaces by itself once there is something to partition (ADR-0007a).
-func rosterFilters(locale i18n.Locale, view rosterView, options []store.RosterOption) []rosterFilter {
+func rosterFilters(locale i18n.Locale, query rosterQuery, options []store.RosterOption) []rosterFilter {
 	if len(options) < 2 {
 		return nil
 	}
@@ -125,8 +125,8 @@ func rosterFilters(locale i18n.Locale, view rosterView, options []store.RosterOp
 	chip := func(value, label string) {
 		chips = append(chips, rosterFilter{
 			Label:  label,
-			Href:   view.filteredBy(value).path(rosterPath),
-			Active: value == view.system,
+			Href:   query.filteredBy(value).path(rosterPath),
+			Active: value == query.system,
 		})
 	}
 	chip("", i18n.T(locale, filterAllKey))
@@ -147,32 +147,32 @@ func filterLabel(locale i18n.Locale, option store.RosterOption) string {
 	return systemLabel(locale, option.Value, option.Name)
 }
 
-func rosterLines(rows []store.RosterRow, view rosterView) []rosterLine {
+func rosterLines(rows []store.RosterRow, query rosterQuery) []rosterLine {
 	lines := make([]rosterLine, 0, len(rows))
 	for _, row := range rows {
 		lines = append(lines, rosterLine{
 			RosterRow:    row,
-			Href:         view.path(athletePath(row.ID)),
-			DeleteAction: view.path(deletePath(row.ID)),
+			Href:         query.path(athletePath(row.ID)),
+			DeleteAction: query.path(deletePath(row.ID)),
 		})
 	}
 	return lines
 }
 
-// rosterHeaders builds the clickable column headers for the active view. Each
-// links to the view rosterView.sortedBy produces, which is where the rule for
+// rosterHeaders builds the clickable column headers for the active query. Each
+// links to the query rosterQuery.sortedBy produces, which is where the rule for
 // what a click does lives.
-func rosterHeaders(locale i18n.Locale, view rosterView) []rosterHeader {
+func rosterHeaders(locale i18n.Locale, query rosterQuery) []rosterHeader {
 	headers := make([]rosterHeader, 0, len(rosterColumns))
 	for _, col := range rosterColumns {
 		h := rosterHeader{
 			Label:    i18n.T(locale, col.LabelKey),
 			AriaSort: "none",
-			Href:     view.sortedBy(col.Key).path(rosterPath),
+			Href:     query.sortedBy(col.Key).path(rosterPath),
 		}
-		if col.Key == view.sort {
-			h.Active, h.Descending = true, view.descending
-			if view.descending {
+		if col.Key == query.sort {
+			h.Active, h.Descending = true, query.descending
+			if query.descending {
 				h.Indicator, h.AriaSort = "▼", "descending"
 			} else {
 				h.Indicator, h.AriaSort = "▲", "ascending"

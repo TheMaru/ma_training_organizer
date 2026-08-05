@@ -46,10 +46,10 @@ filter.**
 Whether a slug is *well-formed* is a property of the URL; whether it is
 *represented* is a property of the data. Only one handler needs the second.
 
-- **Form**, in `rosterViewFrom`, pure and without a database: a slug shape,
+- **Form**, in `rosterQueryFrom`, pure and without a database: a slug shape,
   `none`, or empty; anything else reads as empty. This keeps the file's guarantee
   that no user-controlled string reaches a rendered URL or a `Location` header,
-  and keeps `query()` free of escaping — though the guarantee now rests on the
+  and keeps `params()` free of escaping — though the guarantee now rests on the
   value having a fixed *shape* rather than coming from a fixed *set*.
 - **Representation**, in the roster handler alone: the eight other call sites
   carry the filter through untouched and never ask the database about it.
@@ -76,15 +76,15 @@ one source there is nothing for a second one to drift from.
   alternative should this invariant ever feel too clever. Rejected because it
   trades logic for template surface that only exists to apologise for a state the
   other design cannot enter.
-- **`rosterViewFrom` as a method on `*Server` (rejected):** it would reach the
+- **`rosterQueryFrom` as a method on `*Server` (rejected):** it would reach the
   database without polluting any signature, since every call site is already a
   handler method, and eight extra `DISTINCT`s over a club-sized roster on local
-  SQLite cost nothing. Rejected on coupling, not cost: it gives *parsing the view
-  state* a database error path in all nine handlers — the delete handler would
-  have to decide what to do when it could not determine which chips are populated
-  — it makes a URL's meaning depend on who was deleted a second ago, everywhere,
-  and it costs `rosterview_test.go` its freedom from a database fixture for a
-  property that has nothing to do with URL grammar.
+  SQLite cost nothing. Rejected on coupling, not cost: it gives *parsing the
+  roster query* a database error path in all nine handlers — the delete handler
+  would have to decide what to do when it could not determine which chips are
+  populated — it makes a URL's meaning depend on who was deleted a second ago,
+  everywhere, and it costs `rosterquery_test.go` its freedom from a database
+  fixture for a property that has nothing to do with URL grammar.
 - **A separate store query for the options, plus a test pinning the invariant
   (rejected):** the same behaviour, but with two sources that must agree. It
   makes the invariant enforced by evidence rather than by construction, which is
@@ -100,7 +100,7 @@ one source there is nothing for a second one to drift from.
   correct rather than merely tolerable: no athletes, no controls. The filter row
   sits above the sort row — narrow first, then order — and carries a visible
   muted `Filtern` label, parallel to `Sortieren`, as ADR-0005 requires.
-- The comment in `internal/web/rosterview.go` about values coming from a fixed
+- The comment in `internal/web/rosterquery.go` about values coming from a fixed
   set must be rewritten to say fixed *shape*. Security-wise the two are
   equivalent — `[a-z0-9-]` rules out escaping and header injection just as a
   closed set does — but a future reader has to understand the difference.

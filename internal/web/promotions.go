@@ -27,7 +27,7 @@ func (s *Server) handleAthleteDetail(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	s.renderAthleteDetail(w, r, http.StatusOK, rosterViewFrom(r), a, "")
+	s.renderAthleteDetail(w, r, http.StatusOK, rosterQueryFrom(r), a, "")
 }
 
 // handleAthletePromote records a promotion for the athlete, then redirects back
@@ -49,14 +49,14 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	view := rosterViewFrom(r)
+	query := rosterQueryFrom(r)
 	rankID, _ := strconv.ParseInt(r.PostFormValue("rankId"), 10, 64)
 	date := strings.TrimSpace(r.PostFormValue("promotedOn"))
 	// A malformed date must be rejected here: the DATE column would otherwise take
 	// the garbage string and every later read would fail its NullTime scan (500).
 	// <input type="date"> guards the UI; this guards a hand-crafted POST.
 	if _, err := time.Parse("2006-01-02", date); rankID == 0 || err != nil {
-		s.renderAthleteDetail(w, r, http.StatusBadRequest, view, a, translate(r, "promotion.required"))
+		s.renderAthleteDetail(w, r, http.StatusBadRequest, query, a, translate(r, "promotion.required"))
 		return
 	}
 
@@ -65,15 +65,15 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	redirect(w, r, view.path(athletePath(id)))
+	redirect(w, r, query.path(athletePath(id)))
 }
 
 // renderAthleteDetail loads the athlete's promotion history and the grading
 // systems for the record form, derives the current rank, and renders the detail
-// page. errMsg is shown when re-rendering after a rejected record attempt. view
+// page. errMsg is shown when re-rendering after a rejected record attempt. query
 // is the roster this page was opened from: every link and form on the page keeps
 // carrying it, so the way back stays the sorted roster.
-func (s *Server) renderAthleteDetail(w http.ResponseWriter, r *http.Request, status int, view rosterView, a store.Athlete, errMsg string) {
+func (s *Server) renderAthleteDetail(w http.ResponseWriter, r *http.Request, status int, query rosterQuery, a store.Athlete, errMsg string) {
 	promotions, err := store.ListPromotions(s.db, a.ID)
 	if err != nil {
 		serverError(w)
@@ -94,8 +94,8 @@ func (s *Server) renderAthleteDetail(w http.ResponseWriter, r *http.Request, sta
 		"HasCurrent":    hasCurrent,
 		"Systems":       systems,
 		"Error":         errMsg,
-		"EditHref":      view.path(editPath(a.ID)),
-		"PromoteAction": view.path(promotionsPath(a.ID)),
-		"Back":          view.path(rosterPath),
+		"EditHref":      query.path(editPath(a.ID)),
+		"PromoteAction": query.path(promotionsPath(a.ID)),
+		"Back":          query.path(rosterPath),
 	})
 }

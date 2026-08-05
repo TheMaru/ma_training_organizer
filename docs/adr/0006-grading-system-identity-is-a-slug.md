@@ -41,7 +41,7 @@ rather than derived, a collision with the reserved word cannot arise by accident
   a human editing the URL nothing. On a single-club instance the operator *is* a
   URL reader; that is a real requirement here, not a hypothetical one.
 - **The URL-encoded `name` (rejected):** readable, no migration. Rejected twice
-  over. It breaks the invariant documented at `internal/web/rosterview.go` that
+  over. It breaks the invariant documented at `internal/web/rosterquery.go` that
   every rendered query value comes from a fixed set and therefore never needs
   escaping — `BJJ Kids` contains a space. And it makes the identity translatable,
   which is precisely the coupling this ADR exists to cut.

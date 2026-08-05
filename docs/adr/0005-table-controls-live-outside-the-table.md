@@ -14,9 +14,10 @@ Two things forced us to re-examine that arrangement:
 1. The roster gained sortable column headers (`c8ff458`). The sort links live in
    the `<th>`s, i.e. inside the off-screen `thead`, so on a phone the feature has
    no surface at all. The kids trainer is exactly the phone user.
-2. The roster's view state is moving into the URL (`?sort=&dir=`, with `?system=`
+2. The roster's query is moving into the URL (`?sort=&dir=`, with `?system=`
    to follow for the cohort filter), so *how* a control emits a URL is no longer
-   a detail — it decides whether unrelated view state survives an interaction.
+   a detail — it decides whether an unrelated part of the query survives an
+   interaction.
 
 This ADR records where controls that belong to a table are allowed to live, and
 what they are allowed to be built from.
@@ -34,14 +35,14 @@ labelling is done entirely by `td[data-label]::before`. The off-screen `thead`
 therefore contributes nothing but duplicate content, and at phone widths it is
 hidden with `display: none`.
 
-**(b) A table's controls render as sibling links carrying the full view-state
-URL, never as form fields.**
+**(b) A table's controls render as sibling links carrying the full query URL,
+never as form fields.**
 
-A link's `href` is built server-side from the resolved view state, so every
-control automatically carries *all* of it. A `GET` form submits only its own
-fields: any view state not mirrored into a hidden input is silently dropped from
-the resulting URL. That failure is invisible — no error, no failing test, just a
-filter that quietly resets whenever someone sorts. Links keep the view state in
+A link's `href` is built server-side from the resolved query, so every control
+automatically carries *all* of it. A `GET` form submits only its own fields: any
+part of the query not mirrored into a hidden input is silently dropped from the
+resulting URL. That failure is invisible — no error, no failing test, just a
+filter that quietly resets whenever someone sorts. Links keep the query in
 one place; forms create a second enumeration of it that must be maintained by
 hand.
 
@@ -61,7 +62,7 @@ text on the active chip.
   it scales past five columns, but without JavaScript it costs two interactions
   per sort (ADR-0002 rules out an `onchange` submit), it needs a second view model
   with different semantics (`selected` rather than an active indicator), and it
-  inherits the silent view-state loss described in (b).
+  inherits the silent query loss described in (b).
 - **Replacing the desktop header links with one control for all widths
   (rejected):** fewer surfaces, but it discards both the expected
   click-the-column idiom and the `aria-sort` attributes, which on a real desktop
@@ -77,7 +78,7 @@ text on the active chip.
   chips — but only one truth: both render from `rosterColumns` and the resolved
   sort state, into the same URLs.
 - Every future table control (the parked cohort filter first) has its shape
-  decided in advance: a row of links, not a form. Adding a view-state key means
+  decided in advance: a row of links, not a form. Adding a query key means
   one entry in one whitelist, not an audit of every control.
 - Screen-reader users at phone widths lose the `aria-sort` announcement, which is
   replaced by `aria-current` and visually hidden direction text on the active

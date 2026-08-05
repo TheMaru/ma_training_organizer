@@ -19,7 +19,7 @@
 
 <h2>{{t "promotion.heading"}}</h2>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-{{/* The action carries the roster's view state so recording a promotion returns
+{{/* The action carries the roster's query so recording a promotion returns
      to this page still knowing the roster it was opened from. */}}
 <form method="post" action="{{.PromoteAction}}"
       hx-post="{{.PromoteAction}}" hx-target="body" class="stack">

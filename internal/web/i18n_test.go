@@ -163,7 +163,7 @@ func TestRosterColumnLabelsAndCardLabelsStayInSync(t *testing.T) {
 }
 
 // The switcher returns to the roster the trainer is actually looking at, which
-// is the normalised view rather than whatever the URL happened to say.
+// is the normalised query rather than whatever the URL happened to say.
 func TestSwitcherReturnsToTheNormalisedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()

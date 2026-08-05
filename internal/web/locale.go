@@ -61,7 +61,7 @@ func translate(r *http.Request, key string, args ...any) string {
 }
 
 // returnTarget is where switching the language on this page leads back to. It is
-// rebuilt from the normalised view state rather than echoed from the request, so
+// rebuilt from the normalised query rather than echoed from the request, so
 // a junk or stale parameter dies here rather than travelling through the client.
 // Only a GET is a place a link can return to; a page re-rendered from a POST
 // offers the home page instead, its unsaved input being lost either way.
@@ -69,7 +69,7 @@ func returnTarget(r *http.Request) string {
 	if r.Method != http.MethodGet {
 		return homePath
 	}
-	return rosterViewFrom(r).path(r.URL.Path)
+	return rosterQueryFrom(r).path(r.URL.Path)
 }
 
 // handleLanguage stores the submitted language on the trainer's account and
