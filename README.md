@@ -95,10 +95,19 @@ All configuration is via environment variables:
 ## Development
 
 ```sh
-go build ./...    # compile
-go vet ./...      # static checks
-go test ./...     # run tests
+go build ./...                             # compile
+go vet ./...                               # static checks
+go test ./...                              # run tests
+go test -coverprofile=coverage.out ./...   # coverage profile (git-ignored)
+go tool cover -func=coverage.out           # per-function coverage, and the total
+go tool cover -html=coverage.out           # the same, as annotated source
 ```
+
+Record coverage as two absolute counts — statements covered of statements total —
+rather than the percentage, which a refactor that deletes untested code raises
+without adding a test. The profile carries the counts the percentage is derived
+from: `awk 'NR>1 {t+=$2; if ($3>0) c+=$2} END {print c, "of", t}' coverage.out`.
+There is no threshold and no CI gate.
 
 Contributions follow the issue tracker under `.scratch/` and the conventions in
 [`docs/agents/`](docs/agents/). SQL must stay portable (no SQLite-specific
