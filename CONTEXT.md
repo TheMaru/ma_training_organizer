@@ -8,6 +8,10 @@ A tool for martial-arts trainers to organize the people they train. Discipline-a
 A person who trains at the club/school and is tracked by trainers. Not necessarily a child; the tool is martial-arts-general. Distinct from the trainer who logs in to use the tool.
 _Avoid_: Member, student, kid, participant
 
+**Roster**:
+The complete set of athletes the club tracks — one, total, and shared: every trainer sees and edits all of it, and no athlete belongs to a trainer. Sorting and filtering produce *views* of the roster, never other rosters; a view showing twelve of forty athletes is still a view of the one roster.
+_Avoid_: List, table, group, cohort
+
 **Trainer**:
 A person who logs in to manage athletes and award promotions. The only kind of account in v1 (one login = one trainer); all trainers are equal, with no in-app roles. Accounts are provisioned out-of-band, not via self-registration.
 _Avoid_: Coach, instructor, admin, user
