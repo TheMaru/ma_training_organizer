@@ -59,6 +59,48 @@ correct return target is genuinely unknowable server-side.
 - The existing cases still pass — in particular
   `TestSwitcherReturnsToTheNormalisedRoster`, so the parse-based check does not
   mangle a legitimate `?sort=…&dir=…` return target.
+- **A fuzz target on `returnPath`**, described below. It is the acceptance
+  criterion that matters most here, because the table cases only ever pin the
+  character classes somebody thought of, and this defect is a character class
+  nobody thought of.
+
+## Fuzz target
+
+`returnPath` is the right shape of target: one string in, one string out, no
+database, and a property that is checkable without recomputing the function.
+The property is *not* "the output matches this pattern" — that would just restate
+the implementation. It is what the docstring actually claims, expressed the way a
+browser sees it:
+
+> If `returnPath(p)` returns anything other than `homePath`, then removing ASCII
+> tab, LF and CR from the result — which is what a browser does before parsing a
+> URL, per the WHATWG URL standard — must still leave a value that starts with a
+> single `/` and not with `//` or `/\`.
+
+That framing is the whole point: the browser's normalisation is the step the
+original prefix check did not model, so the assertion has to model it too.
+
+This was tried against the current implementation before filing this note, and it
+failed in **0.4 seconds**, minimising to the input `"/\t/"`:
+
+```
+returnPath("/\t/") = "/\t/", which a browser reads as "//" — off-site
+```
+
+So the target reproduces the reported defect from scratch, without being told
+what to look for. Keep it as `FuzzReturnPath` in the same file as the table test,
+and commit the minimised input under `testdata/fuzz/` so it becomes a permanent
+regression case rather than something a future fuzz run has to rediscover.
+
+Go's fuzzing is built into the toolchain, so this adds no dependency. Note that
+`go test ./...` runs a fuzz target only against its seed corpus and
+`testdata/fuzz/`; searching for new inputs needs `-fuzz=FuzzReturnPath`
+explicitly. Both facts are worth a line in the README's development block when
+this lands.
+
+A fuzz target for `normalizeSystemFilter` was considered and rejected: its only
+honest property is "the output is empty or matches `[a-z0-9-]{1,64}`", which is
+the implementation restated, so the test could never disagree with the code.
 
 ## Comments
 
