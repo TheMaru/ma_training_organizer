@@ -32,13 +32,40 @@ Spec: [[spec]].
 **Blocked by:** [[02-open-a-database-in-one-call]] — the new tests should use the
 shared fixture rather than be rewritten after it lands.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Saving an Athlete with a malformed birth date is refused with a message, the entered values preserved, and a client-error status — not a server error
-- [ ] The same holds for the joined-on date
-- [ ] Blank dates remain valid and are still stored as absent, for both fields
-- [ ] The store refuses a malformed date on athlete create, athlete update and promotion create, with a distinct error a caller can match on
-- [ ] A malformed promotion date is refused even when the form is bypassed
-- [ ] Regression test: after an attempted write with a malformed date, the Roster listing and the plain athlete listing both run cleanly. This is the reproduction above, pinned
-- [ ] The ISO layout is spelled once and shared — the CSV import stops carrying its own copy, while keeping its German date input format
-- [ ] Coverage recorded before and after as absolute statement counts
+- [x] Saving an Athlete with a malformed birth date is refused with a message, the entered values preserved, and a client-error status — not a server error
+- [x] The same holds for the joined-on date
+- [x] Blank dates remain valid and are still stored as absent, for both fields
+- [x] The store refuses a malformed date on athlete create, athlete update and promotion create, with a distinct error a caller can match on
+- [x] A malformed promotion date is refused even when the form is bypassed
+- [x] Regression test: after an attempted write with a malformed date, the Roster listing and the plain athlete listing both run cleanly. This is the reproduction above, pinned
+- [x] The ISO layout is spelled once and shared — the CSV import stops carrying its own copy, while keeping its German date input format
+- [x] Coverage recorded before and after as absolute statement counts
+
+## Comments
+
+Shipped 2026-08-06 in `a0115a4`.
+
+**How it landed.** `internal/store/date.go` is the new home of the invariant:
+`ISODate` (now exported, the layout's only spelling), the `ErrMalformedDate`
+sentinel, and the two checks behind it — `checkDate` for a required date,
+`checkOptionalDate` for a nullable one, where blank is absent rather than
+malformed. `insertAthlete` carries the athlete check, so the single-row and the
+bulk CSV path get it from one place; `UpdateAthlete` and `CreatePromotion` call it
+themselves. The athlete form gained the date check the promotion form already had,
+and both now parse against `store.ISODate` instead of their own literal.
+
+Blank is malformed for a promotion, which the ticket did not spell out: the column
+is NOT NULL and `CurrentRank` compares those dates as strings, so there is no
+absent promotion date. The form already rejected it; now the store does too.
+
+**The reproduction, pinned twice.** At the store seam in
+`TestARefusedDateLeavesEveryListingReadable`, and through HTTP in
+`TestCreateAthleteRefusesAMalformedDate`, which also asserts the roster page still
+answers 200 afterwards. Before the fix the HTTP test failed with exactly the error
+from the ticket — `storing driver.Value type string into type *time.Time` — on
+both dates.
+
+**Coverage, before and after.** Before: **799 of 1087** statements. After: **820
+of 1108** — 21 new statements, all of them covered.
