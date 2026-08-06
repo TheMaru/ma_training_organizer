@@ -101,7 +101,23 @@ go test ./...                              # run tests
 go test -coverprofile=coverage.out ./...   # coverage profile (git-ignored)
 go tool cover -func=coverage.out           # per-function coverage, and the total
 go tool cover -html=coverage.out           # the same, as annotated source
+
+go run honnef.co/go/tools/cmd/staticcheck@latest ./...   # deeper static analysis
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...    # known CVEs, reachable ones only
 ```
+
+The last two are `go run` rather than installed binaries so that the toolchain
+stays the only dependency, the same reason the coverage commands above are bare
+`go` commands. `@latest` is deliberate: without CI there is no build to make
+reproducible, and a pinned tools dependency would go stale unnoticed.
+
+Both answer questions reading the code cannot. `staticcheck` catches a
+dependency behaving differently from how it reads at the call site;
+`govulncheck` reports only CVEs your code actually reaches, so its output is a
+list to act on rather than to triage. Complexity metrics were tried and dropped:
+the highest cyclomatic complexity in non-test code is 11, and none of the
+interface-shape defects the `.scratch/store-interface-depth/` work fixed would
+have scored badly — a call sequence that must be obeyed has no branches at all.
 
 Record coverage as two absolute counts — statements covered of statements total —
 rather than the percentage, which a refactor that deletes untested code raises
