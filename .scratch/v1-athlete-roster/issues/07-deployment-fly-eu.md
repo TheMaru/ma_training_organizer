@@ -19,6 +19,17 @@ Deploy the single binary + SQLite to Fly.io in an EU region (ADR-0002, ADR-0003)
 - App reachable over HTTPS from an EU region.
 - Data survives a redeploy (volume persists).
 - Backups are produced and old ones pruned at the retention window.
+- `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` reports no reachable
+  vulnerability, run **immediately before** the deploy rather than trusted from
+  an earlier scan. Nothing automates this check, by choice, and it is the one
+  check whose answer changes while the code sits still — so this is the moment it
+  must not be skipped. If it reports standard-library findings, raise the
+  `toolchain` directive in `go.mod`, not the `go` directive; the README's
+  development block says why.
+- Fly's builder must honour that `toolchain` directive. With the default
+  `GOTOOLCHAIN=auto` it downloads the pinned version itself; if the build image
+  sets `GOTOOLCHAIN=local` the build fails loudly, which is the intended
+  behaviour and not something to work around by lowering the pin.
 
 ## Comments
 
