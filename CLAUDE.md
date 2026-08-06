@@ -15,3 +15,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 ### Code comments
 
 A comment says only what the surrounding code does not already clearly say — a documented exception to the stricter global default. See `docs/agents/comments.md`.
+
+### Static analysis
+
+Which analysers run, which were tried and rejected with the evidence, and why `govulncheck` is the one that must be re-run by hand. See `docs/agents/analysis.md`.

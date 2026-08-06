@@ -111,19 +111,11 @@ stays the only dependency, the same reason the coverage commands above are bare
 `go` commands. `@latest` is deliberate: without CI there is no build to make
 reproducible, and a pinned tools dependency would go stale unnoticed.
 
-`go.mod` carries a `toolchain` directive for the same reason. The `go` directive
-is the language version and is not what `govulncheck` reports on — it reports on
-the standard library of whatever toolchain builds the module, so that is the
-version that has to be pinned. Raise the `toolchain` line, not the `go` line,
-when a scan comes back with standard-library findings.
-
-Both answer questions reading the code cannot. `staticcheck` catches a
-dependency behaving differently from how it reads at the call site;
-`govulncheck` reports only CVEs your code actually reaches, so its output is a
-list to act on rather than to triage. Complexity metrics were tried and dropped:
-the highest cyclomatic complexity in non-test code is 11, and none of the
-interface-shape defects the `.scratch/store-interface-depth/` work fixed would
-have scored badly — a call sequence that must be obeyed has no branches at all.
+Nothing automates `govulncheck`, and it is the one check whose answer changes
+while the code sits still, so run it yourself — always before a deploy.
+[`docs/agents/analysis.md`](docs/agents/analysis.md) has the rest: why the list is
+this short, which analysers were tried and rejected, and how to react when a scan
+reports standard-library findings.
 
 Record coverage as two absolute counts — statements covered of statements total —
 rather than the percentage, which a refactor that deletes untested code raises
