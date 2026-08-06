@@ -26,12 +26,9 @@ const (
 	colNotes     = "Notizen"
 )
 
-// isoDate is the layout the store keeps dates in; germanDate is the form a
-// German spreadsheet exports. Both are accepted on input and normalised to ISO.
-const (
-	isoDate    = "2006-01-02"
-	germanDate = "02.01.2006"
-)
+// germanDate is the form a German spreadsheet exports. It and store.ISODate are
+// both accepted on input; every row is normalised to store.ISODate on the way in.
+const germanDate = "02.01.2006"
 
 // importReport summarises one successful import for the trainer: how many
 // athletes were created, and which rows were skipped because that name is
@@ -204,9 +201,9 @@ func parseImportDate(s string) (string, error) {
 	if s == "" {
 		return "", nil
 	}
-	for _, layout := range []string{isoDate, germanDate} {
+	for _, layout := range []string{store.ISODate, germanDate} {
 		if t, err := time.Parse(layout, s); err == nil {
-			return t.Format(isoDate), nil
+			return t.Format(store.ISODate), nil
 		}
 	}
 	return "", fmt.Errorf("%q ist kein gültiges Datum (JJJJ-MM-TT oder TT.MM.JJJJ)", s)

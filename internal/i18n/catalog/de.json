@@ -47,6 +47,7 @@
   "roster.sort.label": "Sortieren",
 
   "athlete.birthDate": "Geburtsdatum",
+  "athlete.dateInvalid": "Bitte Datumsangaben im Format JJJJ-MM-TT eingeben.",
   "athlete.edit": "Athlet bearbeiten",
   "athlete.firstName": "Vorname",
   "athlete.joinedOn": "Eintrittsdatum",

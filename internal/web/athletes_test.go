@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
@@ -95,6 +96,97 @@ func TestCreateAthleteRequiresName(t *testing.T) {
 	}
 	if len(athletes) != 0 {
 		t.Errorf("athlete count = %d, want 0 (invalid create must not persist)", len(athletes))
+	}
+}
+
+// What the trainer is promised for a date the store refuses
+// (store.ErrMalformedDate): a client error, a message, their own input still in
+// the fields — and the shared roster still standing.
+func TestCreateAthleteRefusesAMalformedDate(t *testing.T) {
+	tests := []struct {
+		name          string
+		birth, joined string
+		wantPreserved string
+	}{
+		{"birth date", "morgen", "", "morgen"},
+		{"joined on", "", "irgendwann", "irgendwann"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts, client, db := newAuthTestServer(t)
+			login(t, ts, client, testUsername, testPassword).Body.Close()
+
+			resp, err := client.PostForm(ts.URL+"/athletes",
+				athleteForm("Ada", "Lovelace", tt.birth, tt.joined, "linkshänder"))
+			if err != nil {
+				t.Fatalf("POST /athletes: %v", err)
+			}
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+			}
+			body := readBody(t, resp)
+			if !strings.Contains(body, `class="error"`) {
+				t.Error("no error message in the re-rendered form")
+			}
+			for _, want := range []string{"Ada", "Lovelace", "linkshänder", tt.wantPreserved} {
+				if !strings.Contains(body, want) {
+					t.Errorf("re-rendered form lost %q", want)
+				}
+			}
+
+			athletes, err := store.ListAthletes(db, false)
+			if err != nil {
+				t.Fatalf("ListAthletes: %v", err)
+			}
+			if len(athletes) != 0 {
+				t.Errorf("athlete count = %d, want 0 (a malformed date must not persist)", len(athletes))
+			}
+
+			// The reproduction: the shared roster still loads afterwards.
+			roster := get(t, ts, client, "/athletes")
+			defer roster.Body.Close()
+			if roster.StatusCode != http.StatusOK {
+				t.Errorf("roster status after the refused write = %d, want %d", roster.StatusCode, http.StatusOK)
+			}
+		})
+	}
+}
+
+func TestUpdateAthleteRefusesAMalformedDate(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	id, err := store.CreateAthlete(db, store.Athlete{
+		FirstName: "Ada", LastName: "Lovelace", BirthDate: "1990-12-10",
+	})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+
+	resp, err := client.PostForm(fmt.Sprintf("%s/athletes/%d", ts.URL, id),
+		athleteForm("Augusta", "King", "morgen", "irgendwann", "gräfin"))
+	if err != nil {
+		t.Fatalf("POST update: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+	body := readBody(t, resp)
+	if !strings.Contains(body, `class="error"`) {
+		t.Error("no error message in the re-rendered form")
+	}
+	for _, want := range []string{"Augusta", "King", "gräfin", "morgen", "irgendwann"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("re-rendered form lost %q", want)
+		}
+	}
+
+	got, err := store.AthleteByID(db, id)
+	if err != nil {
+		t.Fatalf("AthleteByID: %v", err)
+	}
+	if got.BirthDate != "1990-12-10" {
+		t.Errorf("birth date = %q, want unchanged %q", got.BirthDate, "1990-12-10")
 	}
 }
 

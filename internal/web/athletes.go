@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -103,8 +104,9 @@ func (s *Server) handleAthleteDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // athleteFromForm reads and trims the athlete form fields. It returns a non-empty
-// message when a required field (first or last name) is missing; the returned
-// Athlete is still populated so the form can be re-rendered with the user's input.
+// message when a required field (first or last name) is missing or a date is not
+// ISO; the returned Athlete is still populated so the form can be re-rendered with
+// the user's input.
 func athleteFromForm(r *http.Request) (store.Athlete, string) {
 	a := store.Athlete{
 		FirstName: strings.TrimSpace(r.PostFormValue("firstName")),
@@ -116,7 +118,22 @@ func athleteFromForm(r *http.Request) (store.Athlete, string) {
 	if a.FirstName == "" || a.LastName == "" {
 		return a, translate(r, "athlete.nameRequired")
 	}
+	if !isoDateOrBlank(a.BirthDate) || !isoDateOrBlank(a.JoinedOn) {
+		return a, translate(r, "athlete.dateInvalid")
+	}
 	return a, ""
+}
+
+// isoDateOrBlank reports whether a date field is one the store will accept
+// (store.ErrMalformedDate). Checking it here is what makes the refusal a message
+// the trainer can act on rather than a 500; <input type="date"> guards the
+// browser, this guards everything else.
+func isoDateOrBlank(date string) bool {
+	if date == "" {
+		return true
+	}
+	_, err := time.Parse(store.ISODate, date)
+	return err == nil
 }
 
 // athleteID parses the {id} route parameter, reporting false for a non-numeric

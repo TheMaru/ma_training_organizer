@@ -6,10 +6,6 @@ import (
 	"fmt"
 )
 
-// isoDate is the yyyy-mm-dd layout used for the optional DATE columns, matching
-// what <input type="date"> submits.
-const isoDate = "2006-01-02"
-
 // ErrAthleteNotFound is returned when a lookup, update or delete targets an
 // athlete that does not exist. Callers match it with errors.Is rather than
 // sql.ErrNoRows so the store's row model stays an implementation detail.
@@ -61,6 +57,9 @@ type execer interface {
 
 // insertAthlete writes one athlete row and returns its id.
 func insertAthlete(ex execer, a Athlete) (int64, error) {
+	if err := checkAthleteDates(a); err != nil {
+		return 0, err
+	}
 	res, err := ex.Exec(
 		`INSERT INTO athletes (first_name, last_name, birth_date, joined_on, notes)
 		 VALUES (?, ?, ?, ?, ?)`,
@@ -129,6 +128,9 @@ func ListAthletes(db *sql.DB, descending bool) ([]Athlete, error) {
 // UpdateAthlete overwrites an athlete's fields by id, returning ErrAthleteNotFound
 // when no athlete has that id.
 func UpdateAthlete(db *sql.DB, a Athlete) error {
+	if err := checkAthleteDates(a); err != nil {
+		return err
+	}
 	res, err := db.Exec(
 		`UPDATE athletes
 		 SET first_name = ?, last_name = ?, birth_date = ?, joined_on = ?, notes = ?
@@ -150,6 +152,15 @@ func DeleteAthlete(db *sql.DB, id int64) error {
 		return fmt.Errorf("delete athlete %d: %w", id, err)
 	}
 	return checkAffected(res, id)
+}
+
+// checkAthleteDates refuses a write whose optional dates are not ISO, returning
+// ErrMalformedDate.
+func checkAthleteDates(a Athlete) error {
+	if err := checkOptionalDate("birth_date", a.BirthDate); err != nil {
+		return err
+	}
+	return checkOptionalDate("joined_on", a.JoinedOn)
 }
 
 // checkAffected turns a zero-rows-affected result into ErrAthleteNotFound so
@@ -192,7 +203,7 @@ func formatDate(t sql.NullTime) string {
 	if !t.Valid {
 		return ""
 	}
-	return t.Time.Format(isoDate)
+	return t.Time.Format(ISODate)
 }
 
 // nullIfEmpty returns nil for an empty string so it is bound as SQL NULL, and

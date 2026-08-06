@@ -47,6 +47,7 @@
   "roster.sort.label": "Sort",
 
   "athlete.birthDate": "Date of birth",
+  "athlete.dateInvalid": "Please enter dates in the format YYYY-MM-DD.",
   "athlete.edit": "Edit athlete",
   "athlete.firstName": "First name",
   "athlete.joinedOn": "Joining date",

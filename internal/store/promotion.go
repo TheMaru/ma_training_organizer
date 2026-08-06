@@ -26,7 +26,13 @@ type Promotion struct {
 
 // CreatePromotion records a promotion and returns its id. Only athlete, rank and
 // date are stored; the derived current rank falls out of the dates (ADR-0001).
+//
+// Unlike an athlete's dates, this one is required (promoted_on is NOT NULL), so a
+// blank date is malformed rather than absent.
 func CreatePromotion(db *sql.DB, p Promotion) (int64, error) {
+	if err := checkDate("promoted_on", p.PromotedOn); err != nil {
+		return 0, err
+	}
 	res, err := db.Exec(
 		`INSERT INTO promotions (athlete_id, rank_id, promoted_on) VALUES (?, ?, ?)`,
 		p.AthleteID, p.RankID, p.PromotedOn,
