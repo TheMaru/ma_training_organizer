@@ -111,6 +111,12 @@ stays the only dependency, the same reason the coverage commands above are bare
 `go` commands. `@latest` is deliberate: without CI there is no build to make
 reproducible, and a pinned tools dependency would go stale unnoticed.
 
+`go.mod` carries a `toolchain` directive for the same reason. The `go` directive
+is the language version and is not what `govulncheck` reports on — it reports on
+the standard library of whatever toolchain builds the module, so that is the
+version that has to be pinned. Raise the `toolchain` line, not the `go` line,
+when a scan comes back with standard-library findings.
+
 Both answer questions reading the code cannot. `staticcheck` catches a
 dependency behaving differently from how it reads at the call site;
 `govulncheck` reports only CVEs your code actually reaches, so its output is a

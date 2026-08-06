@@ -2,6 +2,8 @@ module github.com/TheMaru/ma_training_organizer
 
 go 1.25.7
 
+toolchain go1.26.5
+
 require (
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/alexedwards/scs/sqlite3store v0.0.0-20251002162104-209de6e426de
@@ -9,7 +11,7 @@ require (
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/pressly/goose/v3 v3.27.2
 	golang.org/x/term v0.45.0
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.39.0
 	modernc.org/sqlite v1.54.0
 )
 
