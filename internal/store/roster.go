@@ -71,21 +71,88 @@ type RosterOption struct {
 	Name  string
 }
 
-// RosterFilterOptions returns the cells of the roster's partition that actually
+// RosterQuery is what a caller asks of the roster: the view of it they want. The
+// same three fields come back resolved in RosterView.Query, so a caller that
+// renders links renders them from the answer rather than from the question.
+//
+// Resolving narrows, it never substitutes: the resolved Sort is a whitelist value
+// and the resolved Filter is either empty or exactly the one that was asked. So a
+// caller that has already checked a value's form does not have to check it again on
+// the way back out.
+type RosterQuery struct {
+	Sort       string // a NormalizeRosterSort value; anything else normalises
+	Descending bool
+	Filter     string // "" = all, RosterFilterUngraded, or a system slug
+}
+
+// RosterView is one view of the roster: the rows to show, the filter options the
+// roster actually offers, and the query that produced them.
+//
+// Rows is already filtered. Options is derived from the *unfiltered* roster, so
+// the way back to Alle never disappears (ADR-0007a). Query is resolved — a filter
+// nobody is in has already fallen back to Alle. The unfiltered slice itself does
+// not leave this module, which is what makes those three statements invariants
+// rather than a protocol the caller has to obey.
+type RosterView struct {
+	Query   RosterQuery
+	Rows    []RosterRow
+	Options []RosterOption
+}
+
+// LoadRoster answers one roster query. It is the only way in: it fetches the
+// roster once and derives the options, the shown rows and the resolved filter
+// from that single slice, so there is nothing for a second source to drift from
+// (ADR-0007b).
+func LoadRoster(db *sql.DB, query RosterQuery) (RosterView, error) {
+	rows, err := listRoster(db, query.Sort, query.Descending)
+	if err != nil {
+		return RosterView{}, err
+	}
+	options := rosterFilterOptions(rows)
+	resolved := RosterQuery{
+		Sort:       NormalizeRosterSort(query.Sort),
+		Descending: query.Descending,
+		Filter:     representedFilter(query.Filter, options),
+	}
+	return RosterView{
+		Query:   resolved,
+		Rows:    filterRoster(rows, resolved.Filter),
+		Options: options,
+	}, nil
+}
+
+// representedFilter keeps a filter only if the roster actually offers it. A
+// bookmarked system the last athlete has since left is not a data error, it is a
+// view that no longer exists, so it resolves to Alle — in the spirit of
+// NormalizeRosterSort, where a column nobody can sort by is a view concern too.
+//
+// A kept filter is returned as given rather than as the matching option's value,
+// which is RosterQuery's promise that resolving never substitutes.
+func representedFilter(filter string, options []RosterOption) string {
+	offered := slices.ContainsFunc(options, func(o RosterOption) bool {
+		return o.Value == filter
+	})
+	if offered {
+		return filter
+	}
+	return ""
+}
+
+// rosterFilterOptions returns the cells of the roster's partition that actually
 // hold someone: one per grading system present among the current ranks, plus the
-// ungraded cell if anyone is ungraded. Callers must pass the *unfiltered* roster,
-// or only the active option is left standing and the way back to Alle disappears
-// (ADR-0007a).
+// ungraded cell if anyone is ungraded. It is given the *unfiltered* roster, or
+// only the active option would be left standing and the way back to Alle would
+// disappear (ADR-0007a).
 //
 // Because every returned option matches at least one of the rows it was derived
 // from, no offered filter can produce an empty roster. That is what licenses the
-// absence of a zero-hit UI, so it holds by construction: FilterRoster restricts
-// the very same slice.
+// absence of a zero-hit UI, and it holds by construction: LoadRoster hands
+// filterRoster the very same slice.
 //
 // Systems come in progression order (kids before adult, as the rank sort blocks
 // them), ungraded last — an order that is a property of the reference data, so
 // the chips do not reshuffle when the trainer changes the sort column.
-func RosterFilterOptions(rows []RosterRow) []RosterOption {
+func rosterFilterOptions(rows []RosterRow) []RosterOption {
 	var (
 		systems  []RosterOption
 		orders   = map[string]int{}
@@ -118,13 +185,13 @@ func RosterFilterOptions(rows []RosterRow) []RosterOption {
 	return systems
 }
 
-// FilterRoster restricts a roster to one cell of its partition; an empty option
+// filterRoster restricts a roster to one cell of its partition; an empty option
 // is Alle. The given order is preserved — the roster is sorted in SQL, and
 // narrowing it is not allowed to reorder it.
 //
-// An option nobody holds yields nothing; see RosterFilterOptions for why no
+// An option nobody holds yields nothing; see rosterFilterOptions for why no
 // offered option can reach that state.
-func FilterRoster(rows []RosterRow, option string) []RosterRow {
+func filterRoster(rows []RosterRow, option string) []RosterRow {
 	if option == "" {
 		return rows
 	}
@@ -150,7 +217,7 @@ func NormalizeRosterSort(sort string) string {
 	return RosterSortDefault
 }
 
-// ListRoster returns the whole roster with each athlete's current rank, ordered
+// listRoster returns the whole roster with each athlete's current rank, ordered
 // by the named column. An unknown column silently sorts by RosterSortDefault:
 // sorting is a view concern, not a data error.
 //
@@ -158,7 +225,7 @@ func NormalizeRosterSort(sort string) string {
 // pinned to it by a test. The LEFT JOIN keeps ungraded athletes on the roster with
 // NULL rank keys. Both the window function and NULLS LAST are standard SQL, so the
 // Postgres escape hatch stays open (ADR-0002).
-func ListRoster(db *sql.DB, sort string, descending bool) ([]RosterRow, error) {
+func listRoster(db *sql.DB, sort string, descending bool) ([]RosterRow, error) {
 	rows, err := db.Query(fmt.Sprintf(`
 		SELECT a.id, a.first_name, a.last_name, a.birth_date, a.joined_on, a.notes,
 		       cur.rank_id, cur.rank_name, cur.system_name, cur.system_slug,

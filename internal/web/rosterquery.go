@@ -52,6 +52,23 @@ func rosterQueryFrom(r *http.Request) rosterQuery {
 	}
 }
 
+// storeQuery is this query as the roster takes it. The two types carry the same
+// three fields on purpose: this one is what a URL asks, store.RosterQuery is what
+// a caller asks of the roster, and neither package has to speak the other's
+// vocabulary to name a view.
+func (q rosterQuery) storeQuery() store.RosterQuery {
+	return store.RosterQuery{Sort: q.sort, Descending: q.descending, Filter: q.system}
+}
+
+// rosterQueryOf carries the roster's resolved query back into the URL vocabulary.
+// Nothing is re-checked on the way back: store.RosterQuery documents the resolved
+// filter as either empty or the very value that was asked, and that value came
+// through rosterQueryFrom. Re-normalising it here would be the one way the rendered
+// links could disagree with the rows the roster actually returned.
+func rosterQueryOf(q store.RosterQuery) rosterQuery {
+	return rosterQuery{sort: q.Sort, descending: q.Descending, system: q.Filter}
+}
+
 // normalizeSystemFilter keeps a requested filter only if it is slug-shaped, which
 // store.RosterFilterUngraded ("none") is too. Anything else reads as no filter —
 // the default query rather than an error.

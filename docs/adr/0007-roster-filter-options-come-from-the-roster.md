@@ -44,20 +44,22 @@ Three properties follow, and they are the point of the decision:
 filter.**
 
 Whether a slug is *well-formed* is a property of the URL; whether it is
-*represented* is a property of the data. Only one handler needs the second.
+*represented* is a property of the data. Only the roster itself needs the second.
 
 - **Form**, in `rosterQueryFrom`, pure and without a database: a slug shape,
   `none`, or empty; anything else reads as empty. This keeps the file's guarantee
   that no user-controlled string reaches a rendered URL or a `Location` header,
   and keeps `params()` free of escaping — though the guarantee now rests on the
   value having a fixed *shape* rather than coming from a fixed *set*.
-- **Representation**, in the roster handler alone: the eight other call sites
-  carry the filter through untouched and never ask the database about it.
+- **Representation**, inside the roster module alone: `store.LoadRoster` resolves
+  it and hands the resolved query back. No handler asks the database about it —
+  the eight other call sites carry the filter through untouched, and the roster
+  handler renders the answer it was given.
 
-The roster handler loads the unfiltered roster **once** and derives both the
-options and the filtered rows from that same slice, through pure functions over
-`[]RosterRow` in `store`. The invariant in (a) is then true by construction: with
-one source there is nothing for a second one to drift from.
+`store.LoadRoster` loads the unfiltered roster **once** and derives the options,
+the filtered rows and the resolved filter from that same slice, which never leaves
+the module. The invariant in (a) is then true by construction: with one source
+there is nothing for a second one to drift from.
 
 ## Considered Options
 
@@ -110,9 +112,10 @@ one source there is nothing for a second one to drift from.
   that is a deliberately deferred trade, not an oversight.
 - If the whitelist is ever rebuilt on `store.ListGradingSystems` "for
   simplicity", the zero-hit state becomes reachable and the trainer's reset
-  disappears without an error or a failing test. That is the invisible failure
-  mode ADR-0005(b) is about, which is why the derivation lives next to the
-  filtering rather than in a query of its own.
+  disappears without an error, though a store test now offers each option back to
+  `LoadRoster` and would fail. That is the invisible failure mode ADR-0005(b) is
+  about, which is why the derivation lives next to the filtering rather than in a
+  query of its own.
 - "Cohort" deliberately does **not** enter the domain model. The filter is a
   grading-*system* filter; kids/adults coincide with systems only while there is
   one discipline. A real cohort axis spanning disciplines would be a second

@@ -49,13 +49,20 @@ func rosterFirstNames(rows []store.RosterRow) []string {
 	return names
 }
 
+func loadRoster(t *testing.T, db *sql.DB, query store.RosterQuery) store.RosterView {
+	t.Helper()
+	view, err := store.LoadRoster(db, query)
+	if err != nil {
+		t.Fatalf("LoadRoster(%+v): %v", query, err)
+	}
+	return view
+}
+
+// listRoster loads the unfiltered roster, for the tests that are about the SQL
+// ordering rather than about the partition.
 func listRoster(t *testing.T, db *sql.DB, sort string, descending bool) []store.RosterRow {
 	t.Helper()
-	rows, err := store.ListRoster(db, sort, descending)
-	if err != nil {
-		t.Fatalf("ListRoster(%q, %v): %v", sort, descending, err)
-	}
-	return rows
+	return loadRoster(t, db, store.RosterQuery{Sort: sort, Descending: descending}).Rows
 }
 
 // threeAthletes seeds an unsorted roster whose four name/date sort keys each
@@ -65,6 +72,16 @@ func threeAthletes(t *testing.T, db *sql.DB) {
 	addAthlete(t, db, store.Athlete{FirstName: "Carol", LastName: "Adler", BirthDate: "2001-05-05", JoinedOn: "2026-01-01"}, 0, "")
 	addAthlete(t, db, store.Athlete{FirstName: "Alice", LastName: "Zeder", BirthDate: "2003-01-01", JoinedOn: "2026-02-01"}, 0, "")
 	addAthlete(t, db, store.Athlete{FirstName: "Bob", LastName: "Meier", BirthDate: "1999-09-09", JoinedOn: "2026-03-01"}, 0, "")
+}
+
+// partitionedRoster seeds the smallest roster in which every cell of the partition
+// holds someone: one kid, one adult, one ungraded.
+func partitionedRoster(t *testing.T, db *sql.DB) {
+	t.Helper()
+	f := newRosterFixture(t, db)
+	addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, f.kidsBeginner, "2026-01-01")
+	addAthlete(t, db, store.Athlete{FirstName: "Adam", LastName: "Adult"}, f.adultBeginner, "2026-01-01")
+	addAthlete(t, db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}, 0, "")
 }
 
 func TestListRosterSortsByEachColumn(t *testing.T) {
@@ -267,27 +284,6 @@ func TestListRosterCurrentRankMatchesCurrentRank(t *testing.T) {
 	}
 }
 
-// partitionedRoster is a roster as the filter functions see it: the fields that
-// decide which cell of the partition an athlete falls into, plus a name to
-// identify them by in a failure message. One kid, one adult, one ungraded — the
-// smallest roster in which every cell is populated.
-func partitionedRoster() []store.RosterRow {
-	row := func(first, slug, system string, order int) store.RosterRow {
-		return store.RosterRow{
-			Athlete:     store.Athlete{FirstName: first},
-			SystemSlug:  slug,
-			SystemName:  system,
-			SystemOrder: order,
-		}
-	}
-	return []store.RosterRow{
-		row("Adam", "bjj-adult", "BJJ Adult", 1),
-		row("Kai", "bjj-kids", "BJJ Kids", 0),
-		row("Uwe", "", "", 0),
-		row("Kim", "bjj-kids", "BJJ Kids", 0),
-	}
-}
-
 func optionValues(options []store.RosterOption) []string {
 	values := make([]string, len(options))
 	for i, o := range options {
@@ -296,90 +292,69 @@ func optionValues(options []store.RosterOption) []string {
 	return values
 }
 
-// TestRosterFilterOptionsPartitionTheRoster checks that every athlete falls into
-// exactly one cell — their current rank's system, or ungraded — and that the
-// offered options are the cells which actually hold someone (ADR-0007a).
-func TestRosterFilterOptionsPartitionTheRoster(t *testing.T) {
-	options := store.RosterFilterOptions(partitionedRoster())
+// TestLoadRosterResolvesAnUnrepresentedFilter is ADR-0007b's guarantee asserted at
+// the store's own seam rather than three layers up: a filter for a system nobody
+// is in is not a data error but a view that no longer exists, so it resolves to
+// the unfiltered roster — and the resolution comes back in the query, because
+// every link on the page is built from it.
+func TestLoadRosterResolvesAnUnrepresentedFilter(t *testing.T) {
+	db := storetest.NewDB(t)
+	partitionedRoster(t, db)
 
-	// Systems in progression order (kids before adult, the same order the rank
-	// sort blocks them in), ungraded last.
+	view := loadRoster(t, db, store.RosterQuery{Sort: store.RosterSortFirstName, Filter: "bjj-elderly"})
+
+	if view.Query.Filter != "" {
+		t.Errorf("resolved filter = %q, want empty (Alle)", view.Query.Filter)
+	}
+	if got := rosterFirstNames(view.Rows); !equal(got, []string{"Adam", "Kai", "Uwe"}) {
+		t.Errorf("rows under an unrepresented filter = %v, want the whole roster", got)
+	}
+}
+
+// TestLoadRosterDerivesOptionsFromTheUnfilteredRoster is the other half of
+// ADR-0007a: narrowing the roster must not narrow the chips with it, or the way
+// back to Alle disappears. LoadRoster is the only caller of the derivation now, so
+// this is the only place the rule can be stated.
+func TestLoadRosterDerivesOptionsFromTheUnfilteredRoster(t *testing.T) {
+	db := storetest.NewDB(t)
+	partitionedRoster(t, db)
+
+	view := loadRoster(t, db, store.RosterQuery{Sort: store.RosterSortFirstName, Filter: "bjj-kids"})
+
+	if got := rosterFirstNames(view.Rows); !equal(got, []string{"Kai"}) {
+		t.Errorf("filtered rows = %v, want [Kai]", got)
+	}
 	want := []string{"bjj-kids", "bjj-adult", store.RosterFilterUngraded}
-	if got := optionValues(options); !equal(got, want) {
-		t.Errorf("options = %v, want %v", got, want)
+	if got := optionValues(view.Options); !equal(got, want) {
+		t.Errorf("options under a filter = %v, want the unfiltered %v", got, want)
 	}
-	// The display name rides along; the ungraded cell is in no system and so has
-	// none to show.
-	if options[0].Name != "BJJ Kids" {
-		t.Errorf("first option name = %q, want %q", options[0].Name, "BJJ Kids")
-	}
-	if options[2].Name != "" {
-		t.Errorf("ungraded option name = %q, want empty", options[2].Name)
-	}
-}
-
-// TestRosterFilterOptionsOmitEmptyCells is the whole point of deriving the
-// options from the roster rather than from the seed: a system nobody is in gets
-// no chip, so no offered option can yield an empty roster.
-func TestRosterFilterOptionsOmitEmptyCells(t *testing.T) {
-	rows := []store.RosterRow{
-		{Athlete: store.Athlete{FirstName: "Kai"}, SystemSlug: "bjj-kids", SystemName: "BJJ Kids"},
-		{Athlete: store.Athlete{FirstName: "Kim"}, SystemSlug: "bjj-kids", SystemName: "BJJ Kids"},
-	}
-	if got := optionValues(store.RosterFilterOptions(rows)); !equal(got, []string{"bjj-kids"}) {
-		t.Errorf("options for a kids-only roster = %v, want [bjj-kids]", got)
-	}
-	// An all-ungraded roster offers only that cell — never a system nobody holds.
-	ungraded := []store.RosterRow{{Athlete: store.Athlete{FirstName: "Uwe"}}}
-	if got := optionValues(store.RosterFilterOptions(ungraded)); !equal(got, []string{store.RosterFilterUngraded}) {
-		t.Errorf("options for an ungraded roster = %v, want [none]", got)
-	}
-	if got := store.RosterFilterOptions(nil); len(got) != 0 {
-		t.Errorf("options for an empty roster = %v, want none", got)
-	}
-}
-
-// TestFilterRosterRestrictsToOneCell checks the filter's whole promise: a system
-// filter shows exactly the athletes whose current rank is in it. Ungraded athletes are hidden by it —
-// a filter reading "BJJ Kids" that showed athletes in no system would not be
-// telling the truth (ADR-0007) — and are reachable under their own option.
-func TestFilterRosterRestrictsToOneCell(t *testing.T) {
-	rows := partitionedRoster()
-
-	cases := map[string][]string{
-		"":                         {"Adam", "Kai", "Uwe", "Kim"},
-		"bjj-kids":                 {"Kai", "Kim"},
-		"bjj-adult":                {"Adam"},
-		store.RosterFilterUngraded: {"Uwe"},
-	}
-	for option, want := range cases {
-		if got := rosterFirstNames(store.FilterRoster(rows, option)); !equal(got, want) {
-			t.Errorf("FilterRoster(%q) = %v, want %v", option, got, want)
-		}
-	}
-}
-
-// TestFilterRosterKeepsTheOrderItWasGiven pins that filtering does not reorder
-// what it restricts — the sort happens in SQL, upstream of this.
-func TestFilterRosterKeepsTheOrderItWasGiven(t *testing.T) {
-	rows := []store.RosterRow{
-		{Athlete: store.Athlete{FirstName: "Zoe"}, SystemSlug: "bjj-kids"},
-		{Athlete: store.Athlete{FirstName: "Uwe"}},
-		{Athlete: store.Athlete{FirstName: "Ada"}, SystemSlug: "bjj-kids"},
-	}
-	if got := rosterFirstNames(store.FilterRoster(rows, "bjj-kids")); !equal(got, []string{"Zoe", "Ada"}) {
-		t.Errorf("filtered order = %v, want [Zoe Ada]", got)
+	if view.Query.Filter != "bjj-kids" {
+		t.Errorf("resolved filter = %q, want it kept", view.Query.Filter)
 	}
 }
 
 // TestEveryOfferedOptionHasAthletes pins the invariant that licenses the absence
-// of a zero-hit UI: the options come from the same slice the filter restricts, so
-// no chip a trainer can click leads to an empty table.
+// of a zero-hit UI: no chip a trainer can click leads to an empty table. After the
+// interface change this is a statement about the module rather than about two
+// functions agreeing, so it is asserted by asking LoadRoster again for each option
+// it just offered.
 func TestEveryOfferedOptionHasAthletes(t *testing.T) {
-	rows := partitionedRoster()
-	for _, option := range store.RosterFilterOptions(rows) {
-		if len(store.FilterRoster(rows, option.Value)) == 0 {
+	db := storetest.NewDB(t)
+	partitionedRoster(t, db)
+
+	offered := loadRoster(t, db, store.RosterQuery{Sort: store.RosterSortFirstName})
+	if len(offered.Options) == 0 {
+		t.Fatal("the fixture roster offers no options at all")
+	}
+	for _, option := range offered.Options {
+		view := loadRoster(t, db, store.RosterQuery{Sort: store.RosterSortFirstName, Filter: option.Value})
+		if len(view.Rows) == 0 {
 			t.Errorf("offered option %q matches no athlete", option.Value)
+		}
+		// An option that came back resolved away would mean the same load offered a
+		// filter it then refused — the drift this interface exists to rule out.
+		if view.Query.Filter != option.Value {
+			t.Errorf("offered option %q resolved to %q", option.Value, view.Query.Filter)
 		}
 	}
 }

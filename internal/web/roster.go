@@ -2,7 +2,6 @@ package web
 
 import (
 	"net/http"
-	"slices"
 
 	"github.com/TheMaru/ma_training_organizer/internal/i18n"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
@@ -70,47 +69,29 @@ type rosterFilter struct {
 // handleAthletesList renders the shared roster, sorted server-side by
 // ?sort=<col>&dir=<asc|desc> and narrowed by ?system=<slug|none>.
 //
-// This is the one handler that knows which filters are *represented* (ADR-0007b):
-// it loads the roster unfiltered once and derives both the options and the shown
-// rows from that same slice, which is what store.RosterFilterOptions asks of its
-// caller and what the absent empty-result state rests on.
+// Which filters are *represented* is settled inside store.LoadRoster (ADR-0007b),
+// so this handler renders an answer rather than assembling one. Every link comes
+// from the resolved query, never from the request's own — see store.RosterView for
+// what "resolved" guarantees.
 func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
-	query := rosterQueryFrom(r)
-
-	athletes, err := store.ListRoster(s.db, query.sort, query.descending)
+	view, err := store.LoadRoster(s.db, rosterQueryFrom(r).storeQuery())
 	if err != nil {
 		serverError(w)
 		return
 	}
-	options := store.RosterFilterOptions(athletes)
-	// Resolved before anything builds a URL, so a filter nobody is in cannot
-	// survive into the page's links either.
-	query.system = representedFilter(query.system, options)
+	query := rosterQueryOf(view.Query)
 	locale := localeOf(r.Context())
 
 	s.tmpl.render(w, r, http.StatusOK, "athletes.html", map[string]any{
 		"Authenticated": true,
-		"Athletes":      rosterLines(store.FilterRoster(athletes, query.system), query),
+		"Athletes":      rosterLines(view.Rows, query),
 		"Headers":       rosterHeaders(locale, query),
-		"Filters":       rosterFilters(locale, query, options),
+		"Filters":       rosterFilters(locale, query, view.Options),
 		"NewHref":       query.path(rosterPath + "/new"),
 		// The one page whose canonical URL the request cannot supply: a filter nobody
-		// is in was just resolved away, and only the query built here knows that.
+		// is in was resolved away in the store, and only the resolved query knows that.
 		"Return": query.path(rosterPath),
 	})
-}
-
-// representedFilter keeps a filter only if the roster actually offers it. A
-// bookmarked system the last athlete has since left is not a data error, it is a
-// view that no longer exists, so it resolves to Alle.
-func representedFilter(system string, options []store.RosterOption) string {
-	offered := slices.ContainsFunc(options, func(o store.RosterOption) bool {
-		return o.Value == system
-	})
-	if offered {
-		return system
-	}
-	return ""
 }
 
 // rosterFilters builds the filter chips: Alle followed by one per non-empty cell

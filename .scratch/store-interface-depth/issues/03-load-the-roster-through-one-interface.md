@@ -34,17 +34,60 @@ Spec: [[spec]].
 builds on) and [[02-open-a-database-in-one-call]] (its new tests should be written
 against the shared fixture, not written twice).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] One store call takes a Roster query and returns the rows to show, the represented filter options and the resolved query
-- [ ] The rows are already filtered; the options are derived from the unfiltered Roster; the returned query has an unrepresented filter already resolved away
-- [ ] The raw listing, the option derivation and the filtering are no longer callable from outside the store
-- [ ] The resolution of an unrepresented filter happens inside the call, not in the handler
-- [ ] The sort-column normaliser is still available to `web`
-- [ ] The Roster handler builds every link on the page from the resolved query
-- [ ] The existing Roster HTTP tests pass **unchanged** — no assertion edited
-- [ ] A store-level test asserts that an unrepresented filter resolves to the unfiltered Roster, and that the options come from the unfiltered set. This is ADR-0007b's guarantee, asserted at the store seam for the first time
-- [ ] A store-level test asserts through the new interface that every offered option matches at least one Athlete
-- [ ] The partition mechanics — which cells are non-empty, their order, the fallback when two GradingSystems share a sort order, and filtering preserving the order it was given — are tested in an internal store test file, constructing rows directly and using no database. Prior art: the existing internal test file in the i18n module
-- [ ] ADR-0007's sentence about where representation is resolved names the Roster module rather than the handler
-- [ ] Coverage recorded before and after as absolute statement counts
+- [x] One store call takes a Roster query and returns the rows to show, the represented filter options and the resolved query
+- [x] The rows are already filtered; the options are derived from the unfiltered Roster; the returned query has an unrepresented filter already resolved away
+- [x] The raw listing, the option derivation and the filtering are no longer callable from outside the store
+- [x] The resolution of an unrepresented filter happens inside the call, not in the handler
+- [x] The sort-column normaliser is still available to `web`
+- [x] The Roster handler builds every link on the page from the resolved query
+- [x] The existing Roster HTTP tests pass **unchanged** — no assertion edited
+- [x] A store-level test asserts that an unrepresented filter resolves to the unfiltered Roster, and that the options come from the unfiltered set. This is ADR-0007b's guarantee, asserted at the store seam for the first time
+- [x] A store-level test asserts through the new interface that every offered option matches at least one Athlete
+- [x] The partition mechanics — which cells are non-empty, their order, the fallback when two GradingSystems share a sort order, and filtering preserving the order it was given — are tested in an internal store test file, constructing rows directly and using no database. Prior art: the existing internal test file in the i18n module
+- [x] ADR-0007's sentence about where representation is resolved names the Roster module rather than the handler
+- [x] Coverage recorded before and after as absolute statement counts
+
+## Comments
+
+**Done.** `store.LoadRoster(db, RosterQuery) (RosterView, error)` is the only way
+into the Roster. `ListRoster`, `RosterFilterOptions` and `FilterRoster` are
+unexported, and `web`'s `representedFilter` moved into the store — so the
+unfiltered Roster no longer leaves the module and the sequence that had to be
+obeyed no longer exists. `NormalizeRosterSort` stays exported, as the spec
+requires.
+
+`internal/web/roster_test.go` was not touched. The whole HTTP suite passes
+unchanged, which is the evidence that the refactor preserved behaviour.
+
+**Coverage.** Before: **793 of 1081** (73.4%). After: **799 of 1087** (73.5%).
+
+**Two things the code review caught, both fixed.**
+
+The first was a real defect I had introduced. `rosterQueryOf` ran the store's
+resolved filter back through `normalizeSystemFilter`, on the argument that
+"no string reaches a rendered URL unchecked" should stay a property of
+`rosterquery.go` alone. But the store filters the rows by the value it was given,
+so if the two checks ever disagreed the table would show one cell while every
+link on the page dropped the filter — reintroducing exactly the drift this ticket
+removes, in the one place it had been eliminated. The fix is the other direction:
+`RosterQuery` now documents that resolving *narrows but never substitutes* — the
+resolved filter is empty or exactly the one asked — and `web` relies on that
+instead of re-checking. The form check happens once, on the way in.
+
+The second was the comment carve-out in `docs/agents/comments.md`: the handler
+doc and `rosterQueryOf`'s doc each restated what `RosterView` already owns. Both
+now point at it.
+
+**One deviation from the plan, recorded.** The spec said ADR-0007 needs *one*
+sentence adjusted and no rewrite. Three passages changed instead, because two
+others became false rather than merely dated: the paragraph naming the handler as
+what loads the unfiltered Roster, and a Consequences sentence claiming the
+`ListGradingSystems` regression would pass without a failing test — the new
+store-level test is exactly that test. The ADR is still not superseded and the
+"true by construction" claim is unchanged.
+
+Also, the internal file's sort-order-tie test is new rather than moved. The spec
+said "five moved tests"; there were four, and the tie case the ticket asks for
+had never been tested.

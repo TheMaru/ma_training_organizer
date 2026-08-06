@@ -95,7 +95,7 @@ func AthleteByID(db *sql.DB, id int64) (Athlete, error) {
 // rank. descending flips the direction; first name is the tie-breaker and flips
 // with it, so a descending list is a true reverse of the ascending one. ORDER BY
 // stays plain SQL (no COLLATE) to remain portable (ADR-0002). The roster view
-// uses ListRoster instead — this is the plain athlete listing (demo CLI, tests).
+// uses LoadRoster instead — this is the plain athlete listing (demo CLI, tests).
 func ListAthletes(db *sql.DB, descending bool) ([]Athlete, error) {
 	// dir is a controlled constant (never user input), so interpolating it is
 	// injection-safe. Both keys use it so the whole order reverses together.
