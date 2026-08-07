@@ -17,8 +17,8 @@ to hang it on either, so it lives here.
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a
 dependency that behaves differently from how it reads at the call site. It found
 one thing across the whole repo: `middleware.RealIP` in `internal/web/server.go`,
-now `.scratch/pre-deploy-hardening/issues/05`. Until that ticket lands,
-staticcheck exiting non-zero is expected rather than a regression.
+fixed by deleting it (`.scratch/pre-deploy-hardening/issues/05`). Clean since;
+a non-zero exit is now a regression.
 
 **`govulncheck`** — reports only CVEs the code actually reaches, so its output is
 a list to act on rather than to triage.

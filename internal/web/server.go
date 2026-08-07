@@ -39,10 +39,14 @@ func NewServer(db *sql.DB, sessions *scs.SessionManager) (*Server, error) {
 // middleware. Everything else runs inside scs.LoadAndSave: /login is reachable
 // unauthenticated, and the remaining app routes are gated by requireAuth, which
 // redirects anonymous requests to the login page.
+//
+// There is deliberately no client-IP middleware: chi's middleware.RealIP reads
+// the address from headers the client itself sends, so r.RemoteAddr would name
+// whatever the caller typed. Anything later keyed on the address wants the
+// trusted-header route in issue 05, not that value back.
 func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
