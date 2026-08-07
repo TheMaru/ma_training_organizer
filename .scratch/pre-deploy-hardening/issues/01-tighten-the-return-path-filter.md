@@ -1,6 +1,6 @@
 # 01 — Tighten the language switcher's return-path filter
 
-Status: ready-for-agent
+Status: done
 
 `returnPath` in `internal/web/locale.go` is the security control for the
 client-supplied `return` field of the language switcher. It rejects a value that
@@ -108,3 +108,34 @@ the implementation restated, so the test could never disagree with the code.
 code written the same week (`bb523cb`) — the original check was written as a
 prefix test, which is exactly the shape that misses characters the browser
 normalises away.
+
+2026-08-07: Shipped in `1903f9c`. The fuzz target reproduced the defect from an
+empty seed corpus in 1.2 seconds, minimising to `"/\t/"` exactly as this note
+predicted; the minimised input is committed at
+`internal/web/testdata/fuzz/FuzzReturnPath/343e77666b321615`. Against the new
+check, 7.1M executions found nothing.
+
+Two departures from the Fix section as written, both deliberate:
+
+- The fuzz target could not go "in the same file as the table test".
+  `i18n_test.go` is `package web_test` and `returnPath` is unexported, so
+  `FuzzReturnPath` and a unit table live in a new in-package
+  `internal/web/locale_test.go` — the placement `belt_test.go` and
+  `ranklabel_test.go` already use. The HTTP-level table test gained the tab and
+  DEL cases where it stands.
+- The control-character check runs on the *decoded* value rather than on the raw
+  string. Checking the raw string would have been a branch that never runs, since
+  `url.Parse` already rejects every byte below `0x20` and `0x7f` itself, and it
+  would have missed the `%09` spelling. So `/%09/evil.example` is rejected too,
+  though a browser would read it as a path on this site — whether a given client
+  strips before or after decoding is not worth betting a redirect target on.
+
+On the open question of whether the client-supplied `return` field should exist
+at all: it should. `returnTarget` does rebuild the canonical URL server-side, and
+the roster handler does override it — but both run while rendering the page the
+trainer is *on*. The switcher's `POST /account/language` is a different request,
+and nothing in it says which page it came from. The only other carriers are the
+`Referer` header, which is unreliable and suppressible, or per-page session
+state. Dropping the field would not delete the control so much as trade it for a
+worse one, or give up returning to the page at all. The field stays; the check
+was the thing to fix.
