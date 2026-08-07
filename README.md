@@ -98,6 +98,7 @@ All configuration is via environment variables:
 go build ./...                             # compile
 go vet ./...                               # static checks
 go test ./...                              # run tests
+go test ./internal/web/ -fuzz FuzzReturnPath -fuzztime 60s   # hunt new fuzz inputs
 go test -coverprofile=coverage.out ./...   # coverage profile (git-ignored)
 go tool cover -func=coverage.out           # per-function coverage, and the total
 go tool cover -html=coverage.out           # the same, as annotated source

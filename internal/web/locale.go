@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/TheMaru/ma_training_organizer/internal/i18n"
@@ -85,17 +86,44 @@ func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
 	redirect(w, r, returnPath(r.PostFormValue(returnField)))
 }
 
-// returnPath keeps the submitted target only if it is a path within this app.
-// Anything that could leave the site — an absolute URL, a protocol-relative
-// "//host" or its backslash variant — or split the response — a newline — lands
-// on the home page rather than in a Location header.
+// returnPath keeps the submitted target only if it is a bare path within this
+// app. Anything else — an absolute URL, a protocol-relative "//host" or its
+// backslash variant, an opaque "mailto:" target, a control character — lands on
+// the home page rather than in a Location header.
+//
+// It parses instead of matching prefixes, because a prefix test can only reject
+// the shapes somebody thought of. A browser strips ASCII tab, LF and CR from a
+// URL before parsing it (WHATWG URL standard), so "/<TAB>/host" reaches it as
+// the protocol-relative "//host" — and nothing on the Go side objects, an HTAB
+// being legal in an HTTP/1 field value. FuzzReturnPath pins that property.
 func returnPath(p string) string {
-	switch {
-	case !strings.HasPrefix(p, "/"),
-		strings.HasPrefix(p, "//"),
-		strings.HasPrefix(p, `/\`),
-		strings.ContainsAny(p, "\r\n"):
+	// Decoded first, and before parsing: url.Parse rejects a raw control byte
+	// itself, so testing p alone would be a branch that never runs and would miss
+	// the "%09" spelling besides.
+	decoded, err := url.PathUnescape(p)
+	if err != nil || strings.ContainsFunc(decoded, isControl) {
 		return homePath
 	}
-	return p
+	u, err := url.Parse(p)
+	if err != nil {
+		return homePath
+	}
+	switch {
+	case u.Scheme != "", u.Host != "", u.Opaque != "",
+		!strings.HasPrefix(u.Path, "/"),
+		strings.HasPrefix(u.Path, "//"),
+		strings.HasPrefix(u.Path, `/\`):
+		return homePath
+	}
+	if u.RawQuery == "" {
+		return u.EscapedPath()
+	}
+	return u.EscapedPath() + "?" + u.RawQuery
+}
+
+// isControl reports whether r is a C0 control or DEL. Stated in full rather than
+// as CR and LF alone: which of them a browser or a proxy folds away is not a list
+// worth betting a redirect target on.
+func isControl(r rune) bool {
+	return r < 0x20 || r == 0x7f
 }

@@ -109,11 +109,16 @@ func TestLanguageSwitchOnlyReturnsWithinTheApp(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
+	// Each of these travels percent-encoded in the form body and arrives at the
+	// handler as written here — the tab as %09, which is how it reaches the check
+	// at all. The character classes themselves are pinned in locale_test.go.
 	for _, target := range []string{
 		"https://evil.example/",
 		"//evil.example/",
 		`/\evil.example/`,
 		"/athletes\r\nX: y",
+		"/\t/evil.example",
+		"/athletes\x7f",
 		"",
 	} {
 		resp := switchTo(t, ts, client, "en", target)

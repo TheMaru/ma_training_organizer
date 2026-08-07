@@ -90,9 +90,9 @@ Two things do work, and both are already in use:
   the `store-interface-depth` spec, and it is what `/improve-codebase-architecture`
   is for.
 - **Fuzzing at security boundaries.** Go's fuzzing is built into the toolchain, so
-  it adds no dependency. The fuzz target specified in
-  `.scratch/pre-deploy-hardening/issues/01` reproduced that ticket's reported
-  defect in **0.4 seconds**, minimising to the input `"/\t/"` without being told
-  what to look for. Note that `go test ./...` runs a fuzz target only against its
+  it adds no dependency. `FuzzReturnPath` in `internal/web/locale_test.go`
+  reproduced the defect reported in `.scratch/pre-deploy-hardening/issues/01` in
+  **1.2 seconds**, minimising to the input `"/\t/"` without being told what to
+  look for. Note that `go test ./...` runs a fuzz target only against its
   seed corpus and `testdata/fuzz/`; searching for new inputs needs an explicit
   `-fuzz=<Name>`.
