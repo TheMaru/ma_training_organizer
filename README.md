@@ -14,8 +14,10 @@ The first capability is a shared roster of athletes and their graduation history
 
 Trainers log in and maintain a shared roster of athletes and their graduations:
 
-- **Trainer login** with session auth and self-service password change. Accounts
-  and password resets are provisioned via CLI — no self-registration, no email.
+- **Trainer login** with session auth, self-service password change and a
+  self-service "sign out my other devices" control. Accounts, password resets and
+  operator-side session revocation go through the CLI — no self-registration, no
+  email.
 - **Athlete roster** — create, edit and delete athletes (`firstName`,
   `lastName`, `birthDate`, `joinedOn`, `notes`), list sortable by any column
   including the derived current rank.

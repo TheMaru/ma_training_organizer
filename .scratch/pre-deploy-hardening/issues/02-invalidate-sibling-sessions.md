@@ -1,6 +1,6 @@
 # 02 — Revoke a trainer's sessions, from the app and from the CLI
 
-Status: ready-for-agent
+Status: done
 
 Give a trainer a way to end their sessions on every other device, and give an
 operator a way to end someone's sessions entirely. One mechanism, two callers.
@@ -104,3 +104,51 @@ password-change decision, timeouts, configuration, and offboarding. Timeouts and
 configuration moved to [[pre-deploy-hardening]] 04 (no UI, no new routes, all in
 `config` and the boot path). Offboarding moved to [[trainer-offboarding]] 01,
 because it is a feature question that a hardening ticket must not pre-decide.
+
+2026-08-07: Shipped. `web.RevokeSessions(ctx, sessions, trainerID, exceptToken)`
+in `internal/web/auth.go` is the core the triage note asked for, and the one
+argument that separates its two callers: `handleRevokeSessions` passes the token
+it was clicked from, `revokeSessions` in `cmd/organizer/accounts.go` passes none.
+`scs.Iterate` over `sqlite3store` behaved as triage predicted.
+
+Two things were decided with the maintainer while implementing, both open in the
+ticket as written:
+
+- **The self-service control sits at the bottom of `/account/password`** rather
+  than on a page of its own. The account area has exactly one page today, and a
+  second nav entry carrying a single button was the worse trade. The placement
+  also puts the control directly beneath the form whose deliberate non-behaviour
+  it exists to answer, which is where a trainer looking for it will be.
+- **The revocation reports back.** Nothing changes on the device it was done
+  from, so without a message the action is indistinguishable from a no-op. That
+  needed a flash value in the session — a mechanism the app did not have. It
+  holds a *catalog key*, not a sentence: the message is translated when it is
+  read, so a trainer who switches language before landing on the page gets it in
+  the language they are now reading (ADR-0008).
+
+Departures from the implementation notes:
+
+- The CLI takes the database path like its siblings, not the whole config. The
+  first draft passed `config.Config` on the reasoning that the CLI's session
+  manager "has to be configured the way the server's is" — which is false, and
+  the code review caught it: `Iterate` and `Destroy` touch only the `Store`, and
+  read neither the lifetime nor the cookie settings. `web.NewStoredSessions(db)`
+  now builds exactly that much and no more, with no background cleanup goroutine
+  a one-shot command would never use.
+
+One known limit, not fixed and not thought worth fixing here: `scs.Iterate`
+decodes each session before handing it over and returns on the first decode
+error, so a single corrupt row would abort the whole walk and revoke nothing.
+There is one writer and one codec, so the app does not produce such a row; the
+alternative is bypassing `Iterate` and owning the decode, which buys robustness
+against a case that cannot currently arise.
+
+Tests: `internal/web/sessions_test.go` (the other device dies, the revoking one
+survives, a colleague's session is untouched, the control renders behind a
+confirmation, the notice appears once and follows a language switch) and
+`cmd/organizer/sessions_test.go` (the CLI kills every device, through a second
+session manager on the same store — the two-process arrangement the operator is
+actually in). The acceptance also asked for the password-change decision to be
+pinned, which the comment alone did not do:
+`TestChangingThePasswordLeavesTheOtherDeviceSignedIn` now makes flipping it a
+decision rather than a patch.

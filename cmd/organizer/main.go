@@ -45,6 +45,8 @@ func run(args []string) error {
 			return cmdCreateTrainer(cfg.DBPath, args[1:])
 		case "reset-password":
 			return cmdResetPassword(cfg.DBPath, args[1:])
+		case "revoke-sessions":
+			return cmdRevokeSessions(cfg.DBPath, args[1:])
 		case "seed-demo":
 			return cmdSeedDemo(cfg.DBPath, args[1:])
 		case "clear-demo":

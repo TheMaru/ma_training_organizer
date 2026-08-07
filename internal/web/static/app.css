@@ -248,6 +248,13 @@ textarea {
   margin: 0.5rem 0;
 }
 
+.notice {
+  color: var(--fg);
+  border-left: 3px solid var(--border);
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+}
+
 /* Narrow, single-column forms (login, password change). */
 .stack {
   max-width: 24rem;

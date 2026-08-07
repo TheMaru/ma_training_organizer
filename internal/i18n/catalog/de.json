@@ -31,6 +31,12 @@
   "password.title": "Passwort ändern",
   "password.tooShort": "Das neue Passwort ist zu kurz.",
 
+  "sessions.explain": "Beendet alle Sitzungen auf deinen anderen Geräten. Dieses Gerät bleibt angemeldet.",
+  "sessions.heading": "Andere Geräte abmelden",
+  "sessions.revoke": "Überall sonst abmelden",
+  "sessions.revokeConfirm": "Alle anderen Geräte abmelden? Dort ist danach eine neue Anmeldung nötig.",
+  "sessions.revoked": "Alle anderen Geräte wurden abgemeldet.",
+
   "roster.column.birthDate": "Geburtsdatum",
   "roster.column.firstName": "Vorname",
   "roster.column.joinedOn": "Eintritt",

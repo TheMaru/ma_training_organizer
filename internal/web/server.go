@@ -62,8 +62,9 @@ func (s *Server) Handler() http.Handler {
 
 			r.Get("/", s.handleHome)
 			r.Post("/logout", s.handleLogout)
-			r.Get("/account/password", s.handlePasswordForm)
-			r.Post("/account/password", s.handleChangePassword)
+			r.Get(passwordPath, s.handlePasswordForm)
+			r.Post(passwordPath, s.handleChangePassword)
+			r.Post(revokePath, s.handleRevokeSessions)
 			r.Post(languagePath, s.handleLanguage)
 
 			r.Get("/athletes", s.handleAthletesList)

@@ -31,6 +31,12 @@
   "password.title": "Change password",
   "password.tooShort": "The new password is too short.",
 
+  "sessions.explain": "Ends every session on your other devices. This device stays signed in.",
+  "sessions.heading": "Sign out other devices",
+  "sessions.revoke": "Sign out everywhere else",
+  "sessions.revokeConfirm": "Sign out all other devices? They will each need to sign in again.",
+  "sessions.revoked": "All other devices have been signed out.",
+
   "roster.column.birthDate": "Date of birth",
   "roster.column.firstName": "First name",
   "roster.column.joinedOn": "Joined",

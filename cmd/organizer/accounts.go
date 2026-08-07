@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
 // createTrainer provisions a new trainer with a hashed password. It is the
@@ -45,6 +47,18 @@ func resetPassword(db *sql.DB, username, password string) error {
 		return fmt.Errorf("hash password: %w", err)
 	}
 	return store.UpdateTrainerPassword(db, tr.ID, hash)
+}
+
+// revokeSessions ends every session a named trainer holds, the operator's path
+// for a lost phone or a suspected takeover. It is the testable core behind the
+// revoke-sessions subcommand. There is no session to spare here — see
+// web.RevokeSessions for what the empty token means.
+func revokeSessions(db *sql.DB, username string) error {
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		return err
+	}
+	return web.RevokeSessions(context.Background(), web.NewStoredSessions(db), tr.ID, "")
 }
 
 // cmdCreateTrainer wires the create-trainer subcommand: it opens the database,
@@ -84,6 +98,22 @@ func cmdResetPassword(dbPath string, args []string) error {
 			return err
 		}
 		fmt.Printf("reset password for trainer %q\n", username)
+		return nil
+	})
+}
+
+// cmdRevokeSessions wires the revoke-sessions subcommand, the operator
+// counterpart to the trainer's own control in the account area.
+func cmdRevokeSessions(dbPath string, args []string) error {
+	username, err := singleUsernameArg("revoke-sessions", args)
+	if err != nil {
+		return err
+	}
+	return withDB(dbPath, func(db *sql.DB) error {
+		if err := revokeSessions(db, username); err != nil {
+			return err
+		}
+		fmt.Printf("revoked all sessions for trainer %q\n", username)
 		return nil
 	})
 }
