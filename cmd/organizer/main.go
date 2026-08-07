@@ -62,13 +62,15 @@ func run(args []string) error {
 }
 
 func serve(cfg config.Config) error {
+	log.Printf("config: %s", cfg)
+
 	db, err := store.Open(cfg.DBPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	sessions := web.NewSessionManager(db, cfg.SessionLifetime, cfg.Secure)
+	sessions := web.NewSessionManager(db, cfg.SessionLifetime, cfg.SessionIdleTimeout, cfg.Secure)
 
 	srv, err := web.NewServer(db, sessions)
 	if err != nil {

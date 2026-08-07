@@ -68,6 +68,8 @@ internal/
 docs/adr/           Architecture Decision Records
 docs/agents/        Conventions for agents: issue tracker, triage, domain docs
 .scratch/           Feature specs and issue tracker (see docs/agents/)
+dev                 Wrapper that runs a command with .env loaded (development)
+.env.example        Every environment variable with its default
 ```
 
 ## Getting started
@@ -86,15 +88,46 @@ The server listens on `:8080` by default. Visit
 
 ### Configuration
 
-All configuration is via environment variables:
+All configuration is via environment variables — the binary reads no
+configuration file, in any environment. This table is the reference;
+[`.env.example`](.env.example) is its copy-pasteable form for local development.
 
-| Variable            | Default        | Description                                   |
-| ------------------- | -------------- | --------------------------------------------- |
-| `ORGANIZER_ADDR`    | `:8080`        | TCP address the HTTP server listens on        |
-| `ORGANIZER_DB_PATH` | `organizer.db` | Path to the SQLite database file              |
-| `ORGANIZER_SECURE`  | `false`        | Mark session cookies `Secure` (HTTPS-only)    |
+| Variable                         | Default        | Description                                                          |
+| -------------------------------- | -------------- | -------------------------------------------------------------------- |
+| `ORGANIZER_ADDR`                 | `:8080`        | TCP address the HTTP server listens on                               |
+| `ORGANIZER_DB_PATH`              | `organizer.db` | Path to the SQLite database file — the CLI subcommands read it too   |
+| `ORGANIZER_SESSION_LIFETIME`     | `720h`         | Absolute cap on a trainer session, counted from login (30 days)      |
+| `ORGANIZER_SESSION_IDLE_TIMEOUT` | `168h`         | Expires a session unused for this long, inside the lifetime (7 days) |
+| `ORGANIZER_SECURE`               | `false`        | Mark session cookies `Secure` (HTTPS-only)                           |
+
+The two durations use Go's duration syntax (`720h`, `90m`); a value that does not
+parse, or is not positive, aborts startup rather than being quietly ignored. Both
+numbers are a deliberate starting point, configurable so they can be revised
+after real use — what they trade off is in
+[`internal/config/config.go`](internal/config/config.go).
+
+The server logs its whole resolved configuration on one line at startup.
 
 ## Development
+
+### Local environment: `.env` and `./dev`
+
+Copy [`.env.example`](.env.example) to `.env` (git-ignored) and edit what you
+need. Nothing reads it on its own — run commands through the `./dev` wrapper,
+which sources `.env` when present and then `exec`s whatever it is given:
+
+```sh
+cp .env.example .env
+./dev go run ./cmd/organizer              # the server
+./dev go run ./cmd/organizer seed-demo    # and every subcommand, same variables
+```
+
+The subcommands matter as much as the server: they take `ORGANIZER_DB_PATH` from
+the same place, so running one without the wrapper points it at the default
+`organizer.db` — this repo's own database. Because the wrapper exports into a
+child process only, your shell keeps its own environment either way.
+
+### Build, test, analyse
 
 ```sh
 go build ./...                             # compile

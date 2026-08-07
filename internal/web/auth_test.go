@@ -27,6 +27,13 @@ const (
 // followed, so tests can assert on the 303/Location and HX-Redirect responses.
 func newAuthTestServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
 	t.Helper()
+	return newAuthTestServerIdle(t, time.Hour)
+}
+
+// newAuthTestServerIdle is newAuthTestServer with the idle timeout spelled out,
+// for the tests that are about expiry itself.
+func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, *http.Client, *sql.DB) {
+	t.Helper()
 
 	db := storetest.NewDB(t)
 
@@ -38,7 +45,7 @@ func newAuthTestServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
 		t.Fatalf("CreateTrainer: %v", err)
 	}
 
-	sessions := web.NewSessionManager(db, time.Hour, false)
+	sessions := web.NewSessionManager(db, time.Hour, idle, false)
 	srv, err := web.NewServer(db, sessions)
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)

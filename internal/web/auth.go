@@ -46,12 +46,15 @@ func mustDecoyHash() string {
 }
 
 // NewSessionManager builds an scs session manager backed by the SQLite sessions
-// table (revocable server-side sessions, ADR-0002). secure marks the cookie
-// Secure for production behind Fly's TLS; it is off in local development.
-func NewSessionManager(db *sql.DB, lifetime time.Duration, secure bool) *scs.SessionManager {
+// table (revocable server-side sessions, ADR-0002). lifetime is the absolute cap
+// counted from login and idle expires a session that goes unused; both come from
+// the environment, see internal/config. secure marks the cookie Secure for
+// production behind Fly's TLS; it is off in local development.
+func NewSessionManager(db *sql.DB, lifetime, idle time.Duration, secure bool) *scs.SessionManager {
 	m := scs.New()
 	m.Store = sqlite3store.New(db)
 	m.Lifetime = lifetime
+	m.IdleTimeout = idle
 	m.Cookie.HttpOnly = true
 	m.Cookie.SameSite = http.SameSiteLaxMode
 	m.Cookie.Secure = secure

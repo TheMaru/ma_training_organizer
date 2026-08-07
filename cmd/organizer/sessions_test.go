@@ -26,7 +26,7 @@ func signedIn(t *testing.T, username, password string) (*sql.DB, *httptest.Serve
 		t.Fatalf("createTrainer: %v", err)
 	}
 
-	srv, err := web.NewServer(db, web.NewSessionManager(db, time.Hour, false))
+	srv, err := web.NewServer(db, web.NewSessionManager(db, time.Hour, time.Hour, false))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}

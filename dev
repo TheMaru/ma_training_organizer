@@ -1,0 +1,14 @@
+#!/bin/sh
+# Runs its arguments with .env loaded, e.g. `./dev go run ./cmd/organizer` or
+# `./dev go run ./cmd/organizer seed-demo`. The environment reaches the child
+# process only, so the developer's own shell is never modified. The binary reads
+# no .env itself — see .env.example, and the README's Development section.
+set -eu
+
+if [ -f .env ]; then
+	set -a
+	. ./.env
+	set +a
+fi
+
+exec "$@"
