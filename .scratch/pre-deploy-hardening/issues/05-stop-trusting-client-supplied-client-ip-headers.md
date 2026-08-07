@@ -1,6 +1,6 @@
 # 05 — Stop trusting client-supplied client-IP headers
 
-Status: ready-for-agent
+Status: done
 
 `internal/web/server.go:45` installs `middleware.RealIP` from
 `github.com/go-chi/chi/v5 v5.3.1`. That middleware overwrites `r.RemoteAddr` with
@@ -79,3 +79,18 @@ README, in the same pass that added `govulncheck`. It was the tool's only findin
 across the repo — see the README's note on why complexity metrics were tried and
 dropped, and this is the counter-example: a dependency behaving differently from
 how it reads at the call site is not something reading the code finds.
+
+2026-08-07: Done in `671ab71`, taking the recommended route: the middleware is
+deleted, not replaced. So the request log shows Fly's proxy address from the first
+deploy onwards, and the trusted-header alternative above stays on the shelf until
+something actually needs the client address — a login rate limiter being the likely
+first caller. No test was added, per the acceptance criteria. `staticcheck` now
+reports nothing across the repo; `docs/agents/analysis.md` was updated to say so,
+since it previously recorded a non-zero exit as expected.
+
+A short comment on `Handler` in `internal/web/server.go` records why there is no
+client-IP middleware and points here for the alternative. Its first draft was
+longer and claimed ADR-0002 keeps the web layer unaware of its host; the code
+review caught that as inferred intent stated as decided — ADR-0002's escape hatch
+is portable SQL, and the "config value or a sentence in the ADR log" above is a
+requirement this ticket wrote, not one the ADR already carries.
