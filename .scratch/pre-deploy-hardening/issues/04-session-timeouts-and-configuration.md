@@ -1,6 +1,6 @@
 # 04 — Session timeouts, and make them configurable
 
-Status: ready-for-agent
+Status: done
 
 Add an idle timeout, move both session durations into the environment, and make a
 misconfiguration visible instead of silent.
@@ -118,3 +118,39 @@ The `.env` question was the longest part of the discussion and is recorded above
 because the rejected option is the tempting one: reading `.env` in-process is
 what most projects do, and the reason not to here is specific to this app's
 deployment shape and to its CLI subcommands sharing the same variables.
+
+2026-08-07: Shipped in `9ac7859`. Every acceptance item is in, and the idle
+timeout is covered by two behaviour tests in `internal/web/session_test.go` that
+drive the manager with a 50ms and a 100ms timeout — one asserts a session dies
+after idling, the other that a trainer who keeps clicking is not logged out.
+Verified against scs that `Lifetime` still caps absolutely: the deadline is only
+reset on `RenewToken`, so seven days idle really does sit inside thirty.
+
+Two deliberate departures.
+
+- **A non-positive duration aborts startup too**, not only an unparseable one.
+  The ticket asked for parsing; `0s` or `-24h` would otherwise reach the session
+  manager looking plausible and lock trainers out, which is the same failure the
+  ticket's "misconfiguration visible instead of silent" line is about. The cost
+  is scs's convention that `IdleTimeout = 0` disables the idle timeout — no
+  longer reachable through the environment, deliberately, since that is exactly
+  the state this ticket exists to remove.
+- **The boot log stayed in `serve()`.** The acceptance list says "the server
+  logs", and it does. But the reasoning above it argues from the CLI accident —
+  a mistyped DB variable demo-seeding the repo's own database — and `seed-demo`
+  and `import-athletes` still print nothing about which database they open. One
+  `log.Printf` moved from `serve` up into `run` would cover both; it prints a
+  session-lifetime and a `secure=` flag that mean nothing to a subcommand, which
+  is the only reason not to. Left for the ticket's author to call, and worth
+  folding into issue 07 if the answer is yes.
+
+Review found one thing worth acting on beyond that: the idle-timeout rationale
+had been restated three times (code, README, `.env.example`), which is the drift
+shape `docs/agents/comments.md` names. `internal/config/config.go` now owns the
+why; the README and `.env.example` carry defaults and point at it.
+
+`NewSessionManager` grew a fourth parameter rather than taking a
+`config.Config`. Two adjacent durations is a real footgun, but passing the
+config struct would make `internal/web` depend on `internal/config` to satisfy a
+call-site ergonomic, and the tests would have to build configs to start a
+server. Left as it is.
