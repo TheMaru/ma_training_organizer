@@ -6,17 +6,20 @@ import (
 )
 
 // Promotion is the event of an athlete reaching a rank on a date (CONTEXT.md).
-// RankName, SystemName, SystemSlug and the rank's descriptive Group/Degree are
-// denormalised for display; they are populated by ListPromotions and ignored on
-// insert (CreatePromotion writes only the ids). Group and Degree let a view render
-// the rank visually — a belt graphic (ADR-0004) — and name it in the trainer's
-// language (ADR-0009), without a second lookup; the slug is what that name is
-// keyed on.
+// Those three are what CreatePromotion writes; ID is the row's own identity.
 type Promotion struct {
 	ID         int64
 	AthleteID  int64
 	RankID     int64
 	PromotedOn string
+}
+
+// PromotionRow is one line of a graduation history: the Promotion plus what a view
+// needs to render it, the same way RosterRow relates to Athlete — see RosterRow for
+// why these particular fields travel with a row. They are denormalised by
+// ListPromotions and have no meaning on write.
+type PromotionRow struct {
+	Promotion
 	RankName   string
 	SystemName string
 	SystemSlug string
@@ -24,8 +27,8 @@ type Promotion struct {
 	Degree     int    // sub-level within the group, e.g. BJJ stripes
 }
 
-// CreatePromotion records a promotion and returns its id. Only athlete, rank and
-// date are stored; the derived current rank falls out of the dates (ADR-0001).
+// CreatePromotion records a promotion and returns its id. The derived current rank
+// falls out of the dates (ADR-0001).
 //
 // Unlike an athlete's dates, this one is required (promoted_on is NOT NULL), so a
 // blank date is malformed rather than absent.
@@ -51,7 +54,7 @@ func CreatePromotion(db *sql.DB, p Promotion) (int64, error) {
 // joined with the rank and grading-system names for display. Ties on the same
 // date fall back to insertion order (id) so the ordering is deterministic and
 // matches CurrentRank's tie-break.
-func ListPromotions(db *sql.DB, athleteID int64) ([]Promotion, error) {
+func ListPromotions(db *sql.DB, athleteID int64) ([]PromotionRow, error) {
 	rows, err := db.Query(`
 		SELECT p.id, p.athlete_id, p.rank_id, p.promoted_on, r.name, g.name, g.slug,
 		       r.rank_group, r.degree
@@ -65,10 +68,10 @@ func ListPromotions(db *sql.DB, athleteID int64) ([]Promotion, error) {
 	}
 	defer rows.Close()
 
-	var promotions []Promotion
+	var promotions []PromotionRow
 	for rows.Next() {
 		var (
-			p        Promotion
+			p        PromotionRow
 			promoted sql.NullTime
 		)
 		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.RankName, &p.SystemName, &p.SystemSlug, &p.Group, &p.Degree); err != nil {
@@ -89,8 +92,8 @@ func ListPromotions(db *sql.DB, athleteID int64) ([]Promotion, error) {
 // date the more recently recorded promotion (higher id) wins. Returns ok=false
 // when the athlete has no promotions. ISO yyyy-mm-dd dates compare lexically, so
 // string comparison is a correct date comparison.
-func CurrentRank(promotions []Promotion) (Promotion, bool) {
-	var best Promotion
+func CurrentRank(promotions []PromotionRow) (PromotionRow, bool) {
+	var best PromotionRow
 	found := false
 	for _, p := range promotions {
 		switch {

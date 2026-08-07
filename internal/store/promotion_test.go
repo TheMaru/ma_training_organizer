@@ -67,10 +67,10 @@ func TestListPromotionsCarriesRankGroupAndDegree(t *testing.T) {
 func TestCurrentRankPicksMostRecentByDate(t *testing.T) {
 	// Out-of-order input, ranks skipped: the latest date wins regardless of slice
 	// order or rank ordering.
-	ps := []store.Promotion{
-		{ID: 1, RankName: "White", PromotedOn: "2025-01-10"},
-		{ID: 2, RankName: "White, 2 stripes", PromotedOn: "2025-09-01"},
-		{ID: 3, RankName: "Blue", PromotedOn: "2025-06-01"},
+	ps := []store.PromotionRow{
+		{Promotion: store.Promotion{ID: 1, PromotedOn: "2025-01-10"}, RankName: "White"},
+		{Promotion: store.Promotion{ID: 2, PromotedOn: "2025-09-01"}, RankName: "White, 2 stripes"},
+		{Promotion: store.Promotion{ID: 3, PromotedOn: "2025-06-01"}, RankName: "Blue"},
 	}
 	got, ok := store.CurrentRank(ps)
 	if !ok {
@@ -84,9 +84,9 @@ func TestCurrentRankPicksMostRecentByDate(t *testing.T) {
 func TestCurrentRankCrossesSystems(t *testing.T) {
 	// Kids → adult: the adult rank is current when its date is latest, even though
 	// it belongs to a different system.
-	ps := []store.Promotion{
-		{ID: 1, RankName: "Green", SystemName: "BJJ Kids", PromotedOn: "2024-05-01"},
-		{ID: 2, RankName: "White", SystemName: "BJJ Adult", PromotedOn: "2026-02-01"},
+	ps := []store.PromotionRow{
+		{Promotion: store.Promotion{ID: 1, PromotedOn: "2024-05-01"}, RankName: "Green", SystemName: "BJJ Kids"},
+		{Promotion: store.Promotion{ID: 2, PromotedOn: "2026-02-01"}, RankName: "White", SystemName: "BJJ Adult"},
 	}
 	got, ok := store.CurrentRank(ps)
 	if !ok {
@@ -100,9 +100,9 @@ func TestCurrentRankCrossesSystems(t *testing.T) {
 func TestCurrentRankSameDateTakesLatestRecorded(t *testing.T) {
 	// Two promotions on one date: the more recently recorded (higher id) wins, so
 	// a correction on the same day supersedes the earlier entry.
-	ps := []store.Promotion{
-		{ID: 5, RankName: "Blue", PromotedOn: "2026-01-01"},
-		{ID: 9, RankName: "Purple", PromotedOn: "2026-01-01"},
+	ps := []store.PromotionRow{
+		{Promotion: store.Promotion{ID: 5, PromotedOn: "2026-01-01"}, RankName: "Blue"},
+		{Promotion: store.Promotion{ID: 9, PromotedOn: "2026-01-01"}, RankName: "Purple"},
 	}
 	got, _ := store.CurrentRank(ps)
 	if got.RankName != "Purple" {
