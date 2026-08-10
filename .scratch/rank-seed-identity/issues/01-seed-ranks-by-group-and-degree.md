@@ -1,6 +1,6 @@
 # 01 — Seed ranks by their natural key, not by name
 
-Status: ready-for-agent
+Status: done
 
 `ensureRank` looks a rank up by its **name** before deciding whether to insert
 it:
@@ -108,6 +108,33 @@ It was deliberately kept out of that ticket. Localizing names is a view-layer
 change with no data risk; changing how reference data is seeded can duplicate
 rows that promotions hang off, and deserves its own tests and its own review
 rather than riding along with a display change.
+
+2026-08-10 — Shipped in `70cde76`.
+
+The lookup, the name repair on the hit path, the untouched `sort_order` and both
+required tests are in as specified. Three notes on what the ticket did not
+anticipate:
+
+- **`TestSeedIsIdempotent` did not exist.** The acceptance names it twice — as
+  prior art and as a test that must still pass — but the repo only had
+  `TestSeedDemoIsIdempotent`, `TestClearDemoIsIdempotent` and
+  `TestImportAthletesIsIdempotent`, all in `cmd/organizer` and none of them about
+  `seed()`. Nothing pinned that a second seed over an untouched database writes
+  nothing, which is precisely the contract the new hit path could break. It has
+  been written: it compares every seeded system and rank, ids included, across a
+  reopen. Verified by mutation — making the hit path also write `sort_order`
+  fails it.
+- **The collision test asserts more than a non-nil error.** It checks the failing
+  rename is named in the error, and that the rows survive unchanged, since
+  "rather than corrupt quietly" is half the requirement and an `err != nil` alone
+  would pass for any failure at all.
+- **ADR-0009's consequences were corrected**, beyond what the acceptance listed.
+  Its text described the name lookup as current, which this change ends. While
+  correcting it: its claim that the stored name would have "one job left" was
+  already wrong — `cmd/organizer/demo.go` addresses its target ranks by name
+  through `rankIndex`, so respelling `rankName` still breaks the demo data even
+  though it no longer duplicates ranks. Not filed as a follow-up: the demo is
+  developer fixture data, it fails loudly and in `cmd`, not in the domain.
 
 **A correction to the record.** The first version of this ticket, and ADR-0009's
 consequences section, both claimed there was no unique index behind the name
