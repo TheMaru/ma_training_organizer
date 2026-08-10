@@ -86,19 +86,19 @@ text lives where this project keeps text.
 
 ## Consequences
 
-- **The stored English rank name must never be localized.** `ensureRank` looks a
-  rank up by `(grading_system_id, name)`, so the name is the seed's idempotency
-  key. A unique index on that pair (migration `00002`) stops two rows sharing a
-  name, but it does not stop the failure that matters: respelling `rankName`
-  makes the lookup miss, the insert succeeds under the *new* name, and the system
-  ends up with two rows for one rank while existing promotions still point at the
-  old one. Moving that lookup onto the natural key
-  `(grading_system_id, rank_group, degree)` is filed separately
-  ([[rank-seed-identity]]) and deliberately not done here, so this stays a
-  view-layer change.
-- **After this, the stored name has two jobs left:** the seed's lookup key, and
-  the fallback for a rank whose colour the view cannot resolve. It is not a
-  display string.
+- **The stored English rank name must never be localized.** At the time of this
+  decision `ensureRank` looked a rank up by `(grading_system_id, name)`, so the
+  name was the seed's idempotency key: respelling `rankName` made the lookup miss,
+  the insert succeeded under the *new* name, and the system ended up with two rows
+  for one rank while existing promotions still pointed at the old one. Moving that
+  lookup onto the natural key `(grading_system_id, rank_group, degree)` was filed
+  separately ([[rank-seed-identity]]) and kept out of this change. It has since
+  been done; `ensureRank` states what the seed now does with a name it disagrees
+  with.
+- **After this, the stored name has two jobs left:** the fallback for a rank whose
+  colour the view cannot resolve, and the key `cmd/organizer/demo.go` names its
+  target ranks by. It is not a display string, and neither job survives being
+  localized.
 - **The derivation rests on two facts that could change.** If `seed.rankName`
   stops being a pure function of group and degree, or if anything other than the
   seed starts writing ranks, this decision needs revisiting rather than patching.

@@ -61,11 +61,12 @@ func SeededRankGroups() []string {
 	return groups
 }
 
-// seed inserts the built-in grading systems and their ranks where absent. It is
-// idempotent — existing systems and ranks are left untouched — which is what lets
-// Open run it on every open. Reference data only: it never touches athletes or
-// promotions. The whole seed runs in one transaction so a failure leaves no
-// half-seeded system behind.
+// seed inserts the built-in grading systems and their ranks where absent, and
+// brings the ones already there back in line with the definitions above. It is
+// idempotent — a second run over an untouched database changes nothing — which is
+// what lets Open run it on every open. Reference data only: it never touches
+// athletes or promotions. The whole seed runs in one transaction so a failure
+// leaves no half-seeded system behind.
 func seed(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -125,17 +126,35 @@ func ensureGradingSystem(tx *sql.Tx, name, slug string, order int) (int64, error
 }
 
 // ensureRank inserts the rank for one belt-and-degree if it is not already
-// present. Existing rows are left as-is, including their sort_order, so a
-// re-seed neither duplicates nor reorders ranks.
+// present, and corrects the name of one that is. The lookup is on the natural key
+// (grading_system_id, rank_group, degree), never on the name: the name is a
+// display-shaped string that nothing keeps stable, and respelling it under a
+// name lookup inserted a second row for a rank promotions already pointed at.
+// sort_order is left as found, so a re-seed neither duplicates nor reorders.
+//
+// The natural key is deliberately not a unique index. Migration 00002 leaves
+// rank_group empty and degree zero where a system defines no such dimension, so
+// a system of named steps would put every rank on the same pair and an index
+// would admit one of them. This lookup makes the same assumption and would skip
+// the rest — the difference being that it is code, which whoever adds such a
+// system rewrites along with seedSystems, while an index would survive silently.
 func ensureRank(tx *sql.Tx, gsID int64, belt string, degree, order int) error {
 	name := rankName(belt, degree)
-	var exists int
+	var id int64
+	var stored string
 	err := tx.QueryRow(
-		`SELECT 1 FROM ranks WHERE grading_system_id = ? AND name = ?`, gsID, name,
-	).Scan(&exists)
+		`SELECT id, name FROM ranks WHERE grading_system_id = ? AND rank_group = ? AND degree = ?`,
+		gsID, belt, degree,
+	).Scan(&id, &stored)
 	switch {
 	case err == nil:
-		return nil // already seeded
+		if stored == name {
+			return nil // already seeded
+		}
+		if _, err := tx.Exec(`UPDATE ranks SET name = ? WHERE id = ?`, name, id); err != nil {
+			return fmt.Errorf("rename rank %q to %q: %w", stored, name, err)
+		}
+		return nil
 	case errors.Is(err, sql.ErrNoRows):
 		_, err := tx.Exec(
 			`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order)
@@ -156,10 +175,9 @@ func ensureRank(tx *sql.Tx, gsID int64, belt string, degree, order int) error {
 // promotion targets; group/degree are the descriptive breakdown.
 //
 // It stays English, and must not be localized (ADR-0009): what a trainer reads is
-// composed in the view from group and degree, while this string is ensureRank's
-// idempotency key — respelling it makes the lookup miss and inserts a second row
-// for a rank existing promotions already point at. It is also the fallback shown
-// for a rank the view cannot compose.
+// composed in the view, and this string is only the fallback for a rank the view
+// cannot compose. Respelling it no longer duplicates ranks (see ensureRank), but
+// cmd/organizer/demo.go still addresses its target ranks by these names.
 func rankName(belt string, degree int) string {
 	switch degree {
 	case 0:
