@@ -86,19 +86,21 @@ text lives where this project keeps text.
 
 ## Consequences
 
-- **The stored English rank name must never be localized.** At the time of this
-  decision `ensureRank` looked a rank up by `(grading_system_id, name)`, so the
-  name was the seed's idempotency key: respelling `rankName` made the lookup miss,
-  the insert succeeded under the *new* name, and the system ended up with two rows
-  for one rank while existing promotions still pointed at the old one. Moving that
-  lookup onto the natural key `(grading_system_id, rank_group, degree)` was filed
-  separately ([[rank-seed-identity]]) and kept out of this change. It has since
-  been done; `ensureRank` states what the seed now does with a name it disagrees
-  with.
-- **After this, the stored name has two jobs left:** the fallback for a rank whose
-  colour the view cannot resolve, and the key `cmd/organizer/demo.go` names its
-  target ranks by. It is not a display string, and neither job survives being
-  localized.
+*The first two have since been overtaken — see the Update below.*
+
+- **The stored English rank name must never be localized.** `ensureRank` looks a
+  rank up by `(grading_system_id, name)`, so the name is the seed's idempotency
+  key. A unique index on that pair (migration `00002`) stops two rows sharing a
+  name, but it does not stop the failure that matters: respelling `rankName`
+  makes the lookup miss, the insert succeeds under the *new* name, and the system
+  ends up with two rows for one rank while existing promotions still point at the
+  old one. Moving that lookup onto the natural key
+  `(grading_system_id, rank_group, degree)` is filed separately
+  ([[rank-seed-identity]]) and deliberately not done here, so this stays a
+  view-layer change.
+- **After this, the stored name has two jobs left:** the seed's lookup key, and
+  the fallback for a rank whose colour the view cannot resolve. It is not a
+  display string.
 - **The derivation rests on two facts that could change.** If `seed.rankName`
   stops being a pure function of group and degree, or if anything other than the
   seed starts writing ranks, this decision needs revisiting rather than patching.
@@ -110,3 +112,21 @@ text lives where this project keeps text.
 - Composition is fixed to "colour phrase, then degree phrase". German and
   English both fit; a language that inflects the colour or leads with the numeral
   would not, and would need a different seam.
+
+## Update, 2026-08-10
+
+The decision stands untouched; two of its consequences do not. They are left
+above as written, the same way this ADR left ADR-0008's scope paragraph standing,
+and corrected here.
+
+- **The seed no longer keys on the name.** `ensureRank` looks a rank up by
+  `(grading_system_id, rank_group, degree)` and corrects a stored name it
+  disagrees with ([[rank-seed-identity]] 01). The duplicate-row failure described
+  above is gone; the reasoning behind the key that replaced it lives on
+  `ensureRank`.
+- **"Two jobs" was wrong when written, and still counts two.** The seed's lookup
+  was one of them and has dropped away, but `cmd/organizer/demo.go` addresses its
+  target ranks by name through `rankIndex` and was missed at the time. So the
+  stored name is still the fallback for a rank whose colour the view cannot
+  resolve, and still a lookup key — just for the demo fixture rather than the
+  seed. The decision's own conclusion is unaffected: it must stay English.
