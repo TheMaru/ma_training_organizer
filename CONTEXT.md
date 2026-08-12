@@ -13,8 +13,12 @@ The complete set of athletes the club tracks — one, total, and shared: every t
 _Avoid_: List, table, group, cohort
 
 **Trainer**:
-A person who logs in to manage athletes and award promotions. The only kind of account in v1 (one login = one trainer); all trainers are equal, with no in-app roles. Accounts are provisioned out-of-band, not via self-registration.
+The account of a person who manages athletes and awards promotions. The only kind of account in v1 (one login = one trainer); all trainers are equal, with no in-app roles. Accounts are provisioned out-of-band, not via self-registration, and a trainer stays a Trainer once deactivated.
 _Avoid_: Coach, instructor, admin, user
+
+**Deactivated**:
+A trainer whose account is kept but refused at login, from a recorded date onwards. Reversible, and distinct from a deleted trainer, whose account is gone entirely.
+_Avoid_: Disabled, suspended, archived, inactive, former
 
 **Promotion**:
 The event of an athlete reaching a rank on a date. An athlete's current rank is their most recent promotion by date; the full sequence is their graduation history.
