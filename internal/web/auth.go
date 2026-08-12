@@ -94,9 +94,30 @@ func RevokeSessions(ctx context.Context, sessions *scs.SessionManager, trainerID
 
 // requireAuth gates a route: requests without a logged-in trainer are redirected
 // to the login page instead of reaching the handler.
+//
+// The id in the session is not taken as proof that the account still exists, so
+// the trainer is loaded on every request. Without that, a session outlives the
+// account it belongs to — deleting a trainer would leave their browser with full
+// access until the session happened to expire, and revocation is a separate act
+// that cannot be relied on to have happened (ADR-0010).
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.sessions.GetInt64(r.Context(), sessionKeyTrainerID) == 0 {
+		id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID)
+		if id == 0 {
+			redirect(w, r, "/login")
+			return
+		}
+		if _, err := store.TrainerByID(s.db, id); err != nil {
+			if !errors.Is(err, store.ErrTrainerNotFound) {
+				serverError(w)
+				return
+			}
+			// The session names nobody, so it is worth nothing: destroying it makes
+			// the next request a first visit rather than this same check again.
+			if err := s.sessions.Destroy(r.Context()); err != nil {
+				serverError(w)
+				return
+			}
 			redirect(w, r, "/login")
 			return
 		}

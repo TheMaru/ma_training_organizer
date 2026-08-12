@@ -36,14 +36,7 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	t.Helper()
 
 	db := storetest.NewDB(t)
-
-	hash, err := auth.Hash(testPassword)
-	if err != nil {
-		t.Fatalf("Hash: %v", err)
-	}
-	if _, err := store.CreateTrainer(db, testUsername, hash); err != nil {
-		t.Fatalf("CreateTrainer: %v", err)
-	}
+	addTrainer(t, db, testUsername)
 
 	sessions := web.NewSessionManager(db, time.Hour, idle, false)
 	srv, err := web.NewServer(db, sessions)
@@ -54,6 +47,34 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	t.Cleanup(ts.Close)
 
 	return ts, newClient(t), db
+}
+
+// addTrainer creates a trainer who logs in with testPassword — the one the test
+// server starts with, and any colleague a test needs beside them.
+func addTrainer(t *testing.T, db *sql.DB, username string) {
+	t.Helper()
+	hash, err := auth.Hash(testPassword)
+	if err != nil {
+		t.Fatalf("Hash: %v", err)
+	}
+	if _, err := store.CreateTrainer(db, username, hash); err != nil {
+		t.Fatalf("CreateTrainer %q: %v", username, err)
+	}
+}
+
+// deleteTrainer removes a trainer's row. Raw SQL rather than a store operation
+// because the subcommand that deletes an account is a later ticket
+// (`.scratch/trainer-offboarding/issues/05`), and what the tests here need is an
+// account that is gone, by whatever route.
+func deleteTrainer(t *testing.T, db *sql.DB, username string) {
+	t.Helper()
+	res, err := db.Exec(`DELETE FROM trainers WHERE username = ?`, username)
+	if err != nil {
+		t.Fatalf("delete trainer %q: %v", username, err)
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		t.Fatalf("delete trainer %q affected %d rows, want 1", username, n)
+	}
 }
 
 // newClient builds an HTTP client with its own cookie jar (so it carries one

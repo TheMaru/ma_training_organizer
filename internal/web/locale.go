@@ -34,6 +34,11 @@ func (s *Server) resolveLocale(next http.Handler) http.Handler {
 // localeFor is the trainer's stored choice, else Accept-Language, else German. A
 // trainer who never chose (empty column) or whose stored value is no longer
 // supported is treated like a first visit.
+//
+// The lookup can also miss outright, a session naming an account that is gone.
+// That is not this fallback's to catch and never was: requireAuth refuses such a
+// request. What the fallback is for is the login page, which has to render in some
+// language whether a trainer is known or not.
 func (s *Server) localeFor(r *http.Request) i18n.Locale {
 	if id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID); id != 0 {
 		if tr, err := store.TrainerByID(s.db, id); err == nil {

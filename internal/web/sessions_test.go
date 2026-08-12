@@ -6,9 +6,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/TheMaru/ma_training_organizer/internal/auth"
-	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
 const passwordPagePath = "/account/password"
@@ -53,13 +50,7 @@ func TestRevokeSparesTheOtherTrainersSessions(t *testing.T) {
 	login(t, ts, mine, testUsername, testPassword).Body.Close()
 
 	const colleague = "grace"
-	hash, err := auth.Hash(testPassword)
-	if err != nil {
-		t.Fatalf("Hash: %v", err)
-	}
-	if _, err := store.CreateTrainer(db, colleague, hash); err != nil {
-		t.Fatalf("CreateTrainer: %v", err)
-	}
+	addTrainer(t, db, colleague)
 	theirs := newClient(t)
 	login(t, ts, theirs, colleague, testPassword).Body.Close()
 
