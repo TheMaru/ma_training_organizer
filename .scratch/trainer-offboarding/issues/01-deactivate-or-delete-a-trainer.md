@@ -1,6 +1,7 @@
 # 01 — Offboarding a trainer: deactivate, or delete?
 
 Status: ready-for-agent
+Spec: `.scratch/trainer-offboarding/spec.md`
 
 There is no way to remove a trainer's access. No `delete-trainer`, no way to
 deactivate an account. A trainer who leaves the club keeps working credentials
