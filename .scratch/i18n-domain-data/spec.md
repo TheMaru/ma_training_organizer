@@ -272,8 +272,10 @@ That is exactly why the synthetic pair exists already.
 - **Any schema change, migration or data rewrite.**
 - **Locales beyond German and English.** The design keeps adding one to a single
   catalog file, but no third locale is added here.
-- **CLI output and internal error messages**, which ADR-0008 keeps English and
-  which this does not revisit. Localizing CLI output is [[cli-language]].
+- **CLI output and internal error messages**, which this does not revisit. What
+  the CLI speaks is settled by [[cli-language]] 01 and recorded in ADR-0008's
+  update of 2026-08-12: the operator-facing subcommands are English, the
+  trainer-facing `import-athletes` report is German outside the catalogs.
 - **Free-text domain data** — athlete notes, names — which is trainer-entered
   content, not reference data, and is not translatable in principle.
 - **Runtime-editable translations.** Systems and ranks are seed-only; adding

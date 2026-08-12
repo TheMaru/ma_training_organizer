@@ -39,6 +39,9 @@ grading-system names) still renders raw — localizing it is a model change
 ([[i18n-domain-data]], and cheaper since ADR-0006) — and internal errors and CLI
 output stay English.
 
+*The clause about CLI output was already wrong when written — see the Update of
+2026-08-12 below.*
+
 > **Superseded in part by ADR-0009.** The claim that localizing rank and
 > grading-system names is a model change turned out to be wrong: a rank's name is
 > derivable from `rank_group` + `degree`, and a system's name has been a mere
@@ -82,3 +85,40 @@ output stay English.
   header.
 - The German UI lost its stray English strings (`Athletes` in the nav) on the way
   through, and gained `Abmelden` for `Logout`.
+
+## Update, 2026-08-12
+
+The decision stands untouched; the scope paragraph's last clause does not. "CLI
+output stays English" was wrong about the CLI on the day it was written, and is
+left above as written rather than repaired in place — the same way ADR-0009 left
+this ADR's rank-name reasoning standing. (ADR-0009's note above closes
+"everything else in this ADR stands"; it was written before this correction and
+did not look at the scope paragraph.) `import-athletes` had landed the day before
+([[csv-athlete-import]], 2026-07-29) and reports to the trainer in German; this
+ADR repeated a verification the i18n spec had made on 2026-07-24, when it was
+still correct.
+
+The CLI is two surfaces, not one:
+
+- **Trainer-facing.** Everything `import-athletes` writes for the trainer to read
+  is German: the success report, the skipped rows, and the abort report with its
+  per-line problems. (Its `usage:` line and a bare `read csv:` wrapper are
+  English, like any other operator-facing failure.) The German follows from the
+  CSV column headers it reports on — `Vorname`, `Nachname`, `Geburtsdatum`,
+  `Beitritt`, `Notizen` — a file format clubs have already prepared spreadsheets
+  against, and one the messages use as their display names, so the two cannot
+  diverge. Three constructions exist only to serve it:
+  `countAthletesDE` for the German noun forms of a count, `germanDate` accepted
+  alongside ISO on input, and `errAlreadyReported` in `main.go`, whose only job is
+  to suppress the generic English `error:` line that would otherwise follow a
+  German report.
+- **Operator-facing.** Trainer creation, password reset, session revocation and
+  the demo seed/clear subcommands are English and stay so, as do `serverError`/
+  500s and wrapped store/auth/config errors. This is the half the original clause
+  described, and nothing about it changes.
+
+Routing the import report through `internal/i18n` instead was considered and
+rejected: the decision above binds the locale to the trainer's account, the CLI
+has no login and no account, and resolving from `LANG`/`LC_ALL` would be exactly
+the second mechanism this ADR set out to avoid. Nobody has asked for an English
+import report.

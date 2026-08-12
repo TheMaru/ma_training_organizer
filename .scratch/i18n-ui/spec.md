@@ -36,10 +36,21 @@ below is settled.
   (per-locale translations) that touches ADR-0001; see [[i18n-domain-data]]. It
   is likely subsumed by the belt visual ([[rank-belt-visual]]) via a locale-aware
   colour map. Accepted interim state: translated UI, raw English rank names.
-- **Stays English (internal/developer-facing):** `serverError`/500s, wrapped
-  store/auth/config errors, CLI output. Verified already clean —
+- **Stays English (internal/operator-facing):** `serverError`/500s, wrapped
+  store/auth/config errors, and the operator-facing CLI subcommands — trainer
+  creation, password reset, session revocation, demo seed/clear.
   `store`/`auth`/`config` contain no German strings; `ErrPasswordTooShort` is
   English and is mapped to a German user message in the web layer.
+- **Stays German, outside the catalogs (trainer-facing CLI):** the
+  `import-athletes` subcommand reports to the trainer in German — the success
+  report, the skipped rows, and the abort report with its per-line problems. It
+  reports on German CSV column headers (`Vorname`, `Nachname`, `Geburtsdatum`,
+  `Beitritt`, `Notizen`), which double as the display names in those messages —
+  ADR-0008's update of 2026-08-12 carries the reasoning. It is not resolved
+  through `internal/i18n`: ADR-0008 binds the locale to the trainer's account and
+  the CLI has no account. Its `usage:` line stays English like any other
+  operator-facing failure. (The German prose in the `seed-demo` fixtures is
+  sample content, not UI.)
 
 ## Implementation
 
@@ -97,6 +108,7 @@ not display text.)
   persists on their account across sessions and devices.
 - First visit / pre-login honours `Accept-Language`, defaulting to German.
 - All UI chrome and user-facing messages render in the active language; internal
-  errors and CLI output remain English.
+  errors and the operator-facing CLI subcommands remain English, and the
+  trainer-facing `import-athletes` report stays German outside the catalogs.
 - `<html lang>` reflects the active locale.
 - A parity test enforces matching keys across `de.json` and `en.json`.
