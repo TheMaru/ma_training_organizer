@@ -58,11 +58,13 @@ deletion until it expired — and `localeFor` swallows the resulting
    of the mechanism [[pre-deploy-hardening]] 02 built, not a duplicate of it.
    Deletion revokes too.
 3. **Every request** re-checks the account in `requireAuth`, which loads the
-   trainer and drops a session whose account is deactivated or gone. This is
+   trainer and drops a session whose account is deactivated or gone. ~~This is
    effectively free: `localeFor` already does that read on every authenticated
    request. Once the middleware decides first, `localeFor` only ever sees a
    trainer that exists, and its silent error path should stop pretending
-   otherwise.
+   otherwise.~~ **Both sentences were wrong** (2026-08-12, while building
+   [[02]]): `resolveLocale` is registered outside `requireAuth`, so it still runs
+   first and the read is a second query, not a free one. See [[02]]'s comments.
 
 **A deactivated trainer sees the ordinary login failure**,
 `login.badCredentials` — no distinct "account deactivated" message. A separate

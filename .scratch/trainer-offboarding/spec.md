@@ -178,14 +178,24 @@ the deactivation does not become measurable in the response time.
 trainer and, if the account is missing or deactivated, destroys the session and
 redirects to the login page. This closes a hole that exists today independently of
 this feature: the middleware checks only that a trainer id is present, so a
-session whose account was deleted would keep full access until expiry. The read is
-effectively free — the locale middleware already loads the same row on every
-authenticated request.
+session whose account was deleted would keep full access until expiry. ~~The read
+is effectively free — the locale middleware already loads the same row on every
+authenticated request.~~
 
-Once the middleware decides first, the locale resolution only ever sees a trainer
+~~Once the middleware decides first, the locale resolution only ever sees a trainer
 that exists. Its silent `ErrTrainerNotFound` fallback stops carrying weight and
 should stop pretending to: the ordering between the two middlewares becomes the
-thing that guarantees it, and that is what wants recording where the code says it.
+thing that guarantees it, and that is what wants recording where the code says it.~~
+
+**Struck 2026-08-12, while building the ticket that shipped this** — both claims
+are false, and the reasoning now lives in
+`issues/02-a-session-cannot-outlive-its-trainer.md`'s comments. In short:
+`resolveLocale` is registered outside `requireAuth` (`Handler`), so it runs
+*first*, the fallback stays reachable and stays load-bearing for the login page,
+and the re-check is a second `TrainerByID` query rather than a free one. The
+middleware still re-checks the account on every request, which is the part that
+matters; only the two claims about what that costs and what it makes dead are
+withdrawn.
 
 **No web UI changes.** The app has no trainer list and shows no trainer to
 another, so there is no surface to add a state to and no new catalog keys. If that
