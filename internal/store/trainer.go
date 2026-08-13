@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	sqlite3 "modernc.org/sqlite"
 	sqlite3lib "modernc.org/sqlite/lib"
@@ -24,11 +25,24 @@ var ErrUsernameTaken = errors.New("store: username already taken")
 // Locale is the account's chosen UI language, empty while none was chosen. It is
 // stored as the raw column value: which values are supported is the web layer's
 // question (internal/i18n), not the store's.
+//
+// DeactivatedAt is when the account stopped being able to log in, zero while it
+// still can. Every lookup selects it, so whoever holds a Trainer can answer
+// "may this account log in?" without a second query — which is what the login
+// path and the per-request check both need (ADR-0010).
 type Trainer struct {
-	ID           int64
-	Username     string
-	PasswordHash string
-	Locale       string
+	ID            int64
+	Username      string
+	PasswordHash  string
+	Locale        string
+	DeactivatedAt time.Time
+}
+
+// Deactivated reports whether the account is refused at login. A Deactivated
+// trainer is still a Trainer — the account is kept, only its access is gone
+// (CONTEXT.md, ADR-0010).
+func (t Trainer) Deactivated() bool {
+	return !t.DeactivatedAt.IsZero()
 }
 
 // CreateTrainer inserts a new trainer with the given username and password hash,
@@ -51,18 +65,22 @@ func CreateTrainer(db *sql.DB, username, passwordHash string) (int64, error) {
 	return id, nil
 }
 
-// The four functions below are near-copies in pairs — the lookups differ only in
-// their WHERE clause, the updates only in the column they SET — and that stays.
-// Deleting them moves their SQL into the handlers rather than concentrating it
-// anywhere: the complexity moves, it does not reduce. Recorded here rather than as
-// an ADR because it is reversible in an afternoon, and the reader who needs it has
-// this file open already.
+// The functions below are near-copies within each kind — the lookups differ only
+// in their WHERE clause, the updates only in the column they SET — and that
+// stays. Deleting them moves their SQL into the handlers rather than
+// concentrating it anywhere: the complexity moves, it does not reduce. Recorded
+// here rather than as an ADR because it is reversible in an afternoon, and the
+// reader who needs it has this file open already.
+//
+// What the updates do share is their tail, in updateOneTrainer: the rows-affected
+// check that turns a statement matching no row into ErrTrainerNotFound. That is
+// the part with a decision in it, and it is the same decision every time.
 
 // TrainerByUsername looks up a trainer by username, returning ErrTrainerNotFound
 // if none matches. Used by the login handler.
 func TrainerByUsername(db *sql.DB, username string) (Trainer, error) {
 	return scanTrainer(db.QueryRow(
-		`SELECT id, username, password_hash, locale FROM trainers WHERE username = ?`, username,
+		`SELECT id, username, password_hash, locale, deactivated_at FROM trainers WHERE username = ?`, username,
 	))
 }
 
@@ -70,7 +88,7 @@ func TrainerByUsername(db *sql.DB, username string) (Trainer, error) {
 // matches. Used by the auth middleware to load the session's trainer.
 func TrainerByID(db *sql.DB, id int64) (Trainer, error) {
 	return scanTrainer(db.QueryRow(
-		`SELECT id, username, password_hash, locale FROM trainers WHERE id = ?`, id,
+		`SELECT id, username, password_hash, locale, deactivated_at FROM trainers WHERE id = ?`, id,
 	))
 }
 
@@ -78,35 +96,65 @@ func TrainerByID(db *sql.DB, id int64) (Trainer, error) {
 // ErrTrainerNotFound when no trainer has the given id, so a self-service change
 // or CLI reset against a stale id fails loudly.
 func UpdateTrainerPassword(db *sql.DB, id int64, passwordHash string) error {
-	res, err := db.Exec(
-		`UPDATE trainers SET password_hash = ? WHERE id = ?`, passwordHash, id,
-	)
-	if err != nil {
-		return fmt.Errorf("update trainer %d password: %w", id, err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("rows affected updating trainer %d: %w", id, err)
-	}
-	if n == 0 {
-		return ErrTrainerNotFound
-	}
-	return nil
+	return updateOneTrainer(db, "password update", id,
+		`UPDATE trainers SET password_hash = ? WHERE id = ?`, passwordHash)
 }
 
 // UpdateTrainerLocale stores a trainer's chosen UI language. It returns
 // ErrTrainerNotFound when no trainer has the given id, so a language switch
 // against a stale session id fails loudly rather than silently doing nothing.
 func UpdateTrainerLocale(db *sql.DB, id int64, locale string) error {
-	res, err := db.Exec(
-		`UPDATE trainers SET locale = ? WHERE id = ?`, locale, id,
-	)
+	return updateOneTrainer(db, "locale update", id,
+		`UPDATE trainers SET locale = ? WHERE id = ?`, locale)
+}
+
+// DeactivateTrainer records that a trainer's account may no longer log in,
+// returning ErrTrainerNotFound when no trainer has the given id.
+//
+// It keeps a date already recorded rather than moving it, so running it twice is
+// neither an error nor a rewrite of history: the column answers "since when did
+// this account lose access?", and the second run is not when that happened.
+func DeactivateTrainer(db *sql.DB, id int64) error {
+	return updateOneTrainer(db, "deactivation", id,
+		`UPDATE trainers SET deactivated_at = COALESCE(deactivated_at, CURRENT_TIMESTAMP) WHERE id = ?`)
+}
+
+// ReactivateTrainer clears the deactivation date, letting the account log in
+// again with the password it already had. It returns ErrTrainerNotFound when no
+// trainer has the given id, and changes nothing else: restoring a password is a
+// separate act with a separate command (ADR-0010).
+func ReactivateTrainer(db *sql.DB, id int64) error {
+	return updateOneTrainer(db, "reactivation", id,
+		`UPDATE trainers SET deactivated_at = NULL WHERE id = ?`)
+}
+
+// CountActiveTrainers counts the trainers who can still log in. It is what the
+// CLI's refusal to leave the club without one is made of, so it counts active
+// accounts rather than rows: a club with a long line of departed trainers is one
+// deactivation away from locking everybody out.
+func CountActiveTrainers(db *sql.DB) (int, error) {
+	var n int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM trainers WHERE deactivated_at IS NULL`,
+	).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count active trainers: %w", err)
+	}
+	return n, nil
+}
+
+// updateOneTrainer runs an update whose WHERE clause is a trainer id, turning a
+// statement that matched no row into ErrTrainerNotFound — so a write against an
+// id that is gone fails loudly instead of silently doing nothing. act names the
+// change for the error message; values are the bindings the SET clause needs, in
+// order, and the id is bound last.
+func updateOneTrainer(db *sql.DB, act string, id int64, query string, values ...any) error {
+	res, err := db.Exec(query, append(values, id)...)
 	if err != nil {
-		return fmt.Errorf("update trainer %d locale: %w", id, err)
+		return fmt.Errorf("%s for trainer %d: %w", act, id, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("rows affected updating trainer %d: %w", id, err)
+		return fmt.Errorf("rows affected on %s for trainer %d: %w", act, id, err)
 	}
 	if n == 0 {
 		return ErrTrainerNotFound
@@ -115,16 +163,20 @@ func UpdateTrainerLocale(db *sql.DB, id int64, locale string) error {
 }
 
 // scanTrainer maps a single-row query into a Trainer, translating the no-rows
-// case into ErrTrainerNotFound.
+// case into ErrTrainerNotFound. The SQLite driver hands a TIMESTAMP back as
+// time.Time, so the nullable deactivation date is scanned as NullTime and left
+// zero when the account is active.
 func scanTrainer(row *sql.Row) (Trainer, error) {
 	var tr Trainer
-	err := row.Scan(&tr.ID, &tr.Username, &tr.PasswordHash, &tr.Locale)
+	var deactivated sql.NullTime
+	err := row.Scan(&tr.ID, &tr.Username, &tr.PasswordHash, &tr.Locale, &deactivated)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return Trainer{}, ErrTrainerNotFound
 	case err != nil:
 		return Trainer{}, fmt.Errorf("scan trainer: %w", err)
 	}
+	tr.DeactivatedAt = deactivated.Time
 	return tr, nil
 }
 

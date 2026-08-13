@@ -95,11 +95,12 @@ func RevokeSessions(ctx context.Context, sessions *scs.SessionManager, trainerID
 // requireAuth gates a route: requests without a logged-in trainer are redirected
 // to the login page instead of reaching the handler.
 //
-// The id in the session is not taken as proof that the account still exists, so
-// the trainer is loaded on every request. Without that, a session outlives the
-// account it belongs to — deleting a trainer would leave their browser with full
-// access until the session happened to expire, and revocation is a separate act
-// that cannot be relied on to have happened (ADR-0010).
+// The id in the session is not taken as proof that the account may still be used,
+// so the trainer is loaded on every request and their state read. Without that, a
+// session outlives the account it belongs to — deleting or deactivating a trainer
+// would leave their browser with full access until the session happened to
+// expire, and revocation is a separate act that cannot be relied on to have
+// happened (ADR-0010).
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID)
@@ -107,22 +108,38 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			redirect(w, r, "/login")
 			return
 		}
-		if _, err := store.TrainerByID(s.db, id); err != nil {
-			if !errors.Is(err, store.ErrTrainerNotFound) {
-				serverError(w)
-				return
-			}
-			// The session names nobody, so it is worth nothing: destroying it makes
-			// the next request a first visit rather than this same check again.
-			if err := s.sessions.Destroy(r.Context()); err != nil {
-				serverError(w)
-				return
-			}
-			redirect(w, r, "/login")
+		mayContinue, err := s.trainerMayUseTheApp(id)
+		if err != nil {
+			serverError(w)
 			return
 		}
-		next.ServeHTTP(w, r)
+		if mayContinue {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// The session names nobody who may log in, so it is worth nothing:
+		// destroying it makes the next request a first visit rather than this same
+		// check again.
+		if err := s.sessions.Destroy(r.Context()); err != nil {
+			serverError(w)
+			return
+		}
+		redirect(w, r, "/login")
 	})
+}
+
+// trainerMayUseTheApp answers the question requireAuth has about the id in a
+// session. An account that is gone and one that is deactivated are both a plain
+// "no" rather than an error: only a database that could not answer is.
+func (s *Server) trainerMayUseTheApp(id int64) (bool, error) {
+	tr, err := store.TrainerByID(s.db, id)
+	switch {
+	case errors.Is(err, store.ErrTrainerNotFound):
+		return false, nil
+	case err != nil:
+		return false, err
+	}
+	return !tr.Deactivated(), nil
 }
 
 // handleLoginForm renders the login page. An already-authenticated trainer is
@@ -158,7 +175,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	if !ok {
+	// A deactivated account is refused exactly as a wrong password is (ADR-0010):
+	// naming the state would confirm the username exists, which is what the decoy
+	// hash above exists to prevent. The state is read only after auth.Verify has
+	// run, so the refusal costs the same argon2 work as any other failed login and
+	// does not become visible in the response time either.
+	if !ok || tr.Deactivated() {
 		s.renderLogin(w, r, http.StatusUnauthorized, username, translate(r, "login.badCredentials"))
 		return
 	}

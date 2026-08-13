@@ -77,6 +77,20 @@ func deleteTrainer(t *testing.T, db *sql.DB, username string) {
 	}
 }
 
+// deactivate takes a trainer's access away through the store, the way the
+// operator's CLI does. What is under test in this package is the enforcement, not
+// the act — the act's own tests live at the cmd/organizer seam.
+func deactivate(t *testing.T, db *sql.DB, username string) {
+	t.Helper()
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		t.Fatalf("TrainerByUsername %q: %v", username, err)
+	}
+	if err := store.DeactivateTrainer(db, tr.ID); err != nil {
+		t.Fatalf("DeactivateTrainer %q: %v", username, err)
+	}
+}
+
 // newClient builds an HTTP client with its own cookie jar (so it carries one
 // session) that does not follow redirects, letting tests assert on the 303 and
 // HX-Redirect responses directly.
@@ -218,6 +232,37 @@ func TestLoginWithWrongPasswordFails(t *testing.T) {
 	defer home.Body.Close()
 	if home.StatusCode != http.StatusSeeOther {
 		t.Errorf("GET / after failed login status = %d, want %d (redirect)", home.StatusCode, http.StatusSeeOther)
+	}
+}
+
+// A departed trainer's login has to fail like any other failed login: same
+// status, same page, same message. A distinct answer would confirm the username
+// exists, which is the disclosure handleLogin's decoy hash exists to prevent.
+func TestDeactivatedTrainerLoginIsIndistinguishable(t *testing.T) {
+	ts, _, db := newAuthTestServer(t)
+
+	// The same username both times, so the two pages differ in nothing but the
+	// reason they were rendered.
+	wrong := login(t, ts, newClient(t), testUsername, "not-the-password")
+	wrongStatus, wrongBody := wrong.StatusCode, readBody(t, wrong)
+
+	deactivate(t, db, testUsername)
+
+	client := newClient(t)
+	refused := login(t, ts, client, testUsername, testPassword)
+	refusedStatus, refusedBody := refused.StatusCode, readBody(t, refused)
+
+	if refusedStatus != wrongStatus {
+		t.Errorf("status = %d, want %d, the wrong-password answer", refusedStatus, wrongStatus)
+	}
+	if refusedBody != wrongBody {
+		t.Errorf("body differs from the wrong-password answer:\n got: %s\nwant: %s", refusedBody, wrongBody)
+	}
+
+	home := get(t, ts, client, "/")
+	defer home.Body.Close()
+	if home.StatusCode != http.StatusSeeOther {
+		t.Errorf("GET / after the refused login = %d, want %d (no session started)", home.StatusCode, http.StatusSeeOther)
 	}
 }
 

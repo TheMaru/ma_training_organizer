@@ -51,14 +51,79 @@ func resetPassword(db *sql.DB, username, password string) error {
 
 // revokeSessions ends every session a named trainer holds, the operator's path
 // for a lost phone or a suspected takeover. It is the testable core behind the
-// revoke-sessions subcommand. There is no session to spare here — see
-// web.RevokeSessions for what the empty token means.
+// revoke-sessions subcommand.
 func revokeSessions(db *sql.DB, username string) error {
 	tr, err := store.TrainerByUsername(db, username)
 	if err != nil {
 		return err
 	}
-	return web.RevokeSessions(context.Background(), web.NewStoredSessions(db), tr.ID, "")
+	return revokeAllSessions(db, tr.ID)
+}
+
+// revokeAllSessions ends every session a trainer holds, sparing none — see
+// web.RevokeSessions for what the empty token means. Offboarding is a caller of
+// that mechanism, not a second copy of it.
+func revokeAllSessions(db *sql.DB, trainerID int64) error {
+	return web.RevokeSessions(context.Background(), web.NewStoredSessions(db), trainerID, "")
+}
+
+// errLastActiveTrainer is returned when an offboarding act would leave the club
+// with nobody who can log in. There is no override flag: the alternative — every
+// trainer locked out until somebody reaches a console — is not a trade worth
+// offering (ADR-0010).
+var errLastActiveTrainer = errors.New("that would leave the club with no trainer who can log in")
+
+// refuseIfLastActiveTrainer refuses an act that would take the last login away.
+// act names it for the message, which has to name the way through as well: an
+// operator who is told only "no" has to guess.
+//
+// A trainer who is already deactivated cannot be the last one, so the act is
+// permitted there whatever the count — that is what makes a second
+// deactivate-trainer harmless.
+func refuseIfLastActiveTrainer(db *sql.DB, act string, tr store.Trainer) error {
+	if tr.Deactivated() {
+		return nil
+	}
+	active, err := store.CountActiveTrainers(db)
+	if err != nil {
+		return err
+	}
+	if active <= 1 {
+		return fmt.Errorf("cannot %s %q: %w — create the replacement with create-trainer first",
+			act, tr.Username, errLastActiveTrainer)
+	}
+	return nil
+}
+
+// deactivateTrainer takes a departed trainer's access away without touching their
+// account: login is refused from now on and the devices they are already signed
+// in on lose their sessions. It is the testable core behind the
+// deactivate-trainer subcommand, and it is reversible with reactivateTrainer.
+func deactivateTrainer(db *sql.DB, username string) error {
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		return err
+	}
+	if err := refuseIfLastActiveTrainer(db, "deactivate", tr); err != nil {
+		return err
+	}
+	if err := store.DeactivateTrainer(db, tr.ID); err != nil {
+		return err
+	}
+	// After the state change, so a failed deactivation does not sign anybody out.
+	return revokeAllSessions(db, tr.ID)
+}
+
+// reactivateTrainer gives a returning trainer their access back, with the
+// password they always had. It is the testable core behind the
+// reactivate-trainer subcommand and it does nothing else: no password reset, and
+// the sessions deactivation ended stay ended (ADR-0010).
+func reactivateTrainer(db *sql.DB, username string) error {
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		return err
+	}
+	return store.ReactivateTrainer(db, tr.ID)
 }
 
 // cmdCreateTrainer wires the create-trainer subcommand: it opens the database,
@@ -114,6 +179,38 @@ func cmdRevokeSessions(dbPath string, args []string) error {
 			return err
 		}
 		fmt.Printf("revoked all sessions for trainer %q\n", username)
+		return nil
+	})
+}
+
+// cmdDeactivateTrainer wires the deactivate-trainer subcommand, the ordinary
+// offboarding act: it needs no prompt, because it takes nothing away that
+// reactivate-trainer cannot give back.
+func cmdDeactivateTrainer(dbPath string, args []string) error {
+	username, err := singleUsernameArg("deactivate-trainer", args)
+	if err != nil {
+		return err
+	}
+	return withDB(dbPath, func(db *sql.DB) error {
+		if err := deactivateTrainer(db, username); err != nil {
+			return err
+		}
+		fmt.Printf("deactivated trainer %q: login refused from now on, sessions ended\n", username)
+		return nil
+	})
+}
+
+// cmdReactivateTrainer wires the reactivate-trainer subcommand, the way back.
+func cmdReactivateTrainer(dbPath string, args []string) error {
+	username, err := singleUsernameArg("reactivate-trainer", args)
+	if err != nil {
+		return err
+	}
+	return withDB(dbPath, func(db *sql.DB) error {
+		if err := reactivateTrainer(db, username); err != nil {
+			return err
+		}
+		fmt.Printf("reactivated trainer %q: the password they had works again\n", username)
 		return nil
 	})
 }

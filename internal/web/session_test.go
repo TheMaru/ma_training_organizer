@@ -68,6 +68,52 @@ func TestSessionDiesWithItsTrainer(t *testing.T) {
 	wantNoCookies(t, ts, client)
 }
 
+// Deactivation is enforced per request, not only at login: a session started
+// while the account was active must stop working the moment it is not, whether or
+// not the operator's revocation reached it.
+func TestSessionDiesWhenItsTrainerIsDeactivated(t *testing.T) {
+	ts, client, db := newAuthTestServer(t)
+	login(t, ts, client, testUsername, testPassword).Body.Close()
+
+	deactivate(t, db, testUsername)
+
+	resp := get(t, ts, client, "/")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status after the account was deactivated = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+	if loc := resp.Header.Get("Location"); loc != "/login" {
+		t.Errorf("Location = %q, want %q", loc, "/login")
+	}
+	wantNoCookies(t, ts, client)
+}
+
+// The same guard against signing everybody out, for the deactivation case: one
+// trainer's departure leaves the colleague still in the middle of a training.
+func TestOnlyTheDeactivatedTrainersSessionDies(t *testing.T) {
+	ts, mine, db := newAuthTestServer(t)
+	login(t, ts, mine, testUsername, testPassword).Body.Close()
+
+	const colleague = "grace"
+	addTrainer(t, db, colleague)
+	theirs := newClient(t)
+	login(t, ts, theirs, colleague, testPassword).Body.Close()
+
+	deactivate(t, db, testUsername)
+
+	gone := get(t, ts, mine, "/")
+	gone.Body.Close()
+	if gone.StatusCode != http.StatusSeeOther {
+		t.Errorf("deactivated trainer: GET / status = %d, want %d", gone.StatusCode, http.StatusSeeOther)
+	}
+
+	staying := get(t, ts, theirs, "/")
+	staying.Body.Close()
+	if staying.StatusCode != http.StatusOK {
+		t.Errorf("colleague's GET / status = %d, want %d", staying.StatusCode, http.StatusOK)
+	}
+}
+
 // The other half of the check above, and the reason it is a lookup per session
 // rather than a sweep: an account going takes exactly one trainer's sessions with
 // it. Without this the new check could pass by signing everybody out.
