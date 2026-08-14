@@ -2,7 +2,7 @@ module github.com/TheMaru/ma_training_organizer
 
 go 1.25.7
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 require (
 	github.com/alexedwards/argon2id v1.0.0
