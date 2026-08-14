@@ -3,12 +3,17 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 )
 
 // trainerPassword is what every trainer these tests provision logs in with, so a
@@ -52,9 +57,14 @@ func servedOK(t *testing.T, who string, resp *http.Response) {
 
 func home(t *testing.T, ts *httptest.Server, client *http.Client) *http.Response {
 	t.Helper()
-	resp, err := client.Get(ts.URL + "/")
+	return get(t, ts, client, "/")
+}
+
+func get(t *testing.T, ts *httptest.Server, client *http.Client, path string) *http.Response {
+	t.Helper()
+	resp, err := client.Get(ts.URL + path)
 	if err != nil {
-		t.Fatalf("GET /: %v", err)
+		t.Fatalf("GET %s: %v", path, err)
 	}
 	return resp
 }
@@ -355,6 +365,147 @@ func TestCreateTrainerAgainstAnActiveNameStaysPlain(t *testing.T) {
 	}
 }
 
+// Deletion is the exception rather than the ordinary offboarding act (ADR-0010):
+// it exists for an erasure request, and it gives the username back.
+func TestDeleteTrainerRemovesTheAccountAndFreesTheUsername(t *testing.T) {
+	db, ts := startApp(t)
+	addTrainers(t, db, "ada", "grace")
+
+	if err := deleteTrainer(db, "grace"); err != nil {
+		t.Fatalf("deleteTrainer: %v", err)
+	}
+
+	if _, err := store.TrainerByUsername(db, "grace"); !errors.Is(err, store.ErrTrainerNotFound) {
+		t.Errorf("lookup after deletion = %v, want ErrTrainerNotFound", err)
+	}
+	if got := loginStatus(t, ts, "grace", trainerPassword); got != http.StatusUnauthorized {
+		t.Errorf("deleted trainer's login = %d, want %d", got, http.StatusUnauthorized)
+	}
+	// Freeing the name for reuse is half of why the act exists, so it is asserted
+	// rather than inferred from the row being gone.
+	if err := createTrainer(db, "grace", trainerPassword); err != nil {
+		t.Errorf("create-trainer on the freed username: %v", err)
+	}
+}
+
+// The account is gone, so requireAuth would turn the departed trainer's devices
+// away anyway (see web.Server.requireAuth). The sessions are still ended, and
+// counted before any request is made — otherwise the assertion would be about the
+// middleware rather than about deletion leaving no session behind.
+func TestDeleteTrainerEndsTheirSessionsOnly(t *testing.T) {
+	db, ts := startApp(t)
+	addTrainers(t, db, "ada", "grace")
+	phone := signIn(t, ts, "grace", trainerPassword)
+	colleague := signIn(t, ts, "ada", trainerPassword)
+	if got := storedSessions(t, db); got != 2 {
+		t.Fatalf("stored sessions after two logins = %d, want 2", got)
+	}
+
+	if err := deleteTrainer(db, "grace"); err != nil {
+		t.Fatalf("deleteTrainer: %v", err)
+	}
+
+	if got := storedSessions(t, db); got != 1 {
+		t.Errorf("stored sessions after deletion = %d, want 1 (the colleague's)", got)
+	}
+	atLoginPage(t, "phone", home(t, ts, phone))
+	servedOK(t, "colleague", home(t, ts, colleague))
+}
+
+// The same rule as for deactivation, and deliberately the same predicate: an
+// erasure request does not get to lock the club out either. Three trainers here,
+// two of them long gone, so a rule counting rows would allow the act.
+func TestDeleteRefusesTheOnlyActiveTrainer(t *testing.T) {
+	db, ts := startApp(t)
+	addTrainers(t, db, "ada", "departed-one", "departed-two")
+	for _, u := range []string{"departed-one", "departed-two"} {
+		if err := deactivateTrainer(db, u); err != nil {
+			t.Fatalf("deactivateTrainer %q: %v", u, err)
+		}
+	}
+	laptop := signIn(t, ts, "ada", trainerPassword)
+
+	err := deleteTrainer(db, "ada")
+	if !errors.Is(err, errLastActiveTrainer) {
+		t.Fatalf("error = %v, want errLastActiveTrainer", err)
+	}
+	if !strings.Contains(err.Error(), "create-trainer") {
+		t.Errorf("refusal %q does not name the way through", err)
+	}
+
+	// Refused, not half-applied: the account is still there, still logs in, and the
+	// session that was live stays live.
+	if _, err := store.TrainerByUsername(db, "ada"); err != nil {
+		t.Errorf("account gone despite the refusal: %v", err)
+	}
+	servedOK(t, "the live session", home(t, ts, laptop))
+}
+
+// A trainer who already cannot log in is not the last active one, whatever the
+// count — so an erasure request for somebody long departed is never refused.
+func TestDeleteADeactivatedTrainerIsAllowed(t *testing.T) {
+	db, _ := startApp(t)
+	addTrainers(t, db, "ada", "departed")
+	if err := deactivateTrainer(db, "departed"); err != nil {
+		t.Fatalf("deactivateTrainer: %v", err)
+	}
+
+	if err := deleteTrainer(db, "departed"); err != nil {
+		t.Errorf("deleteTrainer on a deactivated trainer: %v", err)
+	}
+}
+
+// Offboarding a person never costs the club its data. No athlete belongs to a
+// trainer (CONTEXT.md), so there is nothing to reassign and nothing to cascade —
+// and the colleague still at the club reads the same roster afterwards.
+func TestDeleteTrainerLeavesTheRosterAlone(t *testing.T) {
+	db, ts := startApp(t)
+	addTrainers(t, db, "ada", "grace")
+	athleteID, err := store.CreateAthlete(db, store.Athlete{FirstName: "Kenji", LastName: "Tanaka"})
+	if err != nil {
+		t.Fatalf("CreateAthlete: %v", err)
+	}
+	if _, err := store.CreatePromotion(db, store.Promotion{
+		AthleteID:  athleteID,
+		RankID:     storetest.RankID(t, db, "BJJ Adult", "White"),
+		PromotedOn: "2025-03-01",
+	}); err != nil {
+		t.Fatalf("CreatePromotion: %v", err)
+	}
+	colleague := signIn(t, ts, "ada", trainerPassword)
+
+	if err := deleteTrainer(db, "grace"); err != nil {
+		t.Fatalf("deleteTrainer: %v", err)
+	}
+
+	body := getBody(t, ts, colleague, "/athletes")
+	if !strings.Contains(body, "Tanaka") {
+		t.Error("the athlete is missing from the roster after a trainer was deleted")
+	}
+	promotions, err := store.ListPromotions(db, athleteID)
+	if err != nil {
+		t.Fatalf("ListPromotions: %v", err)
+	}
+	if len(promotions) != 1 {
+		t.Errorf("promotions after the deletion = %d, want 1", len(promotions))
+	}
+}
+
+// getBody fetches a page as one of the clients and returns what it rendered.
+func getBody(t *testing.T, ts *httptest.Server, client *http.Client, path string) string {
+	t.Helper()
+	resp := get(t, ts, client, path)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s status = %d, want %d", path, resp.StatusCode, http.StatusOK)
+	}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(b)
+}
+
 func TestDeactivateUnknownTrainer(t *testing.T) {
 	db, _ := startApp(t)
 	addTrainers(t, db, "ada")
@@ -369,6 +520,97 @@ func TestReactivateUnknownTrainer(t *testing.T) {
 	addTrainers(t, db, "ada")
 
 	if err := reactivateTrainer(db, "ghost"); !errors.Is(err, store.ErrTrainerNotFound) {
+		t.Errorf("error = %v, want ErrTrainerNotFound", err)
+	}
+}
+
+// The one act nothing gives back, so the operator is asked first — and a
+// mistyped username survives an answer that is not a clear yes.
+func TestDeleteTrainerLeavesTheAccountAloneWithoutAYes(t *testing.T) {
+	for _, answer := range []string{"n\n", "\n", "", "sure\n"} {
+		t.Run(fmt.Sprintf("%q", answer), func(t *testing.T) {
+			path := cliDatabase(t, "ada", "grace")
+			answering(t, answer)
+
+			if err := cmdDeleteTrainer(path, []string{"grace"}); err != nil {
+				t.Fatalf("cmdDeleteTrainer: %v", err)
+			}
+
+			withCLIDatabase(t, path, func(db *sql.DB) {
+				if _, err := store.TrainerByUsername(db, "grace"); err != nil {
+					t.Errorf("account gone after %q: %v", answer, err)
+				}
+			})
+		})
+	}
+}
+
+// The other half: a yes deletes, so the prompt is a question and not a wall.
+func TestDeleteTrainerProceedsOnAYes(t *testing.T) {
+	for _, answer := range []string{"y\n", "yes\n", "  Y  \n"} {
+		t.Run(fmt.Sprintf("%q", answer), func(t *testing.T) {
+			path := cliDatabase(t, "ada", "grace")
+			answering(t, answer)
+
+			if err := cmdDeleteTrainer(path, []string{"grace"}); err != nil {
+				t.Fatalf("cmdDeleteTrainer: %v", err)
+			}
+
+			withCLIDatabase(t, path, func(db *sql.DB) {
+				if _, err := store.TrainerByUsername(db, "grace"); !errors.Is(err, store.ErrTrainerNotFound) {
+					t.Errorf("lookup after %q = %v, want ErrTrainerNotFound", answer, err)
+				}
+			})
+		})
+	}
+}
+
+// cliDatabase builds a database on a path, which is what a subcommand wrapper
+// takes: it opens the database itself rather than being handed one.
+func cliDatabase(t *testing.T, usernames ...string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "cli.db")
+	withCLIDatabase(t, path, func(db *sql.DB) { addTrainers(t, db, usernames...) })
+	return path
+}
+
+func withCLIDatabase(t *testing.T, path string, fn func(*sql.DB)) {
+	t.Helper()
+	if err := withDB(path, func(db *sql.DB) error {
+		fn(db)
+		return nil
+	}); err != nil {
+		t.Fatalf("withDB %s: %v", path, err)
+	}
+}
+
+// answering stands in for the operator at the terminal: it points os.Stdin at a
+// canned answer for the length of the test. confirm reads that global the way
+// readHidden does, which is what keeps the prompt out of the core — the price is
+// that a test using this one may not call t.Parallel.
+func answering(t *testing.T, answer string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "answer")
+	if err := os.WriteFile(path, []byte(answer), 0o600); err != nil {
+		t.Fatalf("write answer: %v", err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open answer: %v", err)
+	}
+	saved := os.Stdin
+	os.Stdin = f
+	t.Cleanup(func() {
+		os.Stdin = saved
+		f.Close()
+	})
+}
+
+func TestDeleteUnknownTrainer(t *testing.T) {
+	db, _ := startApp(t)
+	addTrainers(t, db, "ada")
+
+	if err := deleteTrainer(db, "ghost"); !errors.Is(err, store.ErrTrainerNotFound) {
 		t.Errorf("error = %v, want ErrTrainerNotFound", err)
 	}
 }

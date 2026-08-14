@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"unicode/utf8"
@@ -111,7 +113,8 @@ var errLastActiveTrainer = errors.New("that would leave the club with no trainer
 //
 // A trainer who is already deactivated cannot be the last one, so the act is
 // permitted there whatever the count — that is what makes a second
-// deactivate-trainer harmless.
+// deactivate-trainer harmless, and what keeps an erasure request for somebody
+// long departed from being refused.
 func refuseIfLastActiveTrainer(db *sql.DB, act string, tr store.Trainer) error {
 	if tr.Deactivated() {
 		return nil
@@ -156,6 +159,30 @@ func reactivateTrainer(db *sql.DB, username string) error {
 		return err
 	}
 	return store.ReactivateTrainer(db, tr.ID)
+}
+
+// deleteTrainer removes a trainer's account outright: the erasure act, and the
+// exception rather than the ordinary offboarding one (ADR-0010). It is the
+// testable core behind the delete-trainer subcommand, which is where the operator
+// is asked to confirm.
+//
+// It works on any trainer, deactivated or not — see ADR-0010 for why nothing is
+// gained by demanding the two acts in order.
+func deleteTrainer(db *sql.DB, username string) error {
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		return err
+	}
+	if err := refuseIfLastActiveTrainer(db, "delete", tr); err != nil {
+		return err
+	}
+	if err := store.DeleteTrainer(db, tr.ID); err != nil {
+		return err
+	}
+	// After the state change, as in deactivateTrainer. The sessions outlive the row
+	// they belong to — the trainer id lives inside each session's encoded values —
+	// so revoking them is a real act here and not a formality.
+	return revokeAllSessions(db, tr.ID)
 }
 
 // trainerListing is every trainer as list-trainers reports them. It renders
@@ -297,6 +324,36 @@ func cmdReactivateTrainer(dbPath string, args []string) error {
 	})
 }
 
+// cmdDeleteTrainer wires the delete-trainer subcommand. It asks before it acts,
+// because this is the one act nothing gives back — and it asks here rather than in
+// deleteTrainer, so the core stays non-interactive and testable.
+//
+// The question comes before the account is looked up: an operator who answers no
+// has said no to whatever they typed, and a name that turns out not to exist is
+// reported the same way afterwards either way.
+func cmdDeleteTrainer(dbPath string, args []string) error {
+	username, err := singleUsernameArg("delete-trainer", args)
+	if err != nil {
+		return err
+	}
+	return withDB(dbPath, func(db *sql.DB) error {
+		confirmed, err := confirm(fmt.Sprintf(
+			"Delete trainer %q? The account is gone for good; the roster is untouched.", username))
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			fmt.Printf("left trainer %q alone\n", username)
+			return nil
+		}
+		if err := deleteTrainer(db, username); err != nil {
+			return err
+		}
+		fmt.Printf("deleted trainer %q: the account is gone, the username is free again\n", username)
+		return nil
+	})
+}
+
 // cmdListTrainers wires the list-trainers subcommand. It takes no username, so it
 // rejects extra arguments the way the demo subcommands do.
 func cmdListTrainers(dbPath string, args []string) error {
@@ -348,6 +405,26 @@ func promptNewPassword() (string, error) {
 		return "", errors.New("passwords do not match")
 	}
 	return first, nil
+}
+
+// confirm asks a yes-or-no question on the terminal and reports the answer. Only
+// "y" or "yes" is a yes: anything else — a typo, a bare newline, a closed stdin —
+// leaves the act undone, which is the safe way round for the one act that cannot
+// be undone.
+//
+// The prompt goes to stderr like the password prompts, so a run whose output is
+// being captured is not left waiting behind an invisible question.
+func confirm(question string) (bool, error) {
+	fmt.Fprintf(os.Stderr, "%s [y/N]: ", question)
+	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("read confirmation: %w", err)
+	}
+	switch strings.ToLower(strings.TrimSpace(answer)) {
+	case "y", "yes":
+		return true, nil
+	}
+	return false, nil
 }
 
 // readHidden prints prompt and reads a line from the terminal without echoing.

@@ -51,6 +51,8 @@ func run(args []string) error {
 			return cmdDeactivateTrainer(cfg.DBPath, args[1:])
 		case "reactivate-trainer":
 			return cmdReactivateTrainer(cfg.DBPath, args[1:])
+		case "delete-trainer":
+			return cmdDeleteTrainer(cfg.DBPath, args[1:])
 		case "list-trainers":
 			return cmdListTrainers(cfg.DBPath, args[1:])
 		case "seed-demo":

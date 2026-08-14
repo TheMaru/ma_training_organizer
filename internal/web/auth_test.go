@@ -62,18 +62,16 @@ func addTrainer(t *testing.T, db *sql.DB, username string) {
 	}
 }
 
-// deleteTrainer removes a trainer's row. Raw SQL rather than a store operation
-// because the subcommand that deletes an account is a later ticket
-// (`.scratch/trainer-offboarding/issues/05`), and what the tests here need is an
-// account that is gone, by whatever route.
+// deleteTrainer removes a trainer's account through the store, as deactivate
+// does, so what these tests set up is what the operator's CLI leaves behind.
 func deleteTrainer(t *testing.T, db *sql.DB, username string) {
 	t.Helper()
-	res, err := db.Exec(`DELETE FROM trainers WHERE username = ?`, username)
+	tr, err := store.TrainerByUsername(db, username)
 	if err != nil {
-		t.Fatalf("delete trainer %q: %v", username, err)
+		t.Fatalf("TrainerByUsername %q: %v", username, err)
 	}
-	if n, _ := res.RowsAffected(); n != 1 {
-		t.Fatalf("delete trainer %q affected %d rows, want 1", username, n)
+	if err := store.DeleteTrainer(db, tr.ID); err != nil {
+		t.Fatalf("DeleteTrainer %q: %v", username, err)
 	}
 }
 

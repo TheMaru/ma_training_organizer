@@ -121,9 +121,10 @@ func CreateTrainer(db *sql.DB, username, passwordHash string) (int64, error) {
 // here rather than as an ADR because it is reversible in an afternoon, and the
 // reader who needs it has this file open already.
 //
-// What the updates do share is their tail, in updateOneTrainer: the rows-affected
+// What the writes do share is their tail, in writeOneTrainer: the rows-affected
 // check that turns a statement matching no row into ErrTrainerNotFound. That is
-// the part with a decision in it, and it is the same decision every time.
+// the part with a decision in it, and it is the same decision every time — for the
+// deletion as much as for the updates.
 
 // TrainerByUsername looks up a trainer by username, returning ErrTrainerNotFound
 // if none matches. Used by the login handler.
@@ -145,7 +146,7 @@ func TrainerByID(db *sql.DB, id int64) (Trainer, error) {
 // ErrTrainerNotFound when no trainer has the given id, so a self-service change
 // or CLI reset against a stale id fails loudly.
 func UpdateTrainerPassword(db *sql.DB, id int64, passwordHash string) error {
-	return updateOneTrainer(db, "password update", id,
+	return writeOneTrainer(db, "password update", id,
 		`UPDATE trainers SET password_hash = ? WHERE id = ?`, passwordHash)
 }
 
@@ -153,7 +154,7 @@ func UpdateTrainerPassword(db *sql.DB, id int64, passwordHash string) error {
 // ErrTrainerNotFound when no trainer has the given id, so a language switch
 // against a stale session id fails loudly rather than silently doing nothing.
 func UpdateTrainerLocale(db *sql.DB, id int64, locale string) error {
-	return updateOneTrainer(db, "locale update", id,
+	return writeOneTrainer(db, "locale update", id,
 		`UPDATE trainers SET locale = ? WHERE id = ?`, locale)
 }
 
@@ -164,7 +165,7 @@ func UpdateTrainerLocale(db *sql.DB, id int64, locale string) error {
 // neither an error nor a rewrite of history: the column answers "since when did
 // this account lose access?", and the second run is not when that happened.
 func DeactivateTrainer(db *sql.DB, id int64) error {
-	return updateOneTrainer(db, "deactivation", id,
+	return writeOneTrainer(db, "deactivation", id,
 		`UPDATE trainers SET deactivated_at = COALESCE(deactivated_at, CURRENT_TIMESTAMP) WHERE id = ?`)
 }
 
@@ -173,8 +174,15 @@ func DeactivateTrainer(db *sql.DB, id int64) error {
 // trainer has the given id, and changes nothing else: restoring a password is a
 // separate act with a separate command (ADR-0010).
 func ReactivateTrainer(db *sql.DB, id int64) error {
-	return updateOneTrainer(db, "reactivation", id,
+	return writeOneTrainer(db, "reactivation", id,
 		`UPDATE trainers SET deactivated_at = NULL WHERE id = ?`)
+}
+
+// DeleteTrainer removes a trainer's account, returning ErrTrainerNotFound when no
+// trainer has the given id. Nothing else in the schema points at the row, so there
+// is nothing to cascade (CONTEXT.md, on who the roster belongs to).
+func DeleteTrainer(db *sql.DB, id int64) error {
+	return writeOneTrainer(db, "deletion", id, `DELETE FROM trainers WHERE id = ?`)
 }
 
 // CountActiveTrainers counts the trainers who can still log in. It is what the
@@ -191,12 +199,12 @@ func CountActiveTrainers(db *sql.DB) (int, error) {
 	return n, nil
 }
 
-// updateOneTrainer runs an update whose WHERE clause is a trainer id, turning a
+// writeOneTrainer runs a write whose WHERE clause is a trainer id, turning a
 // statement that matched no row into ErrTrainerNotFound — so a write against an
 // id that is gone fails loudly instead of silently doing nothing. act names the
-// change for the error message; values are the bindings the SET clause needs, in
-// order, and the id is bound last.
-func updateOneTrainer(db *sql.DB, act string, id int64, query string, values ...any) error {
+// change for the error message; values are the bindings the statement needs
+// before the id, in order, and the id is bound last.
+func writeOneTrainer(db *sql.DB, act string, id int64, query string, values ...any) error {
 	res, err := db.Exec(query, append(values, id)...)
 	if err != nil {
 		return fmt.Errorf("%s for trainer %d: %w", act, id, err)
