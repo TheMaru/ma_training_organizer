@@ -253,6 +253,108 @@ func TestDeactivateAnAlreadyDeactivatedTrainerIsAllowed(t *testing.T) {
 	}
 }
 
+// An operator resetting a deactivated trainer's password is working on an account
+// that cannot log in either way. Refused, and told the verb for what they may
+// actually have meant.
+func TestResetPasswordRefusesADeactivatedTrainer(t *testing.T) {
+	db, ts := startApp(t)
+	addTrainers(t, db, "ada", "grace")
+	if err := deactivateTrainer(db, "grace"); err != nil {
+		t.Fatalf("deactivateTrainer: %v", err)
+	}
+	before, err := store.TrainerByUsername(db, "grace")
+	if err != nil {
+		t.Fatalf("TrainerByUsername: %v", err)
+	}
+
+	err = resetPassword(db, "grace", "brand-new-secret")
+	if !errors.Is(err, errTrainerDeactivated) {
+		t.Fatalf("error = %v, want errTrainerDeactivated", err)
+	}
+	if !strings.Contains(err.Error(), "reactivate-trainer") {
+		t.Errorf("refusal %q does not name reactivation", err)
+	}
+
+	// Refused, not half-applied: the old hash stands, and the new password is not
+	// a way in either.
+	after, err := store.TrainerByUsername(db, "grace")
+	if err != nil {
+		t.Fatalf("TrainerByUsername: %v", err)
+	}
+	if after.PasswordHash != before.PasswordHash {
+		t.Error("password hash changed despite the refusal")
+	}
+	if got := loginStatus(t, ts, "grace", "brand-new-secret"); got != http.StatusUnauthorized {
+		t.Errorf("login with the refused password = %d, want %d", got, http.StatusUnauthorized)
+	}
+}
+
+// Revocation stays permitted on a deactivated trainer, and stays revocation: an
+// operator working an incident should not have to reason about command order, and
+// a subcommand that quietly did nothing would be worse than a refusal.
+//
+// The state is set through the store rather than through deactivateTrainer, which
+// revokes as it goes — that would leave nothing for the act under test to end.
+func TestRevokeSessionsWorksOnADeactivatedTrainer(t *testing.T) {
+	db, ts := startApp(t)
+	addTrainers(t, db, "ada", "grace")
+	signIn(t, ts, "grace", trainerPassword)
+	signIn(t, ts, "ada", trainerPassword)
+	tr, err := store.TrainerByUsername(db, "grace")
+	if err != nil {
+		t.Fatalf("TrainerByUsername: %v", err)
+	}
+	if err := store.DeactivateTrainer(db, tr.ID); err != nil {
+		t.Fatalf("DeactivateTrainer: %v", err)
+	}
+
+	if err := revokeSessions(db, "grace"); err != nil {
+		t.Fatalf("revokeSessions on a deactivated trainer: %v", err)
+	}
+
+	if got := storedSessions(t, db); got != 1 {
+		t.Errorf("stored sessions after revocation = %d, want 1 (ada's)", got)
+	}
+}
+
+// create-trainer is where an operator meets a name they cannot see anywhere else:
+// the account exists, deactivated, and "already taken" alone would send them
+// hunting for it (ADR-0010).
+func TestCreateTrainerReportsADeactivatedAccount(t *testing.T) {
+	db, _ := startApp(t)
+	addTrainers(t, db, "ada", "grace")
+	if err := deactivateTrainer(db, "grace"); err != nil {
+		t.Fatalf("deactivateTrainer: %v", err)
+	}
+
+	err := createTrainer(db, "grace", "another-horse")
+	// Still the taken-username case, so a caller matching on it keeps working.
+	if !errors.Is(err, store.ErrUsernameTaken) {
+		t.Fatalf("error = %v, want ErrUsernameTaken", err)
+	}
+	if !strings.Contains(err.Error(), "deactivated") {
+		t.Errorf("message %q does not say the account is deactivated", err)
+	}
+	if !strings.Contains(err.Error(), "reactivate-trainer") {
+		t.Errorf("message %q does not name the way to that account", err)
+	}
+}
+
+// The taken-username message only names deactivation when that is true, or the
+// operator is sent to reactivate an account that is already active.
+func TestCreateTrainerAgainstAnActiveNameStaysPlain(t *testing.T) {
+	db, _ := startApp(t)
+	addTrainers(t, db, "ada")
+
+	err := createTrainer(db, "ada", "another-horse")
+	if !errors.Is(err, store.ErrUsernameTaken) {
+		t.Fatalf("error = %v, want ErrUsernameTaken", err)
+	}
+	if strings.Contains(err.Error(), "deactivated") {
+		t.Errorf("message %q calls an active account deactivated", err)
+	}
+}
+
 func TestDeactivateUnknownTrainer(t *testing.T) {
 	db, _ := startApp(t)
 	addTrainers(t, db, "ada")

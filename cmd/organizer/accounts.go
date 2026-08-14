@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/term"
 
@@ -27,13 +28,41 @@ func createTrainer(db *sql.DB, username, password string) error {
 		return fmt.Errorf("hash password: %w", err)
 	}
 	if _, err := store.CreateTrainer(db, username, hash); err != nil {
-		return err
+		return explainTakenUsername(db, username, err)
 	}
 	return nil
 }
 
+// explainTakenUsername says which kind of account holds the name, when the name is
+// held at all. A deactivated one is invisible everywhere else in the app — no
+// trainer sees another, and there is no web listing — so "already taken" on its own
+// sends the operator hunting (ADR-0010). The error stays an ErrUsernameTaken, so a
+// caller matching on it is unaffected.
+//
+// A lookup that fails here is swallowed on purpose: the caller's real answer is
+// already in hand and only its wording was at stake.
+func explainTakenUsername(db *sql.DB, username string, err error) error {
+	if !errors.Is(err, store.ErrUsernameTaken) {
+		return err
+	}
+	if tr, lookupErr := store.TrainerByUsername(db, username); lookupErr == nil && tr.Deactivated() {
+		return fmt.Errorf("%w: %q belongs to a deactivated trainer — reactivate-trainer gives that account back",
+			err, username)
+	}
+	return err
+}
+
+// errTrainerDeactivated is returned when an act is refused because the account
+// cannot log in anyway. It names reactivation, because an operator working on a
+// deactivated account often meant the homecoming rather than the act they typed.
+var errTrainerDeactivated = errors.New("the account is deactivated — reactivate-trainer gives it back first")
+
 // resetPassword sets a new password for an existing trainer. Like createTrainer,
 // it is the testable core behind the reset-password subcommand.
+//
+// A deactivated trainer is refused: the new password would not let them in, so
+// setting one is either a surprise waiting for the operator or the wrong command
+// for what they meant (ADR-0010).
 func resetPassword(db *sql.DB, username, password string) error {
 	if err := auth.ValidatePassword(password); err != nil {
 		return err
@@ -41,6 +70,9 @@ func resetPassword(db *sql.DB, username, password string) error {
 	tr, err := store.TrainerByUsername(db, username)
 	if err != nil {
 		return err
+	}
+	if tr.Deactivated() {
+		return fmt.Errorf("cannot reset the password of %q: %w", username, errTrainerDeactivated)
 	}
 	hash, err := auth.Hash(password)
 	if err != nil {
@@ -124,6 +156,56 @@ func reactivateTrainer(db *sql.DB, username string) error {
 		return err
 	}
 	return store.ReactivateTrainer(db, tr.ID)
+}
+
+// trainerListing is every trainer as list-trainers reports them. It renders
+// itself, which is what lets the subcommand's core return data and print nothing —
+// the shape importReport already uses, and what makes the output assertable
+// without capturing stdout. What it may not carry is store.TrainerSummary's to
+// say.
+type trainerListing []store.TrainerSummary
+
+// String renders the listing, or names the way out of the one case where there is
+// nothing to show. Dates are printed as stored, which is UTC: the deactivation
+// date answers "since when?" to the day, and a local-time conversion would put the
+// listing and the database a day apart for an operator reading it near midnight.
+func (l trainerListing) String() string {
+	if len(l) == 0 {
+		return "no trainers yet — create one with create-trainer"
+	}
+	width := 0
+	for _, tr := range l {
+		if n := utf8.RuneCountInString(tr.Username); n > width {
+			width = n
+		}
+	}
+	var b strings.Builder
+	for i, tr := range l {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(tr.Username)
+		// Runes, not bytes: a username with an umlaut in it would otherwise pull the
+		// whole column out of line.
+		b.WriteString(strings.Repeat(" ", width-utf8.RuneCountInString(tr.Username)+2))
+		if tr.Deactivated() {
+			b.WriteString("deactivated since " + tr.DeactivatedAt.Format(store.ISODate))
+		} else {
+			b.WriteString("active")
+		}
+	}
+	return b.String()
+}
+
+// listTrainers answers "who has access?", which nothing in the app itself does.
+// It is the testable core behind the list-trainers subcommand: it returns the
+// listing and prints none of it.
+func listTrainers(db *sql.DB) (trainerListing, error) {
+	trainers, err := store.ListTrainers(db)
+	if err != nil {
+		return nil, err
+	}
+	return trainerListing(trainers), nil
 }
 
 // cmdCreateTrainer wires the create-trainer subcommand: it opens the database,
@@ -211,6 +293,22 @@ func cmdReactivateTrainer(dbPath string, args []string) error {
 			return err
 		}
 		fmt.Printf("reactivated trainer %q: the password they had works again\n", username)
+		return nil
+	})
+}
+
+// cmdListTrainers wires the list-trainers subcommand. It takes no username, so it
+// rejects extra arguments the way the demo subcommands do.
+func cmdListTrainers(dbPath string, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: organizer list-trainers")
+	}
+	return withDB(dbPath, func(db *sql.DB) error {
+		listing, err := listTrainers(db)
+		if err != nil {
+			return err
+		}
+		fmt.Println(listing)
 		return nil
 	})
 }

@@ -45,6 +45,55 @@ func (t Trainer) Deactivated() bool {
 	return !t.DeactivatedAt.IsZero()
 }
 
+// TrainerSummary is one trainer as the operator's listing sees them: who the
+// account belongs to, and whether it may still log in. It is a type of its own
+// rather than a Trainer so that the password hash is absent by construction —
+// the listing is meant to be readable on a shared screen or pasted into a note,
+// and a field that is not there cannot leak.
+type TrainerSummary struct {
+	ID            int64
+	Username      string
+	DeactivatedAt time.Time
+}
+
+// Deactivated mirrors Trainer.Deactivated for a listing entry.
+func (s TrainerSummary) Deactivated() bool {
+	return !s.DeactivatedAt.IsZero()
+}
+
+// ListTrainers returns every trainer, ordered by username so two runs of the
+// operator's listing are comparable. It is the only way to see who has access:
+// the app itself never shows one trainer to another (ADR-0010).
+//
+// LOWER() rather than the default collation, so "Zoe" does not sort ahead of
+// "ada" — an order the operator would read as no order at all. Standard SQL, so
+// the Postgres escape hatch stays open (ADR-0002); the username tie-breaker keeps
+// two names differing only in case from swapping places between runs.
+func ListTrainers(db *sql.DB) ([]TrainerSummary, error) {
+	rows, err := db.Query(
+		`SELECT id, username, deactivated_at FROM trainers ORDER BY LOWER(username), username`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list trainers: %w", err)
+	}
+	defer rows.Close()
+
+	var trainers []TrainerSummary
+	for rows.Next() {
+		var s TrainerSummary
+		var deactivated sql.NullTime
+		if err := rows.Scan(&s.ID, &s.Username, &deactivated); err != nil {
+			return nil, fmt.Errorf("scan trainer row: %w", err)
+		}
+		s.DeactivatedAt = deactivated.Time
+		trainers = append(trainers, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate trainers: %w", err)
+	}
+	return trainers, nil
+}
+
 // CreateTrainer inserts a new trainer with the given username and password hash,
 // returning its id. A duplicate username yields ErrUsernameTaken.
 func CreateTrainer(db *sql.DB, username, passwordHash string) (int64, error) {
