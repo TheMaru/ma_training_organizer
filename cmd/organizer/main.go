@@ -34,6 +34,13 @@ func main() {
 }
 
 func run(args []string) error {
+	// Help is answered before the configuration is read, because an environment
+	// the binary refuses to start under is exactly when somebody asks for it.
+	if len(args) > 0 && isHelpRequest(args[0]) {
+		fmt.Println(helpText)
+		return nil
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -62,7 +69,7 @@ func run(args []string) error {
 		case "import-athletes":
 			return cmdImportAthletes(cfg.DBPath, args[1:])
 		default:
-			return fmt.Errorf("unknown command: %s", args[0])
+			return fmt.Errorf("unknown command: %s\nrun: organizer help", args[0])
 		}
 	}
 
