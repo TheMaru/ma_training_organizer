@@ -84,21 +84,20 @@ func resetPassword(db *sql.DB, username, password string) error {
 }
 
 // revokeSessions ends every session a named trainer holds, the operator's path
-// for a lost phone or a suspected takeover. It is the testable core behind the
-// revoke-sessions subcommand.
-func revokeSessions(db *sql.DB, username string) error {
+// for a lost phone or a suspected takeover, and reports how many it ended. It is
+// the testable core behind the revoke-sessions subcommand.
+func revokeSessions(db *sql.DB, username string) (int, error) {
 	tr, err := store.TrainerByUsername(db, username)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	return revokeAllSessions(db, tr.ID)
 }
 
-// revokeAllSessions ends every session a trainer holds, sparing none — see
-// session.Manager.RevokeSessions for what the empty token means. Offboarding is a
-// caller of that mechanism, not a second copy of it.
-func revokeAllSessions(db *sql.DB, trainerID int64) error {
-	return session.ForCommand(db).RevokeSessions(context.Background(), trainerID, "")
+// revokeAllSessions ends every session a trainer holds, sparing none. Offboarding
+// is a caller of session.Manager.RevokeAll, not a second copy of it.
+func revokeAllSessions(db *sql.DB, trainerID int64) (int, error) {
+	return session.ForCommand(db).RevokeAll(context.Background(), trainerID)
 }
 
 // errLastActiveTrainer is returned when an offboarding act would leave the club
@@ -146,7 +145,8 @@ func deactivateTrainer(db *sql.DB, username string) error {
 		return err
 	}
 	// After the state change, so a failed deactivation does not sign anybody out.
-	return revokeAllSessions(db, tr.ID)
+	_, err = revokeAllSessions(db, tr.ID)
+	return err
 }
 
 // reactivateTrainer gives a returning trainer their access back, with the
@@ -180,9 +180,10 @@ func deleteTrainer(db *sql.DB, username string) error {
 		return err
 	}
 	// After the state change, as in deactivateTrainer. The sessions outlive the row
-	// they belong to — the trainer id lives inside each session's encoded values —
-	// so revoking them is a real act here and not a formality.
-	return revokeAllSessions(db, tr.ID)
+	// they belong to (see session.Manager.RevokeAll), so revoking them is a real act
+	// here and not a formality.
+	_, err = revokeAllSessions(db, tr.ID)
+	return err
 }
 
 // trainerListing is every trainer as list-trainers reports them. It renders
@@ -284,12 +285,26 @@ func cmdRevokeSessions(dbPath string, args []string) error {
 		return err
 	}
 	return withDB(dbPath, func(db *sql.DB) error {
-		if err := revokeSessions(db, username); err != nil {
+		revoked, err := revokeSessions(db, username)
+		if err != nil {
 			return err
 		}
-		fmt.Printf("revoked all sessions for trainer %q\n", username)
+		fmt.Printf("revoked %s for trainer %q\n", countSessions(revoked), username)
 		return nil
 	})
+}
+
+// countSessions renders how many sessions an act ended. None is a real answer
+// rather than a failure — the trainer was signed in nowhere — and saying so beats
+// "0 sessions" for an operator working an incident.
+func countSessions(n int) string {
+	switch n {
+	case 0:
+		return "no sessions"
+	case 1:
+		return "1 session"
+	}
+	return fmt.Sprintf("%d sessions", n)
 }
 
 // cmdDeactivateTrainer wires the deactivate-trainer subcommand, the ordinary

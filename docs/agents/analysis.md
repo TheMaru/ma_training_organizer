@@ -14,6 +14,13 @@ to hang it on either, so it lives here.
 
 **`go vet`** and **`go test`**, as always.
 
+**One module boundary is checked by a test**, not by a linter:
+`TestSessionIsTheOnlyPackageThatImportsSCS` in `internal/session` parses every
+`.go` file in the module and fails if any package outside that one imports scs.
+It is a test rather than a rule in a config file because it is a claim about this
+codebase that only this codebase can state — and because `go test ./...` is
+already run, so nobody has to remember it.
+
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a
 dependency that behaves differently from how it reads at the call site. It found
 one thing across the whole repo: `middleware.RealIP` in `internal/web/server.go`,

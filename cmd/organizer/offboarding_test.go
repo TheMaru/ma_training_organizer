@@ -99,8 +99,9 @@ func TestDeactivateTrainerEndsTheirSessionsOnly(t *testing.T) {
 	phone := signIn(t, ts, "ada", trainerPassword)
 	laptop := signIn(t, ts, "ada", trainerPassword)
 	colleague := signIn(t, ts, "grace", trainerPassword)
-	if got := storedSessions(t, db); got != 3 {
-		t.Fatalf("stored sessions after three logins = %d, want 3", got)
+	ada := trainerID(t, db, "ada")
+	if got := sessionsHeldBy(t, db, ada); got != 2 {
+		t.Fatalf("sessions after two logins = %d, want 2", got)
 	}
 
 	if err := deactivateTrainer(db, "ada"); err != nil {
@@ -110,27 +111,13 @@ func TestDeactivateTrainerEndsTheirSessionsOnly(t *testing.T) {
 	// Asserted before any request is made, so it is revocation being measured and
 	// not requireAuth: the middleware refuses a deactivated trainer too, and would
 	// send both devices to the login page even if nothing had been revoked.
-	if got := storedSessions(t, db); got != 1 {
-		t.Errorf("stored sessions after deactivation = %d, want 1 (the colleague's)", got)
+	if got := sessionsHeldBy(t, db, ada); got != 0 {
+		t.Errorf("the deactivated trainer still holds %d sessions", got)
 	}
 
 	atLoginPage(t, "phone", home(t, ts, phone))
 	atLoginPage(t, "laptop", home(t, ts, laptop))
 	servedOK(t, "colleague", home(t, ts, colleague))
-}
-
-// storedSessions counts every session the app holds. Counting rows is the only
-// way to see a revocation as such: the trainer id lives inside each session's
-// encoded values (see web.RevokeSessions), so there is nothing to count by
-// trainer, and a request would answer a different question than "was this
-// session revoked?".
-func storedSessions(t *testing.T, db *sql.DB) int {
-	t.Helper()
-	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM sessions`).Scan(&n); err != nil {
-		t.Fatalf("count sessions: %v", err)
-	}
-	return n
 }
 
 // A return costs nothing: the same password works again, so nobody has to
@@ -310,20 +297,23 @@ func TestRevokeSessionsWorksOnADeactivatedTrainer(t *testing.T) {
 	addTrainers(t, db, "ada", "grace")
 	signIn(t, ts, "grace", trainerPassword)
 	signIn(t, ts, "ada", trainerPassword)
-	tr, err := store.TrainerByUsername(db, "grace")
-	if err != nil {
-		t.Fatalf("TrainerByUsername: %v", err)
-	}
-	if err := store.DeactivateTrainer(db, tr.ID); err != nil {
+	grace := trainerID(t, db, "grace")
+	if err := store.DeactivateTrainer(db, grace); err != nil {
 		t.Fatalf("DeactivateTrainer: %v", err)
 	}
 
-	if err := revokeSessions(db, "grace"); err != nil {
+	revoked, err := revokeSessions(db, "grace")
+	if err != nil {
 		t.Fatalf("revokeSessions on a deactivated trainer: %v", err)
 	}
 
-	if got := storedSessions(t, db); got != 1 {
-		t.Errorf("stored sessions after revocation = %d, want 1 (ada's)", got)
+	// Still revocation, not a subcommand that quietly did nothing: the session it
+	// ended is counted, and the colleague's is left where it was.
+	if revoked != 1 {
+		t.Errorf("revoked = %d, want 1", revoked)
+	}
+	if got := sessionsHeldBy(t, db, trainerID(t, db, "ada")); got != 1 {
+		t.Errorf("ada holds %d sessions, want 1", got)
 	}
 }
 
@@ -397,16 +387,19 @@ func TestDeleteTrainerEndsTheirSessionsOnly(t *testing.T) {
 	addTrainers(t, db, "ada", "grace")
 	phone := signIn(t, ts, "grace", trainerPassword)
 	colleague := signIn(t, ts, "ada", trainerPassword)
-	if got := storedSessions(t, db); got != 2 {
-		t.Fatalf("stored sessions after two logins = %d, want 2", got)
+	// Read while the account is still there: the sessions outlive the row, so the
+	// id is what the question is asked with afterwards.
+	grace := trainerID(t, db, "grace")
+	if got := sessionsHeldBy(t, db, grace); got != 1 {
+		t.Fatalf("sessions after the login = %d, want 1", got)
 	}
 
 	if err := deleteTrainer(db, "grace"); err != nil {
 		t.Fatalf("deleteTrainer: %v", err)
 	}
 
-	if got := storedSessions(t, db); got != 1 {
-		t.Errorf("stored sessions after deletion = %d, want 1 (the colleague's)", got)
+	if got := sessionsHeldBy(t, db, grace); got != 0 {
+		t.Errorf("the deleted trainer still holds %d sessions", got)
 	}
 	atLoginPage(t, "phone", home(t, ts, phone))
 	servedOK(t, "colleague", home(t, ts, colleague))

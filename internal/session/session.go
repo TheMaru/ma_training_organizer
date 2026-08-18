@@ -3,10 +3,10 @@
 // ADR-0002 chose, so every other package asks it for a Trainer, a flash value or
 // a revocation instead of holding a session store of its own.
 //
-// That the Trainer's identity lives here is what makes the rest possible: it is
-// stored inside each Session's encoded values, so a package that cannot read
-// that key cannot answer "whose Session is this?" — and revocation is exactly
-// that question asked of every stored Session.
+// The Trainer's identity lives here because that is what makes the rest
+// possible: a package that cannot read the key a Session records it under cannot
+// answer "whose Session is this?", and revocation is that question asked of every
+// stored Session — see RevokeAll for where the key is kept and what it costs.
 package session
 
 import (
@@ -122,31 +122,4 @@ func (m *Manager) Put(ctx context.Context, key, value string) {
 // reaches the page that reads it keeps it until they do.
 func (m *Manager) Pop(ctx context.Context, key string) string {
 	return m.scs.PopString(ctx, callerKeyPrefix+key)
-}
-
-// RevokeSessions destroys every stored Session belonging to trainerID. The
-// Session whose token is exceptToken survives; an empty exceptToken spares
-// nothing. That one argument is the whole difference between the two callers:
-// the Trainer's own "sign out other devices" control passes the token it was
-// clicked from, the Operator's CLI passes none.
-//
-// It walks the entire session store because the Trainer id lives inside each
-// Session's encoded values, which SQL cannot reach into — so there is no
-// narrower query to run.
-func (m *Manager) RevokeSessions(ctx context.Context, trainerID int64, exceptToken string) error {
-	return m.scs.Iterate(ctx, func(ctx context.Context) error {
-		if m.scs.GetInt64(ctx, keyTrainerID) != trainerID {
-			return nil
-		}
-		if exceptToken != "" && m.scs.Token(ctx) == exceptToken {
-			return nil
-		}
-		return m.scs.Destroy(ctx)
-	})
-}
-
-// Token is this request's session token, the argument RevokeSessions takes to
-// spare the Session it was called from.
-func (m *Manager) Token(ctx context.Context) string {
-	return m.scs.Token(ctx)
 }

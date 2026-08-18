@@ -211,8 +211,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 // trainer's sessions everywhere but here. The session it was clicked from has
 // just been authenticated, so it is the one kept.
 func (s *Server) handleRevokeSessions(w http.ResponseWriter, r *http.Request) {
-	id := s.sessions.TrainerID(r.Context())
-	if err := s.sessions.RevokeSessions(r.Context(), id, s.sessions.Token(r.Context())); err != nil {
+	if err := s.sessions.RevokeOthers(r.Context()); err != nil {
 		serverError(w)
 		return
 	}

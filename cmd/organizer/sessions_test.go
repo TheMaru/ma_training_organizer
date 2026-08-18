@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -93,6 +94,29 @@ func postLogin(t *testing.T, c *http.Client, ts *httptest.Server, username, pass
 	return resp.StatusCode
 }
 
+// trainerID looks a trainer's id up, for the tests that go on to ask the session
+// module a question about them — including after the account itself is gone.
+func trainerID(t *testing.T, db *sql.DB, username string) int64 {
+	t.Helper()
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		t.Fatalf("TrainerByUsername %q: %v", username, err)
+	}
+	return tr.ID
+}
+
+// sessionsHeldBy is how many sessions a trainer holds, asked of the module that
+// owns them. It is the question a revocation is about, so an assertion on it says
+// what happened rather than what the schema looks like.
+func sessionsHeldBy(t *testing.T, db *sql.DB, trainerID int64) int {
+	t.Helper()
+	n, err := session.ForCommand(db).Count(context.Background(), trainerID)
+	if err != nil {
+		t.Fatalf("Count sessions of trainer %d: %v", trainerID, err)
+	}
+	return n
+}
+
 // The operator's path spares nothing — including the session that, on the
 // self-service control, would have been the caller's own.
 func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
@@ -100,8 +124,15 @@ func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
 
 	// The running server keeps its own session manager, so this exercises the real
 	// arrangement: a second process reaching the same store.
-	if err := revokeSessions(db, "ada"); err != nil {
+	revoked, err := revokeSessions(db, "ada")
+	if err != nil {
 		t.Fatalf("revokeSessions: %v", err)
+	}
+
+	// The count is what the subcommand tells the operator, so it is asserted and
+	// not inferred from the devices being turned away below.
+	if revoked != len(clients) {
+		t.Errorf("revoked = %d, want %d", revoked, len(clients))
 	}
 
 	for i, c := range clients {
@@ -122,8 +153,19 @@ func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
 func TestRevokeSessionsUnknownTrainer(t *testing.T) {
 	db := storetest.NewDB(t)
 
-	err := revokeSessions(db, "ghost")
+	_, err := revokeSessions(db, "ghost")
 	if !errors.Is(err, store.ErrTrainerNotFound) {
 		t.Errorf("error = %v, want ErrTrainerNotFound", err)
+	}
+}
+
+// What the subcommand prints is a rendering of the count, so the wording is
+// assertable without capturing stdout — the shape trainerListing uses. None is
+// the case worth pinning: it is an answer, not a failure.
+func TestCountSessionsReadsAsAnAnswer(t *testing.T) {
+	for n, want := range map[int]string{0: "no sessions", 1: "1 session", 3: "3 sessions"} {
+		if got := countSessions(n); got != want {
+			t.Errorf("countSessions(%d) = %q, want %q", n, got, want)
+		}
 	}
 }
