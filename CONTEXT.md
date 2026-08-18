@@ -24,6 +24,10 @@ _Avoid_: Disabled, suspended, archived, inactive, former
 Whoever runs the tool itself rather than using it — provisioning trainers, restoring a password, seeding demo data. Not an account and not a role in the app: a hat, usually worn by one of the trainers, and the reason those acts live on the command line instead of behind a login.
 _Avoid_: Admin, sysadmin, maintainer, superuser
 
+**Session**:
+A Trainer's running sign-in on one device. A Trainer may hold several at once, one per device. It ends by signing out, by running out of time, or by being revoked — and it never outlives its Trainer: an account that is deleted or Deactivated takes its sessions with it.
+_Avoid_: Login, cookie, token, connection
+
 **Promotion**:
 The event of an athlete reaching a rank on a date. An athlete's current rank is their most recent promotion by date; the full sequence is their graduation history.
 _Avoid_: Graduation (the field/state), grading
