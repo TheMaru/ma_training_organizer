@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/TheMaru/ma_training_organizer/internal/config"
+	"github.com/TheMaru/ma_training_organizer/internal/session"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
@@ -85,7 +86,11 @@ func serve(cfg config.Config) error {
 	}
 	defer db.Close()
 
-	sessions := web.NewSessionManager(db, cfg.SessionLifetime, cfg.SessionIdleTimeout, cfg.Secure)
+	sessions := session.ForServer(db, session.Policy{
+		Lifetime:     cfg.SessionLifetime,
+		IdleTimeout:  cfg.SessionIdleTimeout,
+		SecureCookie: cfg.Secure,
+	})
 
 	srv, err := web.NewServer(db, sessions)
 	if err != nil {

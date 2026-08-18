@@ -40,7 +40,7 @@ func (s *Server) resolveLocale(next http.Handler) http.Handler {
 // request. What the fallback is for is the login page, which has to render in some
 // language whether a trainer is known or not.
 func (s *Server) localeFor(r *http.Request) i18n.Locale {
-	if id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID); id != 0 {
+	if id := s.sessions.TrainerID(r.Context()); id != 0 {
 		if tr, err := store.TrainerByID(s.db, id); err == nil {
 			if locale, ok := i18n.Parse(tr.Locale); ok {
 				return locale
@@ -83,7 +83,7 @@ func returnTarget(r *http.Request) string {
 // error — it resolves to the default, as an unknown stored value does.
 func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
 	locale, _ := i18n.Parse(r.PostFormValue(localeField))
-	id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID)
+	id := s.sessions.TrainerID(r.Context())
 	if err := store.UpdateTrainerLocale(s.db, id, string(locale)); err != nil {
 		serverError(w)
 		return

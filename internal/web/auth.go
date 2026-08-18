@@ -1,22 +1,12 @@
 package web
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"net/http"
-	"time"
-
-	"github.com/alexedwards/scs/sqlite3store"
-	"github.com/alexedwards/scs/v2"
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
-
-// sessionKeyTrainerID is the session key under which the logged-in trainer's id
-// is stored. A non-zero value is the sole signal that a request is authenticated.
-const sessionKeyTrainerID = "trainerID"
 
 // sessionKeyNotice carries a one-off message over the redirect that follows a
 // mutation, so the page it lands on can report what happened. It holds a catalog
@@ -45,53 +35,6 @@ func mustDecoyHash() string {
 	return h
 }
 
-// NewSessionManager builds an scs session manager backed by the SQLite sessions
-// table (revocable server-side sessions, ADR-0002). lifetime is the absolute cap
-// counted from login and idle expires a session that goes unused; both come from
-// the environment, see internal/config. secure marks the cookie Secure for
-// production behind Fly's TLS; it is off in local development.
-func NewSessionManager(db *sql.DB, lifetime, idle time.Duration, secure bool) *scs.SessionManager {
-	m := scs.New()
-	m.Store = sqlite3store.New(db)
-	m.Lifetime = lifetime
-	m.IdleTimeout = idle
-	m.Cookie.HttpOnly = true
-	m.Cookie.SameSite = http.SameSiteLaxMode
-	m.Cookie.Secure = secure
-	return m
-}
-
-// NewStoredSessions builds a manager over the same sessions table with none of
-// the settings above and no background cleanup: RevokeSessions reads only the
-// store, and a one-shot command has no cookie policy or lifetime of its own to
-// state. It is what the CLI passes to RevokeSessions.
-func NewStoredSessions(db *sql.DB) *scs.SessionManager {
-	m := scs.New()
-	m.Store = sqlite3store.NewWithCleanupInterval(db, 0)
-	return m
-}
-
-// RevokeSessions destroys every stored session belonging to trainerID. The
-// session whose token is exceptToken survives; an empty exceptToken spares
-// nothing. That one argument is the whole difference between the two callers:
-// the trainer's own "sign out other devices" control passes the token it was
-// clicked from, the operator's CLI passes none.
-//
-// It walks the entire session store because the trainer id lives inside each
-// session's encoded values, which SQL cannot reach into — so there is no
-// narrower query to run.
-func RevokeSessions(ctx context.Context, sessions *scs.SessionManager, trainerID int64, exceptToken string) error {
-	return sessions.Iterate(ctx, func(ctx context.Context) error {
-		if sessions.GetInt64(ctx, sessionKeyTrainerID) != trainerID {
-			return nil
-		}
-		if exceptToken != "" && sessions.Token(ctx) == exceptToken {
-			return nil
-		}
-		return sessions.Destroy(ctx)
-	})
-}
-
 // requireAuth gates a route: requests without a logged-in trainer are redirected
 // to the login page instead of reaching the handler.
 //
@@ -103,7 +46,7 @@ func RevokeSessions(ctx context.Context, sessions *scs.SessionManager, trainerID
 // happened (ADR-0010).
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID)
+		id := s.sessions.TrainerID(r.Context())
 		if id == 0 {
 			redirect(w, r, "/login")
 			return
@@ -145,7 +88,7 @@ func (s *Server) trainerMayUseTheApp(id int64) (bool, error) {
 // handleLoginForm renders the login page. An already-authenticated trainer is
 // bounced to the home page rather than shown the form again.
 func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
-	if s.sessions.GetInt64(r.Context(), sessionKeyTrainerID) != 0 {
+	if s.sessions.TrainerID(r.Context()) != 0 {
 		redirect(w, r, "/")
 		return
 	}
@@ -186,11 +129,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Renew the token on privilege change to defend against session fixation.
-	if err := s.sessions.RenewToken(r.Context()); err != nil {
+	if err := s.sessions.Renew(r.Context()); err != nil {
 		serverError(w)
 		return
 	}
-	s.sessions.Put(r.Context(), sessionKeyTrainerID, tr.ID)
+	s.sessions.SetTrainerID(r.Context(), tr.ID)
 	redirect(w, r, "/")
 }
 
@@ -216,7 +159,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	next := r.PostFormValue("new")
 	confirm := r.PostFormValue("confirm")
 
-	id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID)
+	id := s.sessions.TrainerID(r.Context())
 	tr, err := store.TrainerByID(s.db, id)
 	if err != nil {
 		serverError(w)
@@ -252,24 +195,24 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A password change is a privilege change, so rotate this session's token as
-	// defence in depth against fixation. scs renews only the current session, and
-	// leaving the others alone is the decision here, not an oversight: revoking
+	// defence in depth against fixation. Renew touches only the current session,
+	// and leaving the others alone is the decision here, not an oversight: revoking
 	// them is a separate, explicit action, so neither has to guess at the other's
 	// intent. The two ways to take it are handleRevokeSessions, in the account
 	// area beneath this very form, and the CLI's revoke-sessions.
-	if err := s.sessions.RenewToken(r.Context()); err != nil {
+	if err := s.sessions.Renew(r.Context()); err != nil {
 		serverError(w)
 		return
 	}
 	redirect(w, r, "/")
 }
 
-// handleRevokeSessions is the self-service half of RevokeSessions: it ends the
+// handleRevokeSessions is the self-service half of revocation: it ends the
 // trainer's sessions everywhere but here. The session it was clicked from has
 // just been authenticated, so it is the one kept.
 func (s *Server) handleRevokeSessions(w http.ResponseWriter, r *http.Request) {
-	id := s.sessions.GetInt64(r.Context(), sessionKeyTrainerID)
-	if err := RevokeSessions(r.Context(), s.sessions, id, s.sessions.Token(r.Context())); err != nil {
+	id := s.sessions.TrainerID(r.Context())
+	if err := s.sessions.RevokeSessions(r.Context(), id, s.sessions.Token(r.Context())); err != nil {
 		serverError(w)
 		return
 	}
@@ -298,7 +241,7 @@ func (s *Server) renderPassword(w http.ResponseWriter, r *http.Request, status i
 // popNotice takes the pending notice, if there is one, and renders it in the
 // request's language. An empty string means there is nothing to report.
 func (s *Server) popNotice(r *http.Request) string {
-	key := s.sessions.PopString(r.Context(), sessionKeyNotice)
+	key := s.sessions.Pop(r.Context(), sessionKeyNotice)
 	if key == "" {
 		return ""
 	}

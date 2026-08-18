@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
+	"github.com/TheMaru/ma_training_organizer/internal/session"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
@@ -38,7 +39,7 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	db := storetest.NewDB(t)
 	addTrainer(t, db, testUsername)
 
-	sessions := web.NewSessionManager(db, time.Hour, idle, false)
+	sessions := session.ForServer(db, session.Policy{Lifetime: time.Hour, IdleTimeout: idle})
 	srv, err := web.NewServer(db, sessions)
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)

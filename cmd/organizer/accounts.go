@@ -14,8 +14,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
+	"github.com/TheMaru/ma_training_organizer/internal/session"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
-	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
 // createTrainer provisions a new trainer with a hashed password. It is the
@@ -95,10 +95,10 @@ func revokeSessions(db *sql.DB, username string) error {
 }
 
 // revokeAllSessions ends every session a trainer holds, sparing none — see
-// web.RevokeSessions for what the empty token means. Offboarding is a caller of
-// that mechanism, not a second copy of it.
+// session.Manager.RevokeSessions for what the empty token means. Offboarding is a
+// caller of that mechanism, not a second copy of it.
 func revokeAllSessions(db *sql.DB, trainerID int64) error {
-	return web.RevokeSessions(context.Background(), web.NewStoredSessions(db), trainerID, "")
+	return session.ForCommand(db).RevokeSessions(context.Background(), trainerID, "")
 }
 
 // errLastActiveTrainer is returned when an offboarding act would leave the club

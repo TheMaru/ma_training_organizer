@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TheMaru/ma_training_organizer/internal/session"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
@@ -39,7 +40,10 @@ func startApp(t *testing.T) (*sql.DB, *httptest.Server) {
 	t.Helper()
 
 	db := storetest.NewDB(t)
-	srv, err := web.NewServer(db, web.NewSessionManager(db, time.Hour, time.Hour, false))
+	srv, err := web.NewServer(db, session.ForServer(db, session.Policy{
+		Lifetime:    time.Hour,
+		IdleTimeout: time.Hour,
+	}))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}

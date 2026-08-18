@@ -8,9 +8,10 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/TheMaru/ma_training_organizer/internal/session"
 )
 
 //go:embed static/*
@@ -20,12 +21,12 @@ var staticFS embed.FS
 type Server struct {
 	tmpl     *renderer
 	db       *sql.DB
-	sessions *scs.SessionManager
+	sessions *session.Manager
 }
 
 // NewServer constructs a Server with its templates parsed. It takes the database
 // (for credential lookups) and a session manager (for login state).
-func NewServer(db *sql.DB, sessions *scs.SessionManager) (*Server, error) {
+func NewServer(db *sql.DB, sessions *session.Manager) (*Server, error) {
 	tmpl, err := newRenderer()
 	if err != nil {
 		return nil, err
@@ -36,7 +37,7 @@ func NewServer(db *sql.DB, sessions *scs.SessionManager) (*Server, error) {
 // Handler returns the fully-wired HTTP handler.
 //
 // Static assets and the health check are public and sit outside the session
-// middleware. Everything else runs inside scs.LoadAndSave: /login is reachable
+// middleware. Everything else runs inside it: /login is reachable
 // unauthenticated, and the remaining app routes are gated by requireAuth, which
 // redirects anonymous requests to the login page.
 //
@@ -55,7 +56,7 @@ func (s *Server) Handler() http.Handler {
 	r.Get("/healthz", s.handleHealthz)
 
 	r.Group(func(r chi.Router) {
-		r.Use(s.sessions.LoadAndSave)
+		r.Use(s.sessions.Middleware)
 		r.Use(s.resolveLocale)
 
 		r.Get("/login", s.handleLoginForm)
