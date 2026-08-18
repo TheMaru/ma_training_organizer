@@ -6,7 +6,18 @@ and no shipped migration, so every deepening is free now and costs more later. T
 `/code-review` since `bb523cb` runs between the waves rather than once at the end.
 
 Tickets in `issues/` are numbered in **build order**, not by candidate number. Each
-ticket names its candidate.
+ticket names its candidate. The numbers are reserved up front so a `Blocked by:`
+line has something to point at: `01` = 5 · `02` = 1 · `03` = 4 · `04` = 6 ·
+`05` = 3 · `06` = 10 · `07` = 8 · `08` = 7 · `09` = 9 · `10` = 2.
+
+**Which candidates get a `/grill-with-docs` first (2026-08-18).** The ones with a
+decision still open: 1 (moves seam A, so it touches `spec.md:210,251`), 4 (wants a
+dated note on ADR-0010), 8 (reopens the struck `spec.md:181-198`, and the login
+ordering is a security property), 7 (the display module's cut, ADR-0009 at the
+edge), 9 (the redirect seam collects only 4 of the ~14 call sites; the template
+hrefs are the other question) and 2 (what belongs in the view model). The rest —
+`04`, `05`, `06` — were written straight from this plan, because their Decisions
+follow from the code and change no vocabulary.
 
 ## Waves
 
