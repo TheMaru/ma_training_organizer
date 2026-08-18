@@ -1,6 +1,6 @@
 # 01 — Sessions are a module of their own
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — can start immediately
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 5 of 10 in the architecture review (2026-08-18)
@@ -81,30 +81,71 @@ Settled in `/grill-with-docs`, 2026-08-18. Four rounds, every recommendation con
 
 ## Acceptance
 
-- [ ] `internal/session` exists and is the only package importing
+- [x] `internal/session` exists and is the only package importing
       `github.com/alexedwards/scs/...`. A test or an analyser check makes that checkable,
       not just true.
-- [ ] Two constructors: one for the server taking the database and a named policy value,
+- [x] Two constructors: one for the server taking the database and a named policy value,
       one for a one-shot command taking only the database. `internal/session` does not
       import `internal/config`.
-- [ ] The interface carries: the session middleware, read and set the request's Trainer,
+- [x] The interface carries: the session middleware, read and set the request's Trainer,
       renew, destroy, the prefixed flash pair, revoke all of a Trainer's sessions, revoke
       the others, and count the ones a Trainer holds.
-- [ ] The revocation verbs' docstring states that they walk the whole session store, and
+- [x] The revocation verbs' docstring states that they walk the whole session store, and
       why SQL cannot narrow it.
-- [ ] `NewSessionManager`, `NewStoredSessions`, `RevokeSessions` and `exceptToken` are gone
+- [x] `NewSessionManager`, `NewStoredSessions`, `RevokeSessions` and `exceptToken` are gone
       from `internal/web`.
-- [ ] `sessionKeyNotice` still lives in `internal/web`, and its stored key is prefixed by
+- [x] `sessionKeyNotice` still lives in `internal/web`, and its stored key is prefixed by
       the flash pair rather than written raw.
-- [ ] `cmd/organizer`'s revoke path names a database and a Trainer, and nothing else. Its
+- [x] `cmd/organizer`'s revoke path names a database and a Trainer, and nothing else. Its
       output says how many Sessions were revoked.
-- [ ] `internal/session` has its own tests for what its interface newly claims: revoke all,
+- [x] `internal/session` has its own tests for what its interface newly claims: revoke all,
       revoke the others, count per Trainer, and another Trainer's Sessions left untouched.
-- [ ] `offboarding_test.go` loses `storedSessions` and its `SELECT COUNT(*)`; what it
+- [x] `offboarding_test.go` loses `storedSessions` and its `SELECT COUNT(*)`; what it
       asserts is behaviour ("the phone lands on the login page") and, where it wants a
       count, the module's own question. No test asserts the same mechanics at two levels —
       tests are replaced, not layered.
-- [ ] The seven reads of `sessionKeyTrainerID` go through the module. The doubled
+- [x] The seven reads of `sessionKeyTrainerID` go through the module. The doubled
       `TrainerByID` in `resolveLocale` and the shape of `trainerMayUseTheApp` are
       untouched, left to candidate 8.
-- [ ] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.
+- [x] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.
+
+## Comments
+
+**2026-08-18 — implemented.** Two commits, as decided: `a94d9ee` moves the module
+and the Trainer identity, `116dff6` reshapes revocation into the domain's verbs and
+adds the count. `go test ./...`, `go test -race ./...`, `go vet`, `staticcheck` and
+`govulncheck` all clean (`govulncheck`: 0 reachable, 1 in a required module the
+code does not call).
+
+The interface as built: `ForServer(db, Policy)` · `ForCommand(db)` · `Middleware` ·
+`TrainerID` · `SetTrainerID` · `Renew` · `Destroy` · `Put`/`Pop` (prefixed
+`caller:`) · `RevokeAll` · `RevokeOthers` · `Count`.
+
+Three things worth recording, all decided while building:
+
+- **`RevokeAll` returns how many it revoked**, rather than the CLI asking `Count`
+  first. Two walks and a race for a number one walk already knows.
+- **Trainer zero holds nothing** (`revoke.go`, `holds`). Zero is what every Session
+  nobody has signed into reads as, so without the rule a caller passing a missing
+  id would destroy every visitor's pending flash value. Not in the ticket; the old
+  `web.RevokeSessions` had the same hazard and no caller could reach it, but the
+  rule belongs with the walk rather than with each caller's discipline.
+- **The Operator's side still supplies `context.Background()`**, in
+  `revokeAllSessions` — one line, one place, three callers. The four costs the
+  ticket named are otherwise gone: no second manager, no cleanup interval, no
+  cookie policy, no empty token.
+
+The two commits split slightly differently from "then revocation": revocation had
+to move in the first commit, because the identity key moved with it and nothing in
+`internal/web` could read it any more. So the first commit moves it as it stood,
+`exceptToken` included, and the second gives it the verbs. No intermediate state
+has two packages knowing scs, which was the constraint.
+
+`/code-review` since `6dc633e` ran both axes. Findings applied: the encoded-values
+reasoning now has one owner (`RevokeAll`) with `internal/session`'s package doc and
+`cmd/organizer`'s `deleteTrainer` pointing at it; `Count` and the revocation walk
+are one `eachSessionOf` instead of two copies; `docs/agents/analysis.md` records
+the import-boundary test. Left as they are, with reasons: `countSessions` keeps its
+name (`countAthletesDE` in `import.go` is the same shape), and
+`TestRevokeSessionsEndsEveryDevice` keeps its count assertion — that the CLI core
+returns what it revoked is the wiring, not the mechanics the module's own tests pin.
