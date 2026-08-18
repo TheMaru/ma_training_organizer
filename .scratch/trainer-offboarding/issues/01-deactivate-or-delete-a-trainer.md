@@ -1,6 +1,6 @@
 # 01 — Offboarding a trainer: deactivate, or delete?
 
-Status: ready-for-agent
+Status: done
 Spec: `.scratch/trainer-offboarding/spec.md`
 
 There is no way to remove a trainer's access. No `delete-trainer`, no way to
@@ -191,3 +191,18 @@ The ticket is `ready-for-agent` on the strength of the Acceptance list above. It
 is a wide ticket for one context window — a migration, four subcommands, a
 middleware change — so splitting it through `/to-spec` and `/to-tickets` before
 implementing is reasonable; nothing above presumes it stays one file.
+
+2026-08-18 — Closed as the parent ticket. Nothing was implemented against this
+file directly: the Decisions and Acceptance sections above became
+`.scratch/trainer-offboarding/spec.md` (`5bf507d`) and then four child tickets
+(`d32c51c`), all four now `done`:
+
+- `02` — a session cannot outlive its trainer (`a31a365`), the latent hole the
+  grill uncovered, which was live independent of this feature.
+- `03` — deactivate and reactivate, the migration and the last-active-trainer
+  guard (`216b384`).
+- `04` — `list-trainers` and its two neighbours (`c37d5c5`).
+- `05` — `delete-trainer`, asking on the terminal first (`7767bd3`).
+
+The one thing the grill raised that does not live in a child ticket shipped too:
+[[cli-help]] 01, the help listing, in `1648d9d`.
