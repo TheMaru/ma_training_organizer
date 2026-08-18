@@ -20,6 +20,10 @@ _Avoid_: Coach, instructor, admin, user
 A trainer whose account is kept but refused at login, from a recorded date onwards. Reversible, and distinct from a deleted trainer, whose account is gone entirely.
 _Avoid_: Disabled, suspended, archived, inactive, former
 
+**Offboarding**:
+Taking a departed trainer's access away. Deactivation is the act; deleting the account is the exception, for an erasure request or to free a username (ADR-0010). It is the Operator's to perform, never the trainer's own.
+_Avoid_: Removal, termination, deprovisioning, revoking access
+
 **Operator**:
 Whoever runs the tool itself rather than using it — provisioning trainers, restoring a password, seeding demo data. Not an account and not a role in the app: a hat, usually worn by one of the trainers, and the reason those acts live on the command line instead of behind a login.
 _Avoid_: Admin, sysadmin, maintainer, superuser
