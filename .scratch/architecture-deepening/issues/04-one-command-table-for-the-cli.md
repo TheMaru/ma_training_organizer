@@ -1,7 +1,8 @@
 # 04 — One command table for the CLI
 
 Status: ready-for-agent
-Blocked by: 02, 03 — not logically, but they both rewrite `cmd/organizer`
+Blocked by: 02 (done) — not logically, but it rewrites `cmd/organizer`. `03` was
+listed here too and was closed without ever being written (see the plan).
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 6 of 10 in the architecture review (2026-08-18)
 
