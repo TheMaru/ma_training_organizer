@@ -63,6 +63,8 @@ internal/
   config/           Environment-variable configuration
   web/              Router, handlers, html/templates, static assets (HTMX, CSS)
   store/            Data-access layer, goose migrations, grading-system seeding
+  session/          A Trainer's sign-in on one device, and revoking it
+  trainer/          The Operator's acts on a Trainer account, and their rules
   auth/             Password hashing
   i18n/             Embedded translation catalogs (de, en)
 docs/adr/           Architecture Decision Records

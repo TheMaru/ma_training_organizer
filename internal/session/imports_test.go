@@ -22,8 +22,10 @@ func TestSessionIsTheOnlyPackageThatImportsSCS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("locate the module root: %v", err)
 	}
-	// The module's own directory is the one place the import belongs. Its test
-	// files are excluded with it: a test of this package is part of it.
+	// The module's own directory is the one place the import belongs. Its test files
+	// are excluded with it: a test of this package is part of it. The directory only,
+	// not what sits below it — internal/session/sessiontest is a fixture other suites
+	// import, and it has no more business holding a session store than they do.
 	allowed := filepath.Join(root, "internal", "session")
 
 	fset := token.NewFileSet()
@@ -32,11 +34,11 @@ func TestSessionIsTheOnlyPackageThatImportsSCS(t *testing.T) {
 		case err != nil:
 			return err
 		case d.IsDir():
-			if d.Name() == ".git" || path == allowed {
+			if d.Name() == ".git" {
 				return fs.SkipDir
 			}
 			return nil
-		case !strings.HasSuffix(d.Name(), ".go"):
+		case !strings.HasSuffix(d.Name(), ".go"), filepath.Dir(path) == allowed:
 			return nil
 		}
 		f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)

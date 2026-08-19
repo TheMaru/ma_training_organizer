@@ -61,10 +61,10 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 // addTrainer provisions a trainer who logs in with testPassword — the one the
 // test server starts with, and any colleague a test needs beside them.
 //
-// The three helpers below go through internal/trainer, the acts the Operator
-// invokes. What is under test in this package is the enforcement, not the acts —
-// but setting the state up any other way would verify that enforcement against a
-// weaker definition of Deactivated than the one that can actually be produced.
+// The helpers below go through internal/trainer, the acts the Operator invokes.
+// What is under test in this package is the enforcement, not the acts — but the
+// state it is verified against has to be the state those acts produce (see
+// internal/trainer's package doc).
 func addTrainer(t *testing.T, db *sql.DB, username string) {
 	t.Helper()
 	if err := trainer.Provision(db, username, testPassword); err != nil {
@@ -88,6 +88,17 @@ func deactivate(t *testing.T, db *sql.DB, username string) {
 	if err := trainer.Deactivate(db, username); err != nil {
 		t.Fatalf("trainer.Deactivate %q: %v", username, err)
 	}
+}
+
+// trainerIDOf is the id a Session records, read while the account is still there:
+// what a Session holds outlives the row it names.
+func trainerIDOf(t *testing.T, db *sql.DB, username string) int64 {
+	t.Helper()
+	tr, err := store.TrainerByUsername(db, username)
+	if err != nil {
+		t.Fatalf("TrainerByUsername %q: %v", username, err)
+	}
+	return tr.ID
 }
 
 // reactivate gives an account back, the way through the refusal.

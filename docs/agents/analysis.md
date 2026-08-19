@@ -27,10 +27,8 @@ already run, so nobody has to remember them.
   `DeactivateTrainer`, `ReactivateTrainer`, `DeleteTrainer` or
   `CountActiveTrainers`. A claim about **calls**, so it walks the syntax tree
   rather than the import block, and it reads each file's import name so an alias
-  does not slip past. What it protects is a single definition of *Deactivated*:
-  the enforcement side used to set its tests up with a bare
-  `store.DeactivateTrainer`, which revokes nothing and refuses nothing, and
-  nothing said so.
+  does not slip past. What it protects, and why, is in `internal/trainer`'s package
+  doc.
 
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a
 dependency that behaves differently from how it reads at the call site. It found

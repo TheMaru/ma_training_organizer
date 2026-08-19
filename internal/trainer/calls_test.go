@@ -15,9 +15,7 @@ import (
 const storePath = "github.com/TheMaru/ma_training_organizer/internal/store"
 
 // guarded are the store operations that make up an act on a Trainer account, and
-// the count the refusals are made of. Reaching one of them from anywhere else is
-// how a second, weaker definition of Deactivated gets built — which is what this
-// module was extracted to prevent.
+// the count the refusals are made of.
 //
 // store.UpdateTrainerPassword is deliberately absent: the self-service change in
 // the account area is the Trainer's own act, with its own rules, and it stays in
@@ -31,17 +29,20 @@ var guarded = map[string]bool{
 }
 
 // The module's claim is that an act on a Trainer account happens here and nowhere
-// else — including in test helpers, which is where the second definition came from
-// last time. A claim about which packages call something is checkable rather than
-// merely true, so it is checked: the alternative is that the next helper reaches
-// for the store again and nothing says so.
+// else — test helpers included, since that is where the second definition of
+// Deactivated came from last time (see this package's doc comment for why one
+// definition is the point). A claim about which packages call something is
+// checkable rather than merely true, so it is checked: otherwise the next helper
+// reaches for the store again and nothing says so.
 func TestTrainerIsTheOnlyPackageThatActsOnAnAccount(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatalf("locate the module root: %v", err)
 	}
 	// This module owns the acts, and internal/store owns the operations they are
-	// made of — its own tests exercise its API and are part of it.
+	// made of — its own tests exercise its API and are part of it. Exactly those two
+	// directories, not their subtrees: internal/store/storetest is a fixture other
+	// suites import, so it is on the outside of this line like any other caller.
 	allowed := map[string]bool{
 		filepath.Join(root, "internal", "trainer"): true,
 		filepath.Join(root, "internal", "store"):   true,
@@ -53,11 +54,11 @@ func TestTrainerIsTheOnlyPackageThatActsOnAnAccount(t *testing.T) {
 		case err != nil:
 			return err
 		case d.IsDir():
-			if d.Name() == ".git" || allowed[path] {
+			if d.Name() == ".git" {
 				return fs.SkipDir
 			}
 			return nil
-		case !strings.HasSuffix(d.Name(), ".go"):
+		case !strings.HasSuffix(d.Name(), ".go"), allowed[filepath.Dir(path)]:
 			return nil
 		}
 		f, err := parser.ParseFile(fset, path, nil, 0)

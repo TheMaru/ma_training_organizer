@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -75,39 +76,50 @@ func TestSessionDiesWithItsTrainer(t *testing.T) {
 }
 
 // The state a revocation that never happened leaves behind: a live session whose
-// trainer cannot be found. It is why requireAuth reads the account on every request
-// and does not trust the id it was handed (see requireAuth, ADR-0010) — and it is
-// the one case where the middleware has a session to destroy, so this is where the
-// emptied jar is asserted: the browser is told to drop a cookie worth nothing, and
-// the next request is a first visit rather than this same refusal again.
+// trainer may not use the app. Both arms of that — an account that is gone and one
+// that is deactivated — are why requireAuth reads the account on every request
+// rather than trusting the id it was handed (see requireAuth, ADR-0010).
 //
-// The session is planted through the middleware, the only way one is made, over the
-// same store the server reads.
+// It is also the only case where the middleware has a session to destroy, so the
+// emptied jar is asserted here: the browser is told to drop a cookie worth nothing,
+// and its next request is a first visit rather than this same refusal again.
+//
+// Each act revokes as it goes, so the session is planted afterwards — through the
+// middleware, the only way one is made, over the store the server reads.
 func TestASessionThatOutlivedItsTrainerIsDestroyed(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	const noSuchTrainer = int64(9999)
-	device := sessiontest.SignIn(t, sessiontest.NewManager(t, db), noSuchTrainer)
-	u, err := url.Parse(ts.URL)
-	if err != nil {
-		t.Fatalf("parse %s: %v", ts.URL, err)
-	}
-	client.Jar.SetCookies(u, []*http.Cookie{device.Cookie()})
+	for name, act := range map[string]func(*testing.T, *sql.DB, string){
+		"deleted":     deleteTrainer,
+		"deactivated": deactivate,
+	} {
+		t.Run(name, func(t *testing.T) {
+			ts, client, db := newAuthTestServer(t)
+			id := trainerIDOf(t, db, testUsername)
+			act(t, db, testUsername)
+			device := sessiontest.SignIn(t, sessiontest.NewManager(t, db), id)
+			u, err := url.Parse(ts.URL)
+			if err != nil {
+				t.Fatalf("parse %s: %v", ts.URL, err)
+			}
+			client.Jar.SetCookies(u, []*http.Cookie{device.Cookie()})
 
-	resp := get(t, ts, client, "/")
-	resp.Body.Close()
+			resp := get(t, ts, client, "/")
+			resp.Body.Close()
 
-	if resp.StatusCode != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+			if resp.StatusCode != http.StatusSeeOther {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+			}
+			if loc := resp.Header.Get("Location"); loc != "/login" {
+				t.Errorf("Location = %q, want %q", loc, "/login")
+			}
+			wantNoCookies(t, ts, client)
+		})
 	}
-	if loc := resp.Header.Get("Location"); loc != "/login" {
-		t.Errorf("Location = %q, want %q", loc, "/login")
-	}
-	wantNoCookies(t, ts, client)
 }
 
-// Deactivation is enforced per request, not only at login: a session started while
-// the account was active must stop working the moment it is not, whether or not the
-// operator's revocation reached it.
+// Deactivation is enforced per request, not only at login: the device the departed
+// trainer was reading on is turned away the next time it asks. The act ends their
+// sessions as it goes, so this is the two halves together — the case where
+// revocation reached nothing is the test above.
 func TestSessionDiesWhenItsTrainerIsDeactivated(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()

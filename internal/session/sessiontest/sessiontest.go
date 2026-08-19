@@ -35,11 +35,18 @@ func NewManager(t *testing.T, db *sql.DB) *session.Manager {
 	})
 }
 
-// Device stands for one device holding one Session: the cookie is the whole of
-// what a device carries. A zero Device is one that has never been signed in — a
-// visitor.
+// Device stands for one device: the Manager it talks to and the cookie it carries,
+// which is the whole of what a device holds. NewDevice makes one that has never
+// been signed in — a visitor.
 type Device struct {
-	cookie *http.Cookie
+	sessions *session.Manager
+	cookie   *http.Cookie
+}
+
+// NewDevice is a device carrying nothing yet, for the tests about what a visitor
+// keeps across a revocation.
+func NewDevice(m *session.Manager) *Device {
+	return &Device{sessions: m}
 }
 
 // SignIn starts a Session for trainerID and returns the Device holding it. It
@@ -47,21 +54,21 @@ type Device struct {
 // way the app makes one.
 func SignIn(t *testing.T, m *session.Manager, trainerID int64) *Device {
 	t.Helper()
-	return (&Device{}).Do(t, m, func(ctx context.Context) {
+	return NewDevice(m).Do(t, func(ctx context.Context) {
 		m.SetTrainerID(ctx, trainerID)
 	})
 }
 
 // Do makes one request from this Device, running fn inside the session
 // middleware, and keeps whatever cookie comes back.
-func (d *Device) Do(t *testing.T, m *session.Manager, fn func(ctx context.Context)) *Device {
+func (d *Device) Do(t *testing.T, fn func(ctx context.Context)) *Device {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	if d.cookie != nil {
 		r.AddCookie(d.cookie)
 	}
 	rec := httptest.NewRecorder()
-	m.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	d.sessions.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		fn(r.Context())
 	})).ServeHTTP(rec, r)
 	for _, c := range rec.Result().Cookies() {
@@ -79,10 +86,10 @@ func (d *Device) Cookie() *http.Cookie {
 // SignedInAs is whose Session this Device still carries, as the app asks on every
 // request. Zero is what a revoked Device gets: its cookie names a Session that is
 // no longer there.
-func (d *Device) SignedInAs(t *testing.T, m *session.Manager) int64 {
+func (d *Device) SignedInAs(t *testing.T) int64 {
 	t.Helper()
 	var id int64
-	d.Do(t, m, func(ctx context.Context) { id = m.TrainerID(ctx) })
+	d.Do(t, func(ctx context.Context) { id = d.sessions.TrainerID(ctx) })
 	return id
 }
 

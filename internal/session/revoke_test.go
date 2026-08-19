@@ -40,13 +40,13 @@ func TestRevokeAllEndsEverySessionTheTrainerHolds(t *testing.T) {
 	if revoked != 2 {
 		t.Errorf("revoked = %d, want 2", revoked)
 	}
-	if got := phone.SignedInAs(t, m); got != 0 {
+	if got := phone.SignedInAs(t); got != 0 {
 		t.Errorf("phone still signed in as %d", got)
 	}
-	if got := laptop.SignedInAs(t, m); got != 0 {
+	if got := laptop.SignedInAs(t); got != 0 {
 		t.Errorf("laptop still signed in as %d", got)
 	}
-	if got := colleague.SignedInAs(t, m); got != grace {
+	if got := colleague.SignedInAs(t); got != grace {
 		t.Errorf("colleague signed in as %d, want %d", got, grace)
 	}
 }
@@ -59,16 +59,16 @@ func TestRevokeOthersKeepsTheSessionItWasCalledFrom(t *testing.T) {
 	phone := sessiontest.SignIn(t, m, ada)
 	laptop := sessiontest.SignIn(t, m, ada)
 
-	laptop.Do(t, m, func(ctx context.Context) {
+	laptop.Do(t, func(ctx context.Context) {
 		if err := m.RevokeOthers(ctx); err != nil {
 			t.Fatalf("RevokeOthers: %v", err)
 		}
 	})
 
-	if got := laptop.SignedInAs(t, m); got != ada {
+	if got := laptop.SignedInAs(t); got != ada {
 		t.Errorf("the revoking device is signed in as %d, want %d", got, ada)
 	}
-	if got := phone.SignedInAs(t, m); got != 0 {
+	if got := phone.SignedInAs(t); got != 0 {
 		t.Errorf("the other device is still signed in as %d", got)
 	}
 }
@@ -80,13 +80,13 @@ func TestRevokeOthersSparesTheOtherTrainer(t *testing.T) {
 	laptop := sessiontest.SignIn(t, m, ada)
 	colleague := sessiontest.SignIn(t, m, grace)
 
-	laptop.Do(t, m, func(ctx context.Context) {
+	laptop.Do(t, func(ctx context.Context) {
 		if err := m.RevokeOthers(ctx); err != nil {
 			t.Fatalf("RevokeOthers: %v", err)
 		}
 	})
 
-	if got := colleague.SignedInAs(t, m); got != grace {
+	if got := colleague.SignedInAs(t); got != grace {
 		t.Errorf("colleague signed in as %d, want %d", got, grace)
 	}
 }
@@ -116,7 +116,7 @@ func TestCountAnswersHowManySessionsATrainerHolds(t *testing.T) {
 // message would otherwise lose it whenever anybody revoked.
 func TestNobodyHoldsTheAnonymousSessions(t *testing.T) {
 	m := newManager(t)
-	visitor := (&sessiontest.Device{}).Do(t, m, func(ctx context.Context) {
+	visitor := sessiontest.NewDevice(m).Do(t, func(ctx context.Context) {
 		m.Put(ctx, "notice", "hello")
 	})
 
@@ -132,7 +132,7 @@ func TestNobodyHoldsTheAnonymousSessions(t *testing.T) {
 		t.Errorf("Count(0) = %d, want 0", got)
 	}
 	var notice string
-	visitor.Do(t, m, func(ctx context.Context) { notice = m.Pop(ctx, "notice") })
+	visitor.Do(t, func(ctx context.Context) { notice = m.Pop(ctx, "notice") })
 	if notice != "hello" {
 		t.Errorf("the visitor's pending value = %q, want %q", notice, "hello")
 	}
