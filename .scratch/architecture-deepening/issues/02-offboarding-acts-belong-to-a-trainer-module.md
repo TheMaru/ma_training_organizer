@@ -1,6 +1,6 @@
 # 02 — Offboarding acts belong to a Trainer module
 
-Status: ready-for-agent
+Status: done
 Blocked by: 01 (done)
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 1 of 10 in the architecture review (2026-08-18)
@@ -113,41 +113,87 @@ Settled in `/grill-with-docs`, 2026-08-18. Two rounds, every recommendation conf
 
 ## Acceptance
 
-- [ ] `internal/trainer` exists and exports `Provision`, `ResetPassword`,
+- [x] `internal/trainer` exists and exports `Provision`, `ResetPassword`,
       `RevokeSessions`, `Deactivate`, `Reactivate`, `Delete`, each taking
       `(db *sql.DB, username string)`, plus `ErrLastActiveTrainer` and
       `ErrTrainerDeactivated`. No type, no constructor.
-- [ ] Its package doc says whose acts these are, and why the refusals name CLI
+- [x] Its package doc says whose acts these are, and why the refusals name CLI
       commands.
-- [ ] `cmd/organizer` holds no act with a rule in it: `accounts.go` keeps the `cmdXxx`
+- [x] `cmd/organizer` holds no act with a rule in it: `accounts.go` keeps the `cmdXxx`
       wrappers, the prompts, `confirm`, `withDB`, `singleUsernameArg`, `countSessions`
       and `trainerListing`, and calls `store.ListTrainers` directly. `listTrainers` is
       gone. `cmd/organizer` no longer imports `internal/auth`.
-- [ ] A test in `internal/trainer` fails if any package other than `internal/trainer`
+- [x] A test in `internal/trainer` fails if any package other than `internal/trainer`
       or `internal/store` calls `store.CreateTrainer`, `DeactivateTrainer`,
       `ReactivateTrainer`, `DeleteTrainer` or `CountActiveTrainers`. It names the
       offending file and points at the module.
-- [ ] `internal/session/sessiontest` exists and starts a Session for a trainer id
+- [x] `internal/session/sessiontest` exists and starts a Session for a trainer id
       through the middleware. `session/revoke_test.go` uses it instead of its own
       `device` scaffolding.
-- [ ] `internal/trainer`'s tests assert the acts and no logins: the refusals with
+- [x] `internal/trainer`'s tests assert the acts and no logins: the refusals with
       their reasons and left unapplied, `ResetPassword` refused after `Deactivate`,
       `Provision` reporting a deactivated name, the sessions counted away, a second
       `Deactivate` keeping the first date, the freed username, another trainer's
       sessions untouched, the roster untouched after `Delete`, and
       `ErrTrainerNotFound` for an unknown username on every act.
-- [ ] `internal/web`'s `addTrainer`, `deactivate` and `deleteTrainer` helpers go
+- [x] `internal/web`'s `addTrainer`, `deactivate` and `deleteTrainer` helpers go
       through `internal/trainer`. No test file outside `internal/trainer` and
       `internal/store` writes trainer state through the store.
-- [ ] `internal/web` asserts that the same password logs in again after `Reactivate`.
-- [ ] `cmd/organizer`'s tests cover the wiring only: the confirmation prompt in both
+- [x] `internal/web` asserts that the same password logs in again after `Reactivate`.
+- [x] `cmd/organizer`'s tests cover the wiring only: the confirmation prompt in both
       directions, argument validation, `countSessions`, the listing's rendering, and
       that a subcommand's database is migrated and seeded. No test there asserts an
       act's rules any more.
-- [ ] `.scratch/trainer-offboarding/spec.md` carries a dated note where seam A is
+- [x] `.scratch/trainer-offboarding/spec.md` carries a dated note where seam A is
       named: the seam is now `internal/trainer`, `cmd/organizer` keeps the wiring, and
       no third seam was added.
-- [ ] Two commits, in the order above; each one leaves `go test ./...` passing.
-- [ ] `go test ./...` and `go test -race ./...` pass; the analysers in
+- [x] Two commits, in the order above; each one leaves `go test ./...` passing.
+- [x] `go test ./...` and `go test -race ./...` pass; the analysers in
       `docs/agents/analysis.md` run clean, and it records the new boundary test beside
       the scs one.
+
+## Comments
+
+**Done, 2026-08-19.** `internal/trainer` holds `Provision` · `ResetPassword` ·
+`RevokeSessions` · `Deactivate` · `Reactivate` · `Delete`, free functions over a
+`*sql.DB`, with `ErrLastActiveTrainer` and `ErrTrainerDeactivated`. Three commits:
+the move, the seam, and the `/code-review` findings.
+
+Four things worth recording, all found while building:
+
+- **`Provision` and `ResetPassword` take a password**, so the acceptance line
+  "each taking `(db *sql.DB, username string)`" is met in shape and not in
+  literal arity. Nothing else takes a third argument.
+- **The `internal/web` fixture holds two trainers now.** With the real act in the
+  helper, deactivating the only trainer is refused — a one-trainer server is a
+  state the Operator cannot reach, so the fixture stopped being one. Not in the
+  ticket; it follows from the rule the ticket moved.
+- **The acts revoke as they go, which took an assertion away from `internal/web`.**
+  Both enforcement tests set their state up through the act, so by the time the
+  device asks, its cookie already names nothing: `requireAuth` never reaches the
+  Deactivated read, and the emptied jar it used to assert was unreachable.
+  Confirmed by mutation — `return true, nil` in place of the check left the suite
+  green. `TestASessionThatOutlivedItsTrainerIsDestroyed` covers both arms of that
+  check instead, with a Session planted through `sessiontest` *after* the act: the
+  state a revocation that never reached a device leaves behind, which is the case
+  `requireAuth` exists for (its own docstring says so). The two enforcement tests
+  keep the act's end-to-end effect. One test more than the ticket asked for, and
+  the only way the claim stayed checkable.
+- **Both boundary tests had the same hole.** `SkipDir` on the owning directory
+  exempted everything below it, so `internal/store/storetest` and the new
+  `sessiontest` were inside a line they are on the outside of. Both now allow the
+  directory only; a planted violation in each subdirectory is caught.
+
+Two `/code-review` findings were left as they are, with reasons: the
+provisioning scaffolding stays one small helper per suite (`club`, `addTrainers`,
+`addTrainer`) rather than becoming a `trainertest` package — each is one call to
+the act plus a `t.Fatalf`, and the three want different shapes; and
+`sessiontest.NewManager` keeps its `*testing.T` for a uniform fixture API, the
+way `storetest.NewDB` reads.
+
+`.scratch/trainer-offboarding/spec.md` carries the dated note at seam A;
+`docs/agents/analysis.md` records the calls boundary beside the scs one, pointing
+at `internal/trainer`'s package doc for what it protects. `go test ./...`,
+`go test -race ./...`, `go vet` and `staticcheck` are clean. `govulncheck` was not
+re-run: it answers a question about the world, and this change touched no
+dependency (`docs/agents/analysis.md`) — the deploy ticket owns the fresh scan.
