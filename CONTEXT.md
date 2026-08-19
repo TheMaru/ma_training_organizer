@@ -21,7 +21,7 @@ A trainer whose account is kept but refused at login, from a recorded date onwar
 _Avoid_: Disabled, suspended, archived, inactive, former
 
 **Offboarding**:
-Taking a departed trainer's access away. Deactivation is the act; deleting the account is the exception, for an erasure request or to free a username (ADR-0010). It is the Operator's to perform, never the trainer's own.
+Taking a departed trainer's access away. Deactivation is the act; deleting the account is the exception, for an erasure request or to free a username (ADR-0010). It is the Operator's to perform, never the trainer's own. An Offboarding act is refused if it would leave the club with no trainer who can still log in.
 _Avoid_: Removal, termination, deprovisioning, revoking access
 
 **Operator**:

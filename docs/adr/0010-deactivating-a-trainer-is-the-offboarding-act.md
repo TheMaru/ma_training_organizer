@@ -65,6 +65,6 @@ glossary term.
   trusted for the session's lifetime.
 - `ErrUsernameTaken` can now name an account that nobody can see anywhere in the
   app, so its message has to say so.
-- The club can be left with no active trainer, which the tooling refuses rather
-  than allows. Not a permanent lockout — `create-trainer` runs against the volume
+- The club can be left with no active trainer, which the Offboarding acts refuse
+  rather than allow. Not a permanent lockout — `create-trainer` runs against the volume
   — but a trip to the console at the worst moment.

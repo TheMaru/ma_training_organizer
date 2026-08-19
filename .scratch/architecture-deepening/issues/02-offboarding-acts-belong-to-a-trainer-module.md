@@ -197,3 +197,11 @@ at `internal/trainer`'s package doc for what it protects. `go test ./...`,
 `go test -race ./...`, `go vet` and `staticcheck` are clean. `govulncheck` was not
 re-run: it answers a question about the world, and this change touched no
 dependency (`docs/agents/analysis.md`) — the deploy ticket owns the fresh scan.
+
+**Candidate 4 was closed by this ticket, 2026-08-19.** Its `/grill-with-docs` found
+that the guard had already left `package main` here, and that the store is the wrong
+owner for a rule made of Offboarding, the Operator and `create-trainer` — a rule that
+does not even hold for a freshly migrated database. So the guard stays where this
+ticket put it, ticket `03` was never written, and the message question deferred above
+does not arise: the refusal keeps naming `create-trainer`. Reasoning in
+`.scratch/architecture-deepening/plan.md`, section "Candidate 4".

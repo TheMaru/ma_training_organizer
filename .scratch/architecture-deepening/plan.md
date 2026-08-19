@@ -21,8 +21,9 @@ follow from the code and change no vocabulary.
 
 ## Waves
 
-**A — the offboarding axis.** 5 → 1 → 4 → 6, then `/code-review`. Candidate 5 goes
-first so candidate 1 has a session verb to call.
+**A — the offboarding axis.** 5 → 1 → 6, then `/code-review`. Candidate 5 goes
+first so candidate 1 has a session verb to call. Candidate 4 was in this wave until
+its grill closed it without a ticket — see below.
 
 **B — isolated, small.** 3, 10, 8. Nothing depends on these; 3 is a latent defect.
 
@@ -46,7 +47,9 @@ once.
    `RankID == 0`. A GradingSystem without a slug (migration 00004 `DEFAULT ''`) lands
    in the Ungraded cell and renders inside it with its name. Latent defect.
 4. **The last-active-trainer guard** belongs at the store's write seam, not in the CLI.
-   Wants a dated note on ADR-0010; standard SQL, per ADR-0002.
+   Wants a dated note on ADR-0010; standard SQL, per ADR-0002. **Closed without a
+   ticket, 2026-08-19** — candidate 1 already took the guard out of the CLI. See
+   "Candidate 4" below; ticket `03` was never written and its number stays unused.
 5. **Sessions belong in a module of their own** — see `issues/01`.
 6. **One command table** instead of seven `cmdXxx` + a switch + `helpText`;
    `help_test.go:88` parses `main.go` with `go/ast` to recover the list.
@@ -61,6 +64,53 @@ once.
 10. **`store/date.go` publishes the layout, not the question**, so three callers parse
     for themselves. Sharing the predicate is compatible with ADR-0008; sharing the
     message is not.
+
+## Candidate 4, closed without a ticket (2026-08-19)
+
+`/grill-with-docs`, one round, all three recommendations confirmed. **No code
+changes.** Ticket `03` was never written; the number stays reserved and unused so
+the `Blocked by:` lines that already point at the others keep their meaning.
+
+The candidate's reason was that the guard sat in `package main`, where nothing
+could reach it — `internal/web` therefore set its enforcement tests up with a bare
+`store.DeactivateTrainer` and verified a weaker definition of *Deactivated* than the
+Operator could invoke. Candidate 1 (ticket `02`) fixed exactly that: the guard is in
+`internal/trainer/offboarding.go:25`, every caller can reach it, and
+`internal/trainer/calls_test.go` fails if any package outside `internal/trainer` and
+`internal/store` writes trainer state through the store. What the candidate asked
+for is done; only its proposed location is not.
+
+Pushing it the last step into the store was weighed on its two remaining merits and
+rejected on both:
+
+- **Unmissable by construction rather than by test.** Rejected. The rule is made of
+  three things the store knows nothing about — Offboarding, the Operator, and the
+  `create-trainer` the refusal has to name. And it is not a store invariant: a
+  freshly migrated database has no active trainer at all, and that is allowed. The
+  store would be guarding a property that does not hold for the store. The boundary
+  test is also the mechanism this repo already chose deliberately for the scs
+  imports; calling it too weak here would devalue it there.
+- **One statement instead of count-then-write.** Rejected. The race needs two
+  concurrent `organizer` processes — the acts run only on the command line, and
+  `store.Open` caps the pool at one connection. Folding the count into the `UPDATE`
+  would also collide with `writeOneTrainer`, which reads "no rows affected" as
+  `ErrTrainerNotFound`: a refusal would surface as "trainer not found". Untangling
+  that costs more than the theoretical race is worth.
+
+The message question ticket `02` deferred here therefore does not arise: the refusal
+stays in `internal/trainer` and keeps naming `create-trainer`.
+
+What was written down instead:
+
+- **`CONTEXT.md`, under *Offboarding*:** an act is refused if it would leave the club
+  with no trainer who can still log in. The rule had four spellings —
+  `ErrLastActiveTrainer`, "the last-active-trainer guard" here, a consequence in
+  ADR-0010, two tests — and no definition. Appended to *Offboarding* rather than made
+  its own term: it is a boundary of that act, not a thing in the domain.
+- **ADR-0010's last consequence** said the club being left without an active trainer
+  is what "the tooling" refuses. Since ticket `02` that is `internal/trainer`, with
+  `cmd/organizer` only calling it. Corrected in place, not as a dated addendum: the
+  decision did not change, one imprecise word in its consequence did.
 
 ## Deliberately left alone
 
