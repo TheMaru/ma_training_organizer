@@ -209,6 +209,15 @@ that contains what it should and omits what it must. It does not assert on the
 shape of a SQL statement, on which function called which, or on the presence of a
 column. Two seams, both already in the repo, and deliberately no third.
 
+> **2026-08-19.** Seam A moved: the acts now live in `internal/trainer` and their
+> tests with them (`.scratch/architecture-deepening/issues/02`). `cmd/organizer`
+> keeps the wiring — the prompts, the confirmation, the listing's rendering — and
+> its tests cover that only. Still two seams, and still deliberately no third:
+> `internal/web` sets its state up by calling the acts, which is what the move was
+> for. Everything below reads the same with `internal/trainer` in place of
+> `cmd/organizer`, except that the login assertions listed under seam A belong to
+> seam B now, where a login can be observed.
+
 **Seam A — the `cmd/organizer` package, against a real migrated database.** Prior
 art: the account tests, which build a database with the `storetest` helper and
 call `createTrainer` directly, and the CLI session test, which drives revocation

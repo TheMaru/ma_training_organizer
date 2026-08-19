@@ -14,12 +14,23 @@ to hang it on either, so it lives here.
 
 **`go vet`** and **`go test`**, as always.
 
-**One module boundary is checked by a test**, not by a linter:
-`TestSessionIsTheOnlyPackageThatImportsSCS` in `internal/session` parses every
-`.go` file in the module and fails if any package outside that one imports scs.
-It is a test rather than a rule in a config file because it is a claim about this
+**Two module boundaries are checked by a test**, not by a linter. Both parse every
+`.go` file in the module and fail on a package that crossed the line. They are
+tests rather than rules in a config file because each is a claim about this
 codebase that only this codebase can state — and because `go test ./...` is
-already run, so nobody has to remember it.
+already run, so nobody has to remember them.
+
+- `TestSessionIsTheOnlyPackageThatImportsSCS` in `internal/session`: no package
+  outside that one imports scs. A claim about **imports**.
+- `TestTrainerIsTheOnlyPackageThatActsOnAnAccount` in `internal/trainer`: nothing
+  outside that module and `internal/store` calls `store.CreateTrainer`,
+  `DeactivateTrainer`, `ReactivateTrainer`, `DeleteTrainer` or
+  `CountActiveTrainers`. A claim about **calls**, so it walks the syntax tree
+  rather than the import block, and it reads each file's import name so an alias
+  does not slip past. What it protects is a single definition of *Deactivated*:
+  the enforcement side used to set its tests up with a bare
+  `store.DeactivateTrainer`, which revokes nothing and refuses nothing, and
+  nothing said so.
 
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a
 dependency that behaves differently from how it reads at the call site. It found

@@ -2,7 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
@@ -47,5 +50,39 @@ func TestCountSessionsReadsAsAnAnswer(t *testing.T) {
 		if got := countSessions(n); got != want {
 			t.Errorf("countSessions(%d) = %q, want %q", n, got, want)
 		}
+	}
+}
+
+// Every subcommand that names a trainer takes exactly one, and answers with its
+// usage line when it does not get one — a name made of spaces included, because
+// that is a typo rather than a username. The check runs before anything else, so a
+// mistyped command line leaves no database behind and never reaches a prompt.
+func TestSubcommandsNeedExactlyOneUsername(t *testing.T) {
+	subcommands := map[string]func(string, []string) error{
+		"create-trainer":     cmdCreateTrainer,
+		"reset-password":     cmdResetPassword,
+		"revoke-sessions":    cmdRevokeSessions,
+		"deactivate-trainer": cmdDeactivateTrainer,
+		"reactivate-trainer": cmdReactivateTrainer,
+		"delete-trainer":     cmdDeleteTrainer,
+	}
+	path := filepath.Join(t.TempDir(), "cli.db")
+
+	for name, run := range subcommands {
+		for _, args := range [][]string{nil, {"   "}, {"ada", "grace"}} {
+			t.Run(fmt.Sprintf("%s %v", name, args), func(t *testing.T) {
+				err := run(path, args)
+				if err == nil {
+					t.Fatalf("%s accepted %v", name, args)
+				}
+				if want := "usage: organizer " + name; !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want it to carry %q", err, want)
+				}
+			})
+		}
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("a database was opened for a command line that was never valid: %v", err)
 	}
 }

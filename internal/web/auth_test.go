@@ -14,18 +14,25 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/session"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
 const (
 	testUsername = "trainer"
 	testPassword = "correct-horse"
+	// spareUsername is a second active trainer every fixture holds. An Offboarding
+	// act refuses to take the club's last login away (trainer.ErrLastActiveTrainer),
+	// so a server with one trainer on it is a state the Operator cannot reach — and
+	// these tests set their state up through the acts the Operator invokes.
+	spareUsername = "spare"
 )
 
 // newAuthTestServer starts an httptest server backed by a ready database that
-// already holds one trainer (testUsername/testPassword), and returns a client
-// whose cookie jar carries the session across requests. Redirects are not
-// followed, so tests can assert on the 303/Location and HX-Redirect responses.
+// already holds two trainers (testUsername and spareUsername, both on
+// testPassword), and returns a client whose cookie jar carries the session across
+// requests. Redirects are not followed, so tests can assert on the 303/Location
+// and HX-Redirect responses.
 func newAuthTestServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
 	t.Helper()
 	return newAuthTestServerIdle(t, time.Hour)
@@ -38,6 +45,7 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 
 	db := storetest.NewDB(t)
 	addTrainer(t, db, testUsername)
+	addTrainer(t, db, spareUsername)
 
 	sessions := session.ForServer(db, session.Policy{Lifetime: time.Hour, IdleTimeout: idle})
 	srv, err := web.NewServer(db, sessions)
@@ -50,43 +58,43 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	return ts, newClient(t), db
 }
 
-// addTrainer creates a trainer who logs in with testPassword — the one the test
-// server starts with, and any colleague a test needs beside them.
+// addTrainer provisions a trainer who logs in with testPassword — the one the
+// test server starts with, and any colleague a test needs beside them.
+//
+// The three helpers below go through internal/trainer, the acts the Operator
+// invokes. What is under test in this package is the enforcement, not the acts —
+// but setting the state up any other way would verify that enforcement against a
+// weaker definition of Deactivated than the one that can actually be produced.
 func addTrainer(t *testing.T, db *sql.DB, username string) {
 	t.Helper()
-	hash, err := auth.Hash(testPassword)
-	if err != nil {
-		t.Fatalf("Hash: %v", err)
-	}
-	if _, err := store.CreateTrainer(db, username, hash); err != nil {
-		t.Fatalf("CreateTrainer %q: %v", username, err)
+	if err := trainer.Provision(db, username, testPassword); err != nil {
+		t.Fatalf("trainer.Provision %q: %v", username, err)
 	}
 }
 
-// deleteTrainer removes a trainer's account through the store, as deactivate
-// does, so what these tests set up is what the operator's CLI leaves behind.
+// deleteTrainer removes a trainer's account outright, the erasure act.
 func deleteTrainer(t *testing.T, db *sql.DB, username string) {
 	t.Helper()
-	tr, err := store.TrainerByUsername(db, username)
-	if err != nil {
-		t.Fatalf("TrainerByUsername %q: %v", username, err)
-	}
-	if err := store.DeleteTrainer(db, tr.ID); err != nil {
-		t.Fatalf("DeleteTrainer %q: %v", username, err)
+	if err := trainer.Delete(db, username); err != nil {
+		t.Fatalf("trainer.Delete %q: %v", username, err)
 	}
 }
 
-// deactivate takes a trainer's access away through the store, the way the
-// operator's CLI does. What is under test in this package is the enforcement, not
-// the act — the act's own tests live at the cmd/organizer seam.
+// deactivate takes a trainer's access away, the ordinary Offboarding act — which
+// revokes their Sessions as it goes, so a test asserting that enforcement notices
+// on the next request signs in again afterwards.
 func deactivate(t *testing.T, db *sql.DB, username string) {
 	t.Helper()
-	tr, err := store.TrainerByUsername(db, username)
-	if err != nil {
-		t.Fatalf("TrainerByUsername %q: %v", username, err)
+	if err := trainer.Deactivate(db, username); err != nil {
+		t.Fatalf("trainer.Deactivate %q: %v", username, err)
 	}
-	if err := store.DeactivateTrainer(db, tr.ID); err != nil {
-		t.Fatalf("DeactivateTrainer %q: %v", username, err)
+}
+
+// reactivate gives an account back, the way through the refusal.
+func reactivate(t *testing.T, db *sql.DB, username string) {
+	t.Helper()
+	if err := trainer.Reactivate(db, username); err != nil {
+		t.Fatalf("trainer.Reactivate %q: %v", username, err)
 	}
 }
 
@@ -262,6 +270,35 @@ func TestDeactivatedTrainerLoginIsIndistinguishable(t *testing.T) {
 	defer home.Body.Close()
 	if home.StatusCode != http.StatusSeeOther {
 		t.Errorf("GET / after the refused login = %d, want %d (no session started)", home.StatusCode, http.StatusSeeOther)
+	}
+}
+
+// The homecoming is only visible at a login: reactivation restores no password and
+// starts no session, it just stops the refusal (ADR-0010). So this is where it is
+// asserted — the act's own tests can see the state change but not what it buys.
+func TestReactivatedTrainerLogsInWithTheSamePassword(t *testing.T) {
+	ts, _, db := newAuthTestServer(t)
+	deactivate(t, db, testUsername)
+	refused := login(t, ts, newClient(t), testUsername, testPassword)
+	refused.Body.Close()
+	if refused.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("login while deactivated = %d, want %d", refused.StatusCode, http.StatusUnauthorized)
+	}
+
+	reactivate(t, db, testUsername)
+
+	client := newClient(t)
+	resp := login(t, ts, client, testUsername, testPassword)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("login after reactivation = %d, want %d", resp.StatusCode, http.StatusSeeOther)
+	}
+	// The session it started is honoured, so the account is back rather than merely
+	// past the login form.
+	home := get(t, ts, client, "/")
+	defer home.Body.Close()
+	if home.StatusCode != http.StatusOK {
+		t.Errorf("GET / after reactivation = %d, want %d", home.StatusCode, http.StatusOK)
 	}
 }
 
