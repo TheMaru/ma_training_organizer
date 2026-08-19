@@ -1,4 +1,4 @@
-package main
+package trainer_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/session"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
@@ -24,8 +25,8 @@ func signedIn(t *testing.T, username, password string) (*sql.DB, *httptest.Serve
 	t.Helper()
 
 	db, ts := startApp(t)
-	if err := createTrainer(db, username, password); err != nil {
-		t.Fatalf("createTrainer: %v", err)
+	if err := trainer.Provision(db, username, password); err != nil {
+		t.Fatalf("trainer.Provision: %v", err)
 	}
 	return db, ts, []*http.Client{
 		signIn(t, ts, username, password),
@@ -124,9 +125,9 @@ func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
 
 	// The running server keeps its own session manager, so this exercises the real
 	// arrangement: a second process reaching the same store.
-	revoked, err := revokeSessions(db, "ada")
+	revoked, err := trainer.RevokeSessions(db, "ada")
 	if err != nil {
-		t.Fatalf("revokeSessions: %v", err)
+		t.Fatalf("trainer.RevokeSessions: %v", err)
 	}
 
 	// The count is what the subcommand tells the operator, so it is asserted and
@@ -153,19 +154,8 @@ func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
 func TestRevokeSessionsUnknownTrainer(t *testing.T) {
 	db := storetest.NewDB(t)
 
-	_, err := revokeSessions(db, "ghost")
+	_, err := trainer.RevokeSessions(db, "ghost")
 	if !errors.Is(err, store.ErrTrainerNotFound) {
 		t.Errorf("error = %v, want ErrTrainerNotFound", err)
-	}
-}
-
-// What the subcommand prints is a rendering of the count, so the wording is
-// assertable without capturing stdout — the shape trainerListing uses. None is
-// the case worth pinning: it is an answer, not a failure.
-func TestCountSessionsReadsAsAnAnswer(t *testing.T) {
-	for n, want := range map[int]string{0: "no sessions", 1: "1 session", 3: "3 sessions"} {
-		if got := countSessions(n); got != want {
-			t.Errorf("countSessions(%d) = %q, want %q", n, got, want)
-		}
 	}
 }

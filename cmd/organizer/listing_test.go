@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -8,15 +9,29 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer"
 )
+
+// theListing is what list-trainers renders: the store's answer to "who has
+// access?", which this package asks directly because there is no rule in it (see
+// cmdListTrainers).
+func theListing(t *testing.T, db *sql.DB) trainerListing {
+	t.Helper()
+	trainers, err := store.ListTrainers(db)
+	if err != nil {
+		t.Fatalf("store.ListTrainers: %v", err)
+	}
+	return trainerListing(trainers)
+}
 
 // The listing is the only place either state is visible at all: the app never
 // shows one trainer to another, so without this the operator is working blind.
 func TestListTrainersShowsBothStates(t *testing.T) {
-	db, _ := startApp(t)
+	db := storetest.NewDB(t)
 	addTrainers(t, db, "ada", "grace")
-	if err := deactivateTrainer(db, "grace"); err != nil {
-		t.Fatalf("deactivateTrainer: %v", err)
+	if err := trainer.Deactivate(db, "grace"); err != nil {
+		t.Fatalf("trainer.Deactivate: %v", err)
 	}
 	if _, err := db.Exec(
 		`UPDATE trainers SET deactivated_at = ? WHERE username = ?`, "2020-01-02 03:04:05", "grace",
@@ -24,10 +39,7 @@ func TestListTrainersShowsBothStates(t *testing.T) {
 		t.Fatalf("backdate deactivation: %v", err)
 	}
 
-	listing, err := listTrainers(db)
-	if err != nil {
-		t.Fatalf("listTrainers: %v", err)
-	}
+	listing := theListing(t, db)
 
 	if len(listing) != 2 {
 		t.Fatalf("listed %d trainers, want 2", len(listing))
@@ -72,13 +84,10 @@ func TestListTrainersOnAnEmptyDatabase(t *testing.T) {
 // capitalised on purpose — under the database's default collation every capital
 // sorts ahead of every lowercase letter, which is an order but not a legible one.
 func TestListTrainersOrdersByUsername(t *testing.T) {
-	db, _ := startApp(t)
+	db := storetest.NewDB(t)
 	addTrainers(t, db, "Zoe", "ada", "mira", "bea")
 
-	listing, err := listTrainers(db)
-	if err != nil {
-		t.Fatalf("listTrainers: %v", err)
-	}
+	listing := theListing(t, db)
 
 	var got []string
 	for _, tr := range listing {
@@ -95,17 +104,14 @@ func TestListTrainersOrdersByUsername(t *testing.T) {
 // its rendering are searched, and the search is over every field the entries carry,
 // so a hash arriving in some future column fails this too.
 func TestListTrainersCarriesNoPasswordMaterial(t *testing.T) {
-	db, _ := startApp(t)
+	db := storetest.NewDB(t)
 	addTrainers(t, db, "ada", "grace")
 	tr, err := store.TrainerByUsername(db, "ada")
 	if err != nil {
 		t.Fatalf("TrainerByUsername: %v", err)
 	}
 
-	listing, err := listTrainers(db)
-	if err != nil {
-		t.Fatalf("listTrainers: %v", err)
-	}
+	listing := theListing(t, db)
 
 	for _, subject := range []string{fmt.Sprintf("%+v", listing), listing.String()} {
 		if strings.Contains(subject, tr.PasswordHash) {
