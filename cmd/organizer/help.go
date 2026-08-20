@@ -1,34 +1,57 @@
 package main
 
-// helpText is the listing printed for help, -h and --help. It is English and
-// holds no catalog lookups: this is the operator's half of the CLI (ADR-0008).
+import (
+	"strings"
+	"unicode/utf8"
+)
+
+// helpListing renders the listing printed for help, -h and --help. It is English
+// and holds no catalog lookups: this is the operator's half of the CLI (ADR-0008).
 //
-// The groups exist because a flat list of every subcommand is a wall. The demo
-// pair is listed rather than hidden — whoever eventually finds a hidden command
-// finds it without the heading that says what it is for.
-const helpText = `organizer — the roster and the accounts of a martial-arts club.
+// Everything between the preamble and the Help group comes from the command table,
+// so the listing is complete by construction rather than by anybody remembering to
+// add a line.
+func helpListing() string {
+	lines := []string{helpPreamble}
+	group := ""
+	for _, c := range commands {
+		if c.Group != group {
+			group = c.Group
+			lines = append(lines, "", group+":")
+		}
+		lines = append(lines, listingLine(c))
+	}
+	return strings.Join(append(lines, "", helpEpilogue), "\n")
+}
+
+// listingLine renders one entry the way the listing prints it: the name and its
+// argument sketch on the left, the description at descriptionColumn — or, for a
+// left side too wide for that column, two spaces after it, because a description
+// run together with the arguments would be worse than a ragged one.
+func listingLine(c command) string {
+	left := "  " + c.Name
+	if c.Args != "" {
+		left += " " + c.Args
+	}
+	return left + strings.Repeat(" ", max(descriptionColumn-utf8.RuneCountInString(left), 2)) + c.Description
+}
+
+// descriptionColumn is where every description starts. It is a fixed column and
+// not the widest entry plus a gap, because the preamble and the Help group are
+// written out and have to line up with the rendered entries.
+const descriptionColumn = 35
+
+// helpPreamble and helpEpilogue are the two parts no entry in the table produces:
+// what the binary is and how to invoke it, and the three spellings of a request
+// for this listing. Their descriptions are aligned by hand, which is what
+// descriptionColumn exists to keep them agreeing with.
+const helpPreamble = `organizer — the roster and the accounts of a martial-arts club.
 
 Usage:
   organizer                        start the web server
-  organizer <command> [arguments]
+  organizer <command> [arguments]`
 
-Accounts:
-  create-trainer <username>        provision a trainer and set their first password
-  reset-password <username>        set a new password for a trainer
-  revoke-sessions <username>       log a trainer out everywhere
-  deactivate-trainer <username>    keep the account, refuse it at login
-  reactivate-trainer <username>    let a deactivated trainer back in
-  delete-trainer <username>        remove the account for good, after asking
-  list-trainers                    show every trainer and who lost access when
-
-Data:
-  import-athletes <file.csv>       add athletes to the roster from a CSV file
-
-Development:
-  seed-demo                        put the demo athletes on the roster
-  clear-demo                       take the demo athletes off again
-
-Help:
+const helpEpilogue = `Help:
   help, -h, --help                 print this listing`
 
 // isHelpRequest reports whether an argument is one of the three spellings of a

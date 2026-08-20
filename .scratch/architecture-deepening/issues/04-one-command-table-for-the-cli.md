@@ -1,6 +1,6 @@
 # 04 — One command table for the CLI
 
-Status: ready-for-agent
+Status: done
 Blocked by: 02 (done) — not logically, but it rewrites `cmd/organizer`. `03` was
 listed here too and was closed without ever being written (see the plan).
 Plan: `.scratch/architecture-deepening/plan.md`
@@ -63,21 +63,21 @@ lives changes. What follows is either forced by the code or already settled in
 
 ## Acceptance
 
-- [ ] One table in `cmd/organizer` holds every subcommand: its name, its group,
+- [x] One table in `cmd/organizer` holds every subcommand: its name, its group,
       the argument sketch the listing prints, its one-line description, and the
       function that runs it.
-- [ ] `run` dispatches from the table. No `switch` over subcommand names remains,
+- [x] `run` dispatches from the table. No `switch` over subcommand names remains,
       and an unknown command still errors with the name and a pointer to
       `organizer help` (`TestUnknownCommandPointsAtHelp` keeps passing unchanged).
-- [ ] `helpText` is rendered from the table, groups and order preserved. The
+- [x] `helpText` is rendered from the table, groups and order preserved. The
       printed listing is byte-identical to today's for the ten subcommands — the
       `Usage:` preamble and the `Help:` group may stay written out.
-- [ ] `help`, `-h` and `--help` are still answered before `config.Load`, and
+- [x] `help`, `-h` and `--help` are still answered before `config.Load`, and
       `TestHelpSurvivesABrokenEnvironment` still passes.
-- [ ] `dispatchedCommands` and its `go/ast` walk are gone from `help_test.go`, and
+- [x] `dispatchedCommands` and its `go/ast` walk are gone from `help_test.go`, and
       so is the `go/ast`, `go/parser`, `go/token` import block. What replaces them
       tests the table: every entry appears in the listing under its group, and
       every entry's name dispatches.
-- [ ] Each `cmdXxx` keeps its own argument validation and its own `usage:`
+- [x] Each `cmdXxx` keeps its own argument validation and its own `usage:`
       message; none of them changes behaviour.
-- [ ] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.
+- [x] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.

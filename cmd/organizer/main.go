@@ -38,7 +38,7 @@ func run(args []string) error {
 	// Help is answered before the configuration is read, because an environment
 	// the binary refuses to start under is exactly when somebody asks for it.
 	if len(args) > 0 && isHelpRequest(args[0]) {
-		fmt.Println(helpText)
+		fmt.Println(helpListing())
 		return nil
 	}
 
@@ -48,30 +48,11 @@ func run(args []string) error {
 	}
 
 	if len(args) > 0 {
-		switch args[0] {
-		case "create-trainer":
-			return cmdCreateTrainer(cfg.DBPath, args[1:])
-		case "reset-password":
-			return cmdResetPassword(cfg.DBPath, args[1:])
-		case "revoke-sessions":
-			return cmdRevokeSessions(cfg.DBPath, args[1:])
-		case "deactivate-trainer":
-			return cmdDeactivateTrainer(cfg.DBPath, args[1:])
-		case "reactivate-trainer":
-			return cmdReactivateTrainer(cfg.DBPath, args[1:])
-		case "delete-trainer":
-			return cmdDeleteTrainer(cfg.DBPath, args[1:])
-		case "list-trainers":
-			return cmdListTrainers(cfg.DBPath, args[1:])
-		case "seed-demo":
-			return cmdSeedDemo(cfg.DBPath, args[1:])
-		case "clear-demo":
-			return cmdClearDemo(cfg.DBPath, args[1:])
-		case "import-athletes":
-			return cmdImportAthletes(cfg.DBPath, args[1:])
-		default:
+		cmd, ok := lookupCommand(args[0])
+		if !ok {
 			return fmt.Errorf("unknown command: %s\nrun: organizer help", args[0])
 		}
+		return cmd.Run(cfg.DBPath, args[1:])
 	}
 
 	return serve(cfg)
