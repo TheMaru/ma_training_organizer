@@ -1,6 +1,7 @@
 package trainer_test
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 	"testing"
@@ -60,38 +61,6 @@ func TestDeactivateTwiceKeepsTheFirstDate(t *testing.T) {
 
 	if got := account(t, db, "ada").DeactivatedAt.Format("2006-01-02 15:04:05"); got != longAgo {
 		t.Errorf("deactivated_at = %q, want the first date %q", got, longAgo)
-	}
-}
-
-// The club may not be left with nobody who can log in. Three trainers here, two of
-// them long gone: a rule counting rows would see three and allow the act.
-func TestDeactivateRefusesTheOnlyActiveTrainer(t *testing.T) {
-	db := club(t, "ada", "departed-one", "departed-two")
-	for _, u := range []string{"departed-one", "departed-two"} {
-		if err := trainer.Deactivate(db, u); err != nil {
-			t.Fatalf("trainer.Deactivate %q: %v", u, err)
-		}
-	}
-	sessions := sessiontest.NewManager(t, db)
-	ada := trainerID(t, db, "ada")
-	sessiontest.SignIn(t, sessions, ada)
-
-	err := trainer.Deactivate(db, "ada")
-
-	if !errors.Is(err, trainer.ErrLastActiveTrainer) {
-		t.Fatalf("error = %v, want trainer.ErrLastActiveTrainer", err)
-	}
-	// An operator who cannot do the thing needs to be told what to do instead.
-	if !strings.Contains(err.Error(), "create-trainer") {
-		t.Errorf("refusal %q does not name the way through", err)
-	}
-	// Refused, not half-applied: the account still may log in and the session that
-	// was live is still live.
-	if account(t, db, "ada").Deactivated() {
-		t.Error("account deactivated despite the refusal")
-	}
-	if got := sessiontest.Count(t, sessions, ada); got != 1 {
-		t.Errorf("the live session was ended despite the refusal: %d left, want 1", got)
 	}
 }
 
@@ -174,14 +143,12 @@ func TestDeleteRemovesTheAccountAndFreesTheUsername(t *testing.T) {
 	}
 }
 
-// The sessions outlive the row they belonged to, so ending them is a real act here
-// and not a formality — even though the account being gone is enough for the app
-// to turn the device away (see web.Server.requireAuth).
+// Ending the Sessions is a real act here and not a formality, for the reason
+// session.Manager.RevokeAll gives — even though the account being gone is enough
+// for the app to turn the device away (see web.Server.requireAuth).
 func TestDeleteEndsTheirSessionsOnly(t *testing.T) {
 	db := club(t, "ada", "grace")
 	sessions := sessiontest.NewManager(t, db)
-	// Read while the account is still there: the id is what the question is asked
-	// with afterwards.
 	ada, grace := trainerID(t, db, "ada"), trainerID(t, db, "grace")
 	sessiontest.SignIn(t, sessions, grace)
 	sessiontest.SignIn(t, sessions, ada)
@@ -198,35 +165,58 @@ func TestDeleteEndsTheirSessionsOnly(t *testing.T) {
 	}
 }
 
-// The same rule as for deactivation, and deliberately the same predicate: an
-// erasure request does not get to lock the club out either. Three trainers here,
-// two of them long gone, so a rule counting rows would allow the act.
-func TestDeleteRefusesTheOnlyActiveTrainer(t *testing.T) {
-	db := club(t, "ada", "departed-one", "departed-two")
-	for _, u := range []string{"departed-one", "departed-two"} {
-		if err := trainer.Deactivate(db, u); err != nil {
-			t.Fatalf("trainer.Deactivate %q: %v", u, err)
-		}
+// The club may not be left with nobody who can log in. Both acts are refused by
+// the same predicate, deliberately, so they are asserted together — an erasure
+// request does not get to lock the club out either.
+//
+// Three trainers each time, two of them long gone: a rule counting rows would see
+// three and allow the act. What differs between the two is only what "still there"
+// means afterwards, so that is the one thing the table carries.
+func TestOffboardingRefusesTheOnlyActiveTrainer(t *testing.T) {
+	acts := map[string]struct {
+		do        func(*sql.DB, string) error
+		stillOnly func(*testing.T, *sql.DB, string)
+	}{
+		"deactivate": {trainer.Deactivate, func(t *testing.T, db *sql.DB, username string) {
+			if account(t, db, username).Deactivated() {
+				t.Error("account deactivated despite the refusal")
+			}
+		}},
+		"delete": {trainer.Delete, func(t *testing.T, db *sql.DB, username string) {
+			if _, err := store.TrainerByUsername(db, username); err != nil {
+				t.Errorf("account gone despite the refusal: %v", err)
+			}
+		}},
 	}
-	sessions := sessiontest.NewManager(t, db)
-	ada := trainerID(t, db, "ada")
-	sessiontest.SignIn(t, sessions, ada)
 
-	err := trainer.Delete(db, "ada")
+	for name, act := range acts {
+		t.Run(name, func(t *testing.T) {
+			db := club(t, "ada", "departed-one", "departed-two")
+			for _, u := range []string{"departed-one", "departed-two"} {
+				if err := trainer.Deactivate(db, u); err != nil {
+					t.Fatalf("trainer.Deactivate %q: %v", u, err)
+				}
+			}
+			sessions := sessiontest.NewManager(t, db)
+			ada := trainerID(t, db, "ada")
+			sessiontest.SignIn(t, sessions, ada)
 
-	if !errors.Is(err, trainer.ErrLastActiveTrainer) {
-		t.Fatalf("error = %v, want trainer.ErrLastActiveTrainer", err)
-	}
-	if !strings.Contains(err.Error(), "create-trainer") {
-		t.Errorf("refusal %q does not name the way through", err)
-	}
-	// Refused, not half-applied: the account is still there and the session that was
-	// live is still live.
-	if _, err := store.TrainerByUsername(db, "ada"); err != nil {
-		t.Errorf("account gone despite the refusal: %v", err)
-	}
-	if got := sessiontest.Count(t, sessions, ada); got != 1 {
-		t.Errorf("the live session was ended despite the refusal: %d left, want 1", got)
+			err := act.do(db, "ada")
+
+			if !errors.Is(err, trainer.ErrLastActiveTrainer) {
+				t.Fatalf("error = %v, want trainer.ErrLastActiveTrainer", err)
+			}
+			// An operator who cannot do the thing needs to be told what to do instead.
+			if !strings.Contains(err.Error(), "create-trainer") {
+				t.Errorf("refusal %q does not name the way through", err)
+			}
+			// Refused, not half-applied: the account is untouched and the session that
+			// was live is still live.
+			act.stillOnly(t, db, "ada")
+			if got := sessiontest.Count(t, sessions, ada); got != 1 {
+				t.Errorf("the live session was ended despite the refusal: %d left, want 1", got)
+			}
+		})
 	}
 }
 
