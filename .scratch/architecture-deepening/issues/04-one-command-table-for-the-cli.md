@@ -81,3 +81,44 @@ lives changes. What follows is either forced by the code or already settled in
 - [x] Each `cmdXxx` keeps its own argument validation and its own `usage:`
       message; none of them changes behaviour.
 - [x] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.
+
+## Comments
+
+**2026-08-20 — implemented.** One commit, `8425b01`. `command` and `commands` in
+`cmd/organizer/commands.go`; `run` scans the table, `helpListing` renders it,
+`go/ast` is gone from `help_test.go`. The printed listing is byte-identical to
+`7309b22`'s `helpText`, diffed rather than eyeballed. `go vet`, `go test ./...`,
+`staticcheck` clean; `govulncheck` not re-run for this ticket — it answers a
+question about the world and no dependency changed (`docs/agents/analysis.md`).
+
+Three things went beyond the ticket, all of them the table paying for itself:
+`TestCommandNamesAreUnique` (a duplicate name takes a listing line and is never
+dispatched, and nothing else notices),
+`TestEveryDescriptionStartsInTheSameColumn` (the hand-aligned preamble and the
+rendered entries share `descriptionColumn` and nothing else holds them together)
+and `TestRunPassesTheDatabaseAndTheRemainingArguments` with `swapCommands`, which
+tests the dispatch against a table none of the real subcommands are in.
+
+**2026-08-21 — Wave A's `/code-review`.** Two findings here, both applied; the
+wave's full record is in `plan.md`.
+
+- **`helpListing` emitted a heading whenever the group differed from the
+  *previous* entry.** With the table's groups in blocks that is the same thing,
+  which is why it shipped — but `commands`'s own comment claims "entries of a
+  group are kept together", and an entry inserted out of its block would have
+  printed that group's heading twice. It now renders group by group, and
+  `TestEachGroupGetsOneHeading` pins it against an interleaved table, since the
+  real one cannot tell the two rules apart. The listing for the real table is
+  unchanged, checked again. The table's comment now says the blocks are for the
+  reader, not for the renderer.
+- **`TestSubcommandsNeedExactlyOneUsername` in `accounts_test.go` still listed
+  the six username subcommands by hand** — the second listing this ticket set out
+  to delete, missed because the ticket's inventory named `run` and `helpText` and
+  not this test. It reads them off `commands` by the `<username>` sketch now, and
+  fails if the table has none, so a sketch nobody spells that way any more cannot
+  leave it passing over nothing.
+
+`go vet`, `go test ./...`, `go test -race ./...`, `staticcheck` and `govulncheck`
+all clean after both (`govulncheck` 2026-08-21: 0 reachable, 1 in a required
+module the code does not call).
+

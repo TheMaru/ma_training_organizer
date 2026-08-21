@@ -3,12 +3,18 @@
 The ten candidates from `/improve-codebase-architecture` (2026-08-18). All ten ship
 **before the first deployment**: with no release out there is no live data, no users
 and no shipped migration, so every deepening is free now and costs more later. The
-`/code-review` since `bb523cb` runs between the waves rather than once at the end.
+`/code-review` runs between the waves rather than once at the end, each one since
+the commit before its wave's first ticket — `7309b22` for A. (An earlier draft of
+this line named `bb523cb`, which a history rewrite has since orphaned: the SHA
+still resolves but shares no ancestor with `main`, so a three-dot diff against it
+fails.)
 
 Tickets in `issues/` are numbered in **build order**, not by candidate number. Each
 ticket names its candidate. The numbers are reserved up front so a `Blocked by:`
 line has something to point at: `01` = 5 · `02` = 1 · `03` = 4 · `04` = 6 ·
-`05` = 3 · `06` = 10 · `07` = 8 · `08` = 7 · `09` = 9 · `10` = 2.
+`05` = 3 · `06` = 10 · `07` = 8 · `08` = 7 · `09` = 9 · `10` = 2. `11` and up are
+therefore not candidates but tickets this effort turned up on its way through —
+the first is `11`, from Wave A's review.
 
 **Which candidates get a `/grill-with-docs` first (2026-08-18).** The ones with a
 decision still open: 1 (moves seam A, so it touches `spec.md:210,251`), 4 (wants a
@@ -118,3 +124,47 @@ The deletion test said no: `store.Open`, `LoadRoster`/`RosterView`,
 `Trainer.Deactivated()`, `TrainerSummary`, the Trainer CRUD near-duplicates,
 `internal/auth`, `store/storetest`, `i18n.Lookup` beside `i18n.T`, `CurrentRank`,
 `internal/config`.
+
+## Wave A's `/code-review` (2026-08-21)
+
+Since `7309b22`, both axes. Nothing was implemented wrongly and nothing the three
+tickets asked for is missing; the findings were one latent defect and four places
+the same thing was said or done twice. What was applied:
+
+- **`helpListing` printed a heading per *change* of group**, not per group, so a
+  table whose entries had drifted out of their blocks would print one twice — the
+  one invariant `commands`'s own comment claims and no test held.
+  `TestEachGroupGetsOneHeading` now holds it, against a deliberately interleaved
+  table. The listing for the real table is byte-identical either way, checked.
+- **`TestSubcommandsNeedExactlyOneUsername` still listed the six username
+  subcommands by hand** — exactly the second listing ticket `04` set out to
+  delete, and it would have skipped a seventh silently. It reads them off
+  `commands` by their argument sketch now, and fails if none has one.
+- **"A Session outlives the Trainer row" was written out four times.**
+  `session.RevokeAll` owns it (it already owned the encoded-values reason it
+  follows from); the three others point at it, per `docs/agents/comments.md`.
+  `internal/session`'s package doc also pointed at `RevokeAll` "for where the key
+  is kept", which is a dozen lines below the pointer.
+- **The two boundary tests shared their whole walk.** It is `internal/archtest`
+  now, with each test supplying only its allowed directories and what to look for,
+  and it finds the module root by `go.mod` rather than by `"../.."`. Both were
+  re-checked against planted violations — an aliased import, and a fixture in an
+  allowed directory's subtree — because a boundary test that passes proves nothing
+  on its own.
+- **The two last-active-trainer refusal tests were line-for-line identical** but
+  for the act. One table over the two acts, with only "still there" differing;
+  re-checked by removing the guard, which fails both subtests.
+
+Left alone, with reasons: `RevokeAll` returning a count while `RevokeOthers` does
+not (asymmetric, but each is documented and the count has a caller); the fixture
+duplication *between* test packages — `club`/`addTrainers`, `trainerID` /
+`trainerIDOf` — which wants a `trainertest` shared by `cmd/organizer` and
+`internal/web`, and is a ticket rather than a review fix (`issues/11`, the first
+ticket that is not one of the ten candidates, which is why it starts at 11); and
+the review's
+scope-creep list (the `README` tree lines, ADR-0010, the extra `help_test.go`
+tests), all of which are wanted and recorded.
+
+`go vet`, `go test ./...`, `go test -race ./...`, `staticcheck` and `govulncheck`
+all clean afterwards (`govulncheck` 2026-08-21: 0 reachable, 1 in a required
+module the code does not call — unchanged, and this wave added no dependency).
