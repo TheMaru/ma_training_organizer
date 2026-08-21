@@ -28,8 +28,10 @@ const (
 )
 
 // commands is the binary's subcommands. The order is the order the listing prints
-// them in and entries of a group are kept together, which is why this is a slice
-// and not a map; dispatch is a linear scan over it.
+// them in — of the groups and within each one — which is why this is a slice and
+// not a map; dispatch is a linear scan over it. Entries of a group are kept
+// together here for the reader, not for the renderer: helpListing groups them
+// whatever order they arrive in.
 //
 // `help`, `-h` and `--help` are deliberately not here — run answers them itself,
 // for the reason stated there — so their line in the listing is written out rather

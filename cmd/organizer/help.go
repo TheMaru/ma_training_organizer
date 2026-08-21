@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -13,15 +14,30 @@ import (
 // add a line.
 func helpListing() string {
 	lines := []string{helpPreamble}
-	group := ""
-	for _, c := range commands {
-		if c.Group != group {
-			group = c.Group
-			lines = append(lines, "", group+":")
+	// One heading per group, in the order the groups first appear — not one per
+	// change of group, which would print a heading twice for a table whose entries
+	// had drifted out of their groups.
+	for _, g := range listedGroups() {
+		lines = append(lines, "", g+":")
+		for _, c := range commands {
+			if c.Group == g {
+				lines = append(lines, listingLine(c))
+			}
 		}
-		lines = append(lines, listingLine(c))
 	}
 	return strings.Join(append(lines, "", helpEpilogue), "\n")
+}
+
+// listedGroups is every group the command table uses, each once, in the order it
+// is first used.
+func listedGroups() []string {
+	var groups []string
+	for _, c := range commands {
+		if !slices.Contains(groups, c.Group) {
+			groups = append(groups, c.Group)
+		}
+	}
+	return groups
 }
 
 // listingLine renders one entry the way the listing prints it: the name and its

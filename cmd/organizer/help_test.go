@@ -84,6 +84,30 @@ func TestCommandNamesAreUnique(t *testing.T) {
 	}
 }
 
+// The other invariant the table's comment claims: a group gets one heading. The
+// table is swapped for one whose groups are interleaved — the state a careless
+// insertion leaves behind — because the real table has them in blocks and so
+// cannot tell a per-group heading from a per-change one.
+func TestEachGroupGetsOneHeading(t *testing.T) {
+	swapCommands(t, []command{
+		{Name: "first", Group: "Accounts", Description: "one"},
+		{Name: "second", Group: "Data", Description: "two"},
+		{Name: "third", Group: "Accounts", Description: "three"},
+	})
+
+	listing := helpListing()
+
+	if got := strings.Count(listing, "\nAccounts:"); got != 1 {
+		t.Errorf("the Accounts heading appears %d times, want 1:\n%s", got, listing)
+	}
+	// Both entries still under it, or one heading would only mean one was dropped.
+	for _, name := range []string{"first", "third"} {
+		if _, group := listedUnder(listing, name); group != "Accounts" {
+			t.Errorf("%q is listed under %q, want Accounts:\n%s", name, group, listing)
+		}
+	}
+}
+
 // Every entry in the table is reachable through run, driven for real rather than
 // looked up in the table a second time. Four arguments is more than any subcommand
 // takes, so each is refused by its own usage message before it opens anything —
