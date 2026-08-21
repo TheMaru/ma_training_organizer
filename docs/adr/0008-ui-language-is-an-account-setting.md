@@ -122,3 +122,23 @@ rejected: the decision above binds the locale to the trainer's account, the CLI
 has no login and no account, and resolving from `LANG`/`LC_ALL` would be exactly
 the second mechanism this ADR set out to avoid. Nobody has asked for an English
 import report.
+
+## Update, 2026-08-21
+
+The decision stands; one consequence no longer describes the code. "Resolving the
+locale costs one `TrainerByID` per authenticated request. At this app's scale …
+that is cheaper than a cache that has to be invalidated when the switcher writes"
+was true when written and is now false, so the cache it weighs itself against has
+stopped being a live alternative.
+
+Since `.scratch/architecture-deepening/issues/07`, one middleware loads the
+Trainer once per request and puts it in the request context; the locale
+resolution, the per-request account check and the account handlers all read it
+from there. Resolving the locale costs no query of its own. The trade-off the
+consequence records was between one read and a cache, and it never was: the same
+row was being read three times, once per field.
+
+Left above as written rather than repaired in place, as the 2026-08-12 update was
+— that one corrected a clause that was wrong on the day it was written, this one
+records a sentence the code grew out of. Both are worth telling apart from a
+decision that changed, and neither is one.

@@ -17,7 +17,7 @@ The account of a person who manages athletes and awards promotions. The only kin
 _Avoid_: Coach, instructor, admin, user
 
 **Deactivated**:
-A trainer whose account is kept but refused at login, from a recorded date onwards. Reversible, and distinct from a deleted trainer, whose account is gone entirely.
+A trainer whose account is kept but refused at login, from a recorded date onwards. Reversible, and distinct from a deleted trainer, whose account is gone entirely. The refusal is indistinguishable from a wrong password: the state is invisible from outside the app, so nobody can learn from a login attempt that an account exists.
 _Avoid_: Disabled, suspended, archived, inactive, former
 
 **Offboarding**:

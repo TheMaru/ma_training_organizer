@@ -125,6 +125,13 @@ The deletion test said no: `store.Open`, `LoadRoster`/`RosterView`,
 `internal/auth`, `store/storetest`, `i18n.Lookup` beside `i18n.T`, `CurrentRank`,
 `internal/config`.
 
+**`internal/auth` came back off this list, 2026-08-21.** Candidate 8's grill
+reopened it deliberately: the deletion test asked whether the package earns its
+keep, which it does, and answered nothing about whether it is the right size.
+Ticket `07` grows it from two password primitives into the module that owns
+authentication, so that `Verify` can go unexported and the compiler can hold
+"only this package checks a password". Everything else on the list stands.
+
 ## Wave A's `/code-review` (2026-08-21)
 
 Since `7309b22`, both axes. Nothing was implemented wrongly and nothing the three

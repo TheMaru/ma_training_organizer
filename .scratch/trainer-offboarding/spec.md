@@ -197,6 +197,24 @@ middleware still re-checks the account on every request, which is the part that
 matters; only the two claims about what that costs and what it makes dead are
 withdrawn.
 
+**Revisited 2026-08-21** by `.scratch/architecture-deepening/issues/07`, which
+moves the read out of both middlewares: one `resolveTrainer` loads the Trainer
+once and puts it in the request context, and the locale resolution, the account
+check and the account handlers all read it from there. The strike stands — both
+claims were false as written, and one of them still is:
+
+- **The re-check is free.** True now in substance, false in wording. There is one
+  `TrainerByID` per authenticated request and three consumers share it. But it is
+  not the locale middleware that loads it, which is what the sentence said.
+- **The `ErrTrainerNotFound` fallback is dead code.** Still not true; it is moot.
+  `store.TrainerByID` leaves `resolveLocale` altogether, so no
+  `ErrTrainerNotFound` remains there to be alive or dead. What is left reads "no
+  Trainer in the context, so `Accept-Language`", and it stays load-bearing for the
+  login page exactly as the strike above says.
+
+The count that was wrong here was wrong in the other direction too: it was three
+reads per password change, not two.
+
 **No web UI changes.** The app has no trainer list and shows no trainer to
 another, so there is no surface to add a state to and no new catalog keys. If that
 turns out false during the build, keys go into both catalogs per ADR-0008.
