@@ -20,15 +20,21 @@ tests rather than rules in a config file because each is a claim about this
 codebase that only this codebase can state — and because `go test ./...` is
 already run, so nobody has to remember them.
 
+The walk itself is `internal/archtest`, shared by both: what differs between them
+is only which directories are allowed across the line and what they look for in
+each file. A third boundary therefore costs a predicate rather than another copy
+of the walk. It finds the module root by the `go.mod` above it, so a boundary test
+does not break by moving a directory deeper.
+
 - `TestSessionIsTheOnlyPackageThatImportsSCS` in `internal/session`: no package
   outside that one imports scs. A claim about **imports**.
 - `TestTrainerIsTheOnlyPackageThatActsOnAnAccount` in `internal/trainer`: nothing
   outside that module and `internal/store` calls `store.CreateTrainer`,
   `DeactivateTrainer`, `ReactivateTrainer`, `DeleteTrainer` or
   `CountActiveTrainers`. A claim about **calls**, so it walks the syntax tree
-  rather than the import block, and it reads each file's import name so an alias
-  does not slip past. What it protects, and why, is in `internal/trainer`'s package
-  doc.
+  rather than the import block, and it reads each file's import name
+  (`archtest.ImportName`) so an alias does not slip past. What it protects, and
+  why, is in `internal/trainer`'s package doc.
 
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a
 dependency that behaves differently from how it reads at the call site. It found

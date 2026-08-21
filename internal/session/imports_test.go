@@ -2,11 +2,10 @@ package session_test
 
 import (
 	"go/parser"
-	"go/token"
-	"io/fs"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/TheMaru/ma_training_organizer/internal/archtest"
 )
 
 // scsPath is the import path this module hides. Both scs packages sit under it,
@@ -17,43 +16,15 @@ const scsPath = "github.com/alexedwards/scs/"
 // which packages import something is checkable rather than merely true: a handler
 // or a subcommand that reaches for a session store directly fails here, in the
 // package whose whole point it was to make that unnecessary.
+//
+// The module's own directory is the one place the import belongs, its test files
+// included: a test of this package is part of it.
 func TestSessionIsTheOnlyPackageThatImportsSCS(t *testing.T) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatalf("locate the module root: %v", err)
-	}
-	// The module's own directory is the one place the import belongs. Its test files
-	// are excluded with it: a test of this package is part of it. The directory only,
-	// not what sits below it — internal/session/sessiontest is a fixture other suites
-	// import, and it has no more business holding a session store than they do.
-	allowed := filepath.Join(root, "internal", "session")
-
-	fset := token.NewFileSet()
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		switch {
-		case err != nil:
-			return err
-		case d.IsDir():
-			if d.Name() == ".git" {
-				return fs.SkipDir
-			}
-			return nil
-		case !strings.HasSuffix(d.Name(), ".go"), filepath.Dir(path) == allowed:
-			return nil
-		}
-		f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
-		if err != nil {
-			return err
-		}
-		for _, imp := range f.Imports {
+	archtest.EachFileOutside(t, []string{"internal/session"}, parser.ImportsOnly, func(f archtest.File) {
+		for _, imp := range f.Syntax.Imports {
 			if strings.HasPrefix(strings.Trim(imp.Path.Value, `"`), scsPath) {
-				rel, _ := filepath.Rel(root, path)
-				t.Errorf("%s imports %s — ask internal/session instead", rel, imp.Path.Value)
+				t.Errorf("%s imports %s — ask internal/session instead", f.Rel, imp.Path.Value)
 			}
 		}
-		return nil
 	})
-	if err != nil {
-		t.Fatalf("walk the module: %v", err)
-	}
 }

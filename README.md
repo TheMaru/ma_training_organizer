@@ -67,6 +67,7 @@ internal/
   trainer/          The Operator's acts on a Trainer account, and their rules
   auth/             Password hashing
   i18n/             Embedded translation catalogs (de, en)
+  archtest/         Walks the module's files so a package can test a boundary
 docs/adr/           Architecture Decision Records
 docs/agents/        Conventions for agents: issue tracker, triage, domain docs
 .scratch/           Feature specs and issue tracker (see docs/agents/)
