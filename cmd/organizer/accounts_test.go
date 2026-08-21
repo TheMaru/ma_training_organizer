@@ -58,28 +58,33 @@ func TestCountSessionsReadsAsAnAnswer(t *testing.T) {
 // that is a typo rather than a username. The check runs before anything else, so a
 // mistyped command line leaves no database behind and never reaches a prompt.
 func TestSubcommandsNeedExactlyOneUsername(t *testing.T) {
-	subcommands := map[string]func(string, []string) error{
-		"create-trainer":     cmdCreateTrainer,
-		"reset-password":     cmdResetPassword,
-		"revoke-sessions":    cmdRevokeSessions,
-		"deactivate-trainer": cmdDeactivateTrainer,
-		"reactivate-trainer": cmdReactivateTrainer,
-		"delete-trainer":     cmdDeleteTrainer,
-	}
+	// Read off the command table by its argument sketch rather than listed again
+	// here, so a subcommand that comes to take a username is checked without
+	// anybody remembering to add it.
+	subcommands := 0
 	path := filepath.Join(t.TempDir(), "cli.db")
 
-	for name, run := range subcommands {
+	for _, c := range commands {
+		if c.Args != "<username>" {
+			continue
+		}
+		subcommands++
 		for _, args := range [][]string{nil, {"   "}, {"ada", "grace"}} {
-			t.Run(fmt.Sprintf("%s %v", name, args), func(t *testing.T) {
-				err := run(path, args)
+			t.Run(fmt.Sprintf("%s %v", c.Name, args), func(t *testing.T) {
+				err := c.Run(path, args)
 				if err == nil {
-					t.Fatalf("%s accepted %v", name, args)
+					t.Fatalf("%s accepted %v", c.Name, args)
 				}
-				if want := "usage: organizer " + name; !strings.Contains(err.Error(), want) {
+				if want := "usage: organizer " + c.Name; !strings.Contains(err.Error(), want) {
 					t.Errorf("error = %q, want it to carry %q", err, want)
 				}
 			})
 		}
+	}
+	// A sketch nobody spells "<username>" any more would leave this test passing
+	// over nothing.
+	if subcommands == 0 {
+		t.Fatal("no subcommand in the table takes a username")
 	}
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
