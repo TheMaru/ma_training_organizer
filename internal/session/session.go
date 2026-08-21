@@ -6,7 +6,7 @@
 // The Trainer's identity lives here because that is what makes the rest
 // possible: a package that cannot read the key a Session records it under cannot
 // answer "whose Session is this?", and revocation is that question asked of every
-// stored Session — see RevokeAll for where the key is kept and what it costs.
+// stored Session — see RevokeAll for what reading the key costs.
 package session
 
 import (

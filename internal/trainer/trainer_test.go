@@ -40,7 +40,8 @@ func account(t *testing.T, db *sql.DB, username string) store.Trainer {
 }
 
 // trainerID is what a question about Sessions is asked with, so it is read while
-// the account is still there: the Sessions outlive the row.
+// the account is still there — see session.Manager.RevokeAll for why an act that
+// removes the row does not take the Sessions with it.
 func trainerID(t *testing.T, db *sql.DB, username string) int64 {
 	t.Helper()
 	return account(t, db, username).ID

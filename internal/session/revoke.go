@@ -9,6 +9,11 @@ import "context"
 // encoded values, which SQL cannot reach into, so there is no narrower query to
 // run: the cost is a property of this interface (ADR-0002 chose revocable
 // server-side sessions) and not of how it happens to be implemented today.
+//
+// That the id is an encoded value and not a foreign key is also why revoking is
+// worth doing at all where the Trainer row is going away: nothing cascades, so a
+// Session outlives the row it names, and a caller that skipped this would leave
+// it stored.
 func (m *Manager) RevokeAll(ctx context.Context, trainerID int64) (int, error) {
 	return m.eachSessionOf(ctx, trainerID, "", m.scs.Destroy)
 }

@@ -90,8 +90,8 @@ func deactivate(t *testing.T, db *sql.DB, username string) {
 	}
 }
 
-// trainerIDOf is the id a Session records, read while the account is still there:
-// what a Session holds outlives the row it names.
+// trainerIDOf is the id a Session records, read while the account is still there —
+// see session.Manager.RevokeAll for why the Session survives the row.
 func trainerIDOf(t *testing.T, db *sql.DB, username string) int64 {
 	t.Helper()
 	tr, err := store.TrainerByUsername(db, username)

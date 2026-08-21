@@ -85,9 +85,9 @@ func Delete(db *sql.DB, username string) error {
 	if err := store.DeleteTrainer(db, tr.ID); err != nil {
 		return err
 	}
-	// After the state change, as in Deactivate. The Sessions outlive the row they
-	// belong to (see session.Manager.RevokeAll), so revoking them is a real act
-	// here and not a formality.
+	// After the state change, as in Deactivate — and a real act rather than a
+	// formality even with the row gone, for the reason session.Manager.RevokeAll
+	// gives.
 	_, err = revokeAll(db, tr.ID)
 	return err
 }
