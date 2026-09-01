@@ -1,6 +1,6 @@
 # 05 — Ungraded needs a predicate
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — Wave B depends on nothing
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 3 of 10 in the architecture review (2026-08-18)
@@ -66,18 +66,51 @@ forced by the types.
 
 ## Acceptance
 
-- [ ] `store.RosterRow` has one exported predicate for Ungraded, answering
+- [x] `store.RosterRow` has one exported predicate for Ungraded, answering
       `RankID == 0`, with a docstring that says why the rank id and not the slug
       decides it.
-- [ ] `rosterFilterOptions` and `filterRoster` both use it. No site in
+- [x] `rosterFilterOptions` and `filterRoster` both use it. No site in
       `internal/store` decides Ungraded by an empty `SystemSlug` any more.
-- [ ] `rosterRankLabel` uses it instead of `line.SystemName == ""`.
-- [ ] A regression test pins the defect: a grading system inserted with an empty
+- [x] `rosterRankLabel` uses it instead of `line.SystemName == ""`.
+- [x] A regression test pins the defect: a grading system inserted with an empty
       slug (`storetest.MustInsert`) and an athlete promoted inside it is **not**
       offered as Ungraded, is **not** returned by the Ungraded filter, and keeps
       its system in the rank label. The test names the migration-00004 default as
       the reason such a row can exist.
-- [ ] Ungraded athletes still behave exactly as they do today: they get the chip,
+- [x] Ungraded athletes still behave exactly as they do today: they get the chip,
       the Ungraded filter returns them, and their rank cell renders blank.
-- [ ] `store.CurrentRank` and `athletes.html` are unchanged.
-- [ ] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.
+- [x] `store.CurrentRank` and `athletes.html` are unchanged.
+- [x] `go test ./...` passes; the analysers in `docs/agents/analysis.md` run clean.
+
+## Comments
+
+Two things came up that the ticket did not foresee. Both were raised before the
+edit that would have caused them.
+
+- **The Ungraded branch could not be the only branch that changed.** Once a
+  slugless system stops counting as Ungraded, it becomes its own option with
+  `Value: ""` — and `""` is already Alle. `rosterFilters` would have rendered two
+  chips with the same href, both of them `Active`. So `rosterFilterOptions` now
+  skips a row whose `SystemSlug` is empty as well, after the predicate has had its
+  say: a system with no slug has no identity in a URL (ADR-0006), so it can carry
+  no chip. Its athletes stay on the roster under Alle, with their rank. That is a
+  narrower defect than the one the ticket set out to close, but it is a real one,
+  and it contradicts ADR-0007(a)'s claim that the offered cells partition the
+  roster. ADR-0007 carries an Update saying so.
+- **`rosterRankLabel` needed a second guard.** Asking `Ungraded()` instead of
+  `SystemName == ""` opens a path the old check closed: a graded athlete whose
+  system has an empty name would have rendered `Weiß ()`. It now returns the bare
+  rank when the resolved system label is empty. The question that guard asks is
+  "is there anything to disambiguate with?", which is a label concern, not a
+  second proxy for Ungraded.
+
+The label half of the regression needed a sharper case than the ticket described.
+A slugless system still has a *name*, so the old `SystemName == ""` check passes
+that case too — the test would not have failed if the predicate were reverted.
+`TestRosterRankLabelNamesTheSystemOfAnyRankedAthlete` therefore also asserts the
+case that discriminates: a rank in a system with a slug and no stored name, which
+the old check silenced and the predicate names.
+
+`go vet`, `gofmt -l`, `go test ./...`, `staticcheck` and `govulncheck` all clean
+(`govulncheck` 2026-09-01: 0 reachable, 2 in required modules the code does not
+call).

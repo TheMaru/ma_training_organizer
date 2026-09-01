@@ -143,6 +143,7 @@ func TestRosterRankLabelNamesRankAndSystemTogether(t *testing.T) {
 	// On the roster the belt graphic stands alone, so its accessible name carries
 	// both the rank and the system that tells a Kids white belt from an Adult one.
 	graded := rosterLine{RosterRow: store.RosterRow{
+		RankID:     1,
 		RankName:   "Grey-White, 2 stripes",
 		SystemName: "BJJ Kids",
 		SystemSlug: "bjj-kids",
@@ -159,5 +160,34 @@ func TestRosterRankLabelNamesRankAndSystemTogether(t *testing.T) {
 	// An ungraded athlete has no rank and no system, so there is nothing to name.
 	if got := rosterRankLabel(i18n.German, rosterLine{}); got != "" {
 		t.Errorf("ungraded roster label = %q, want it empty", got)
+	}
+}
+
+// TestRosterRankLabelNamesTheSystemOfAnyRankedAthlete pins which question the
+// bracket asks. A held rank is what gives an athlete a system to name
+// (store.RosterRow.Ungraded); neither the slug nor the stored name decides it.
+func TestRosterRankLabelNamesTheSystemOfAnyRankedAthlete(t *testing.T) {
+	// No slug means no catalog key, so the stored name renders (ADR-0009) — a
+	// club's own system stays usable rather than turning invisible.
+	line := rosterLine{RosterRow: store.RosterRow{
+		RankID:     7,
+		RankName:   "Club White",
+		SystemName: "Club System",
+		Group:      "White",
+	}}
+	if got := rosterRankLabel(i18n.German, line); got != "Weiß (Club System)" {
+		t.Errorf("slugless system label = %q, want %q", got, "Weiß (Club System)")
+	}
+
+	// "BJJ Kinder" comes from the catalog, keyed on the slug (ADR-0009).
+	line.SystemName, line.SystemSlug = "", "bjj-kids"
+	if got := rosterRankLabel(i18n.German, line); got != "Weiß (BJJ Kinder)" {
+		t.Errorf("unnamed system label = %q, want %q", got, "Weiß (BJJ Kinder)")
+	}
+
+	// Neither: the empty-label guard on rosterRankLabel.
+	line.SystemSlug = ""
+	if got := rosterRankLabel(i18n.German, line); got != "Weiß" {
+		t.Errorf("nameless system label = %q, want %q", got, "Weiß")
 	}
 }

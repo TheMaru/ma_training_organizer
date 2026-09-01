@@ -58,6 +58,17 @@ type RosterRow struct {
 	Degree      int
 }
 
+// Ungraded reports whether the athlete is in no grading system at all
+// (CONTEXT.md) — distinct from holding the lowest rank, which is a graduation.
+//
+// It asks the rank id because that is the field the LEFT JOIN leaves zero, and so
+// the only one that decides. The slug only correlates: it is empty on a system
+// that never passed through ensureGradingSystem, whose athletes still hold a real
+// rank.
+func (r RosterRow) Ungraded() bool {
+	return r.RankID == 0
+}
+
 // RosterFilterUngraded is the roster filter's value for the athletes who are in
 // no grading system at all. It is reserved rather than derived (ADR-0006), so a
 // hand-authored slug cannot collide with it.
@@ -139,10 +150,10 @@ func representedFilter(filter string, options []RosterOption) string {
 }
 
 // rosterFilterOptions returns the cells of the roster's partition that actually
-// hold someone: one per grading system present among the current ranks, plus the
-// ungraded cell if anyone is ungraded. It is given the *unfiltered* roster, or
-// only the active option would be left standing and the way back to Alle would
-// disappear (ADR-0007a).
+// hold someone: one per slugged grading system present among the current ranks,
+// plus the ungraded cell if anyone is ungraded. It is given the *unfiltered*
+// roster, or only the active option would be left standing and the way back to
+// Alle would disappear (ADR-0007a).
 //
 // Because every returned option matches at least one of the rows it was derived
 // from, no offered filter can produce an empty roster. That is what licenses the
@@ -159,8 +170,14 @@ func rosterFilterOptions(rows []RosterRow) []RosterOption {
 		ungraded bool
 	)
 	for _, row := range rows {
-		if row.SystemSlug == "" {
+		if row.Ungraded() {
 			ungraded = true
+			continue
+		}
+		// A system without a slug has no identity in a URL (ADR-0006), and the empty
+		// value already means Alle, so it can carry no chip of its own
+		// (ADR-0007, Update 2026-09-01).
+		if row.SystemSlug == "" {
 			continue
 		}
 		if _, seen := orders[row.SystemSlug]; seen {
@@ -195,17 +212,22 @@ func filterRoster(rows []RosterRow, option string) []RosterRow {
 	if option == "" {
 		return rows
 	}
-	slug := option
-	if option == RosterFilterUngraded {
-		slug = ""
-	}
 	filtered := make([]RosterRow, 0, len(rows))
 	for _, row := range rows {
-		if row.SystemSlug == slug {
+		if inRosterCell(row, option) {
 			filtered = append(filtered, row)
 		}
 	}
 	return filtered
+}
+
+// Every cell other than the ungraded one is a system, and a system is its slug
+// (ADR-0006).
+func inRosterCell(row RosterRow, option string) bool {
+	if option == RosterFilterUngraded {
+		return row.Ungraded()
+	}
+	return row.SystemSlug == option
 }
 
 // NormalizeRosterSort maps a requested sort column onto the whitelist, returning

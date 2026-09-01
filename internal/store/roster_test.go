@@ -358,3 +358,41 @@ func TestEveryOfferedOptionHasAthletes(t *testing.T) {
 		}
 	}
 }
+
+// sluglessRank inserts a grading system the seed does not know and one rank in
+// it, returning the rank's id. That builds the row store.RosterRow.Ungraded's doc
+// describes: a real rank behind an empty slug. Raw SQL because no store function
+// can produce one (ADR-0007, Update 2026-09-01).
+func sluglessRank(t *testing.T, db *sql.DB) int64 {
+	t.Helper()
+	system := storetest.MustInsert(t, db,
+		`INSERT INTO grading_systems (name, sort_order) VALUES (?, ?)`, "Club System", 2)
+	return storetest.MustInsert(t, db,
+		`INSERT INTO ranks (grading_system_id, name, rank_group, degree, sort_order) VALUES (?, ?, ?, ?, ?)`,
+		system, "Club White", "White", 0, 0)
+}
+
+// TestLoadRosterDecidesUngradedByTheRank is the regression test for that row. Why
+// it also expects no chip for Clara's system is on rosterFilterOptions.
+func TestLoadRosterDecidesUngradedByTheRank(t *testing.T) {
+	db := storetest.NewDB(t)
+	f := newRosterFixture(t, db)
+
+	addAthlete(t, db, store.Athlete{FirstName: "Kai", LastName: "Kind"}, f.kidsBeginner, "2026-01-01")
+	addAthlete(t, db, store.Athlete{FirstName: "Clara", LastName: "Club"}, sluglessRank(t, db), "2026-01-01")
+	addAthlete(t, db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}, 0, "")
+
+	view := loadRoster(t, db, store.RosterQuery{Sort: store.RosterSortFirstName, Filter: store.RosterFilterUngraded})
+
+	if got := rosterFirstNames(view.Rows); !equal(got, []string{"Uwe"}) {
+		t.Errorf("the Ungraded filter returned %v, want [Uwe] — Clara holds a rank", got)
+	}
+	want := []string{"bjj-kids", store.RosterFilterUngraded}
+	if got := optionValues(view.Options); !equal(got, want) {
+		t.Errorf("options = %v, want %v", got, want)
+	}
+	all := loadRoster(t, db, store.RosterQuery{Sort: store.RosterSortFirstName})
+	if got := rosterFirstNames(all.Rows); !equal(got, []string{"Clara", "Kai", "Uwe"}) {
+		t.Errorf("unfiltered roster = %v, want Clara on it", got)
+	}
+}

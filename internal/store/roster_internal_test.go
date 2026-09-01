@@ -20,16 +20,17 @@ import (
 // every cell is populated.
 func partitionRows() []RosterRow {
 	return []RosterRow{
-		partitionRow("Adam", "bjj-adult", "BJJ Adult", 1),
-		partitionRow("Kai", "bjj-kids", "BJJ Kids", 0),
-		partitionRow("Uwe", "", "", 0),
-		partitionRow("Kim", "bjj-kids", "BJJ Kids", 0),
+		partitionRow("Adam", 1, "bjj-adult", "BJJ Adult", 1),
+		partitionRow("Kai", 2, "bjj-kids", "BJJ Kids", 0),
+		partitionRow("Uwe", 0, "", "", 0),
+		partitionRow("Kim", 3, "bjj-kids", "BJJ Kids", 0),
 	}
 }
 
-func partitionRow(first, slug, system string, order int) RosterRow {
+func partitionRow(first string, rankID int64, slug, system string, order int) RosterRow {
 	return RosterRow{
 		Athlete:     Athlete{FirstName: first},
+		RankID:      rankID,
 		SystemSlug:  slug,
 		SystemName:  system,
 		SystemOrder: order,
@@ -79,14 +80,14 @@ func TestRosterFilterOptionsPartitionTheRoster(t *testing.T) {
 // no chip, so no offered option can yield an empty roster.
 func TestRosterFilterOptionsOmitEmptyCells(t *testing.T) {
 	rows := []RosterRow{
-		{Athlete: Athlete{FirstName: "Kai"}, SystemSlug: "bjj-kids", SystemName: "BJJ Kids"},
-		{Athlete: Athlete{FirstName: "Kim"}, SystemSlug: "bjj-kids", SystemName: "BJJ Kids"},
+		partitionRow("Kai", 1, "bjj-kids", "BJJ Kids", 0),
+		partitionRow("Kim", 2, "bjj-kids", "BJJ Kids", 0),
 	}
 	if got := values(rosterFilterOptions(rows)); !slices.Equal(got, []string{"bjj-kids"}) {
 		t.Errorf("options for a kids-only roster = %v, want [bjj-kids]", got)
 	}
 	// An all-ungraded roster offers only that cell — never a system nobody holds.
-	ungraded := []RosterRow{{Athlete: Athlete{FirstName: "Uwe"}}}
+	ungraded := []RosterRow{partitionRow("Uwe", 0, "", "", 0)}
 	if got := values(rosterFilterOptions(ungraded)); !slices.Equal(got, []string{RosterFilterUngraded}) {
 		t.Errorf("options for an ungraded roster = %v, want [none]", got)
 	}
@@ -101,8 +102,8 @@ func TestRosterFilterOptionsOmitEmptyCells(t *testing.T) {
 // seeded before that column existed are tied and must order by slug instead.
 func TestRosterFilterOptionsBreakASortOrderTieOnTheSlug(t *testing.T) {
 	rows := []RosterRow{
-		partitionRow("Zoe", "zzz-system", "Zzz", 0),
-		partitionRow("Ada", "aaa-system", "Aaa", 0),
+		partitionRow("Zoe", 1, "zzz-system", "Zzz", 0),
+		partitionRow("Ada", 2, "aaa-system", "Aaa", 0),
 	}
 	want := []string{"aaa-system", "zzz-system"}
 	if got := values(rosterFilterOptions(rows)); !slices.Equal(got, want) {

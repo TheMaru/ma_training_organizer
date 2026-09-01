@@ -120,3 +120,25 @@ there is nothing for a second one to drift from.
   grading-*system* filter; kids/adults coincide with systems only while there is
   one discipline. A real cohort axis spanning disciplines would be a second
   filter, not a rename of this one.
+
+## Update, 2026-09-01
+
+Decision (a) says every athlete falls under exactly one of the offered cells. That
+is no longer true in one case, and the exception is deliberate.
+
+A grading system whose `slug` is empty has athletes who hold a real rank. They are
+not ungraded (`store.RosterRow.Ungraded`, which explains how such a system gets
+into the table), so they do not fall in the ungraded cell. Their system carries no
+chip either: ADR-0006 makes the slug the system's identity in the URL, and the
+empty value already means `Alle`, so offering it would render two chips with the
+same href, both of them active.
+
+Such an athlete is therefore in **no offered cell**. The two properties this ADR
+leans on are untouched — `Alle` is still the union of all athletes, and every
+offered option still matches at least one, so the zero-hit UI stays absent. What is
+gone is the claim that the offered cells cover the roster.
+
+Nothing can produce a slugless system today: there is no UI and no subcommand for
+grading systems, and the seed writes a slug for every system it knows. Guaranteeing
+a slug at the boundary instead would restore the partition; that is not done here,
+and it is the way back if a club system ever reaches the table by another route.

@@ -68,13 +68,21 @@ func systemLabel(locale i18n.Locale, slug, stored string) string {
 // kids and the adult system. Empty for an ungraded athlete, who has no rank.
 //
 // It takes the whole row because of that conditional, which is Go's job rather
-// than the template's.
+// than the template's. An athlete has a system to name exactly when they hold a
+// rank — the same question the roster filter asks, and it must get the same
+// answer here.
 func rosterRankLabel(locale i18n.Locale, line rosterLine) string {
 	rank := rankLabel(locale, line.Group, line.Degree, line.RankName)
-	if line.SystemName == "" {
+	if line.Ungraded() {
 		return rank
 	}
-	return rank + " (" + systemLabel(locale, line.SystemSlug, line.SystemName) + ")"
+	system := systemLabel(locale, line.SystemSlug, line.SystemName)
+	if system == "" {
+		// A system with neither a catalog key nor a stored name has nothing to
+		// disambiguate with, so the brackets would be empty rather than helpful.
+		return rank
+	}
+	return rank + " (" + system + ")"
 }
 
 // colourPhrase names a belt's colour: one word on a plain belt, both words joined
