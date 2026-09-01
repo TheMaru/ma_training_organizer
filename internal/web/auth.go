@@ -21,20 +21,6 @@ const (
 	revokePath   = "/account/sessions/revoke"
 )
 
-// decoyHash is a valid argon2id hash of a throwaway value. handleLogin verifies
-// against it when the username is unknown, so a login attempt performs the same
-// argon2 work whether or not the account exists — closing the timing
-// side-channel that would otherwise reveal which usernames are registered.
-var decoyHash = mustDecoyHash()
-
-func mustDecoyHash() string {
-	h, err := auth.Hash("decoy: no trainer will ever have this password")
-	if err != nil {
-		panic("web: precompute decoy password hash: " + err.Error())
-	}
-	return h
-}
-
 // requireAuth gates a route: requests without a logged-in trainer are redirected
 // to the login page instead of reaching the handler.
 //
@@ -51,7 +37,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			redirect(w, r, "/login")
 			return
 		}
-		mayContinue, err := s.trainerMayUseTheApp(id)
+		_, mayContinue, err := auth.TrainerMayUseTheApp(s.db, id)
 		if err != nil {
 			serverError(w)
 			return
@@ -71,20 +57,6 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 	})
 }
 
-// trainerMayUseTheApp answers the question requireAuth has about the id in a
-// session. An account that is gone and one that is deactivated are both a plain
-// "no" rather than an error: only a database that could not answer is.
-func (s *Server) trainerMayUseTheApp(id int64) (bool, error) {
-	tr, err := store.TrainerByID(s.db, id)
-	switch {
-	case errors.Is(err, store.ErrTrainerNotFound):
-		return false, nil
-	case err != nil:
-		return false, err
-	}
-	return !tr.Deactivated(), nil
-}
-
 // handleLoginForm renders the login page. An already-authenticated trainer is
 // bounced to the home page rather than shown the form again.
 func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
@@ -95,36 +67,21 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	s.renderLogin(w, r, http.StatusOK, "", "")
 }
 
-// handleLogin verifies submitted credentials and, on success, starts a session.
-// Wrong password and unknown username are reported identically — and cost the
-// same argon2 work (see decoyHash) — to avoid revealing which usernames exist.
+// handleLogin submits the credentials to auth and, on success, starts a session.
+// Every refusal is one page with one message: which of them it was — unknown
+// username, wrong password, deactivated account — is a disclosure auth goes to
+// some trouble to prevent, and the handler does not undo that here.
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")
 
-	tr, err := store.TrainerByUsername(s.db, username)
+	tr, err := auth.Authenticate(s.db, username, password)
 	if err != nil {
-		if errors.Is(err, store.ErrTrainerNotFound) {
-			_, _ = auth.Verify(password, decoyHash) // equalise timing; result unused
+		if errors.Is(err, auth.ErrBadCredentials) {
 			s.renderLogin(w, r, http.StatusUnauthorized, username, translate(r, "login.badCredentials"))
 			return
 		}
 		serverError(w)
-		return
-	}
-
-	ok, err := auth.Verify(password, tr.PasswordHash)
-	if err != nil {
-		serverError(w)
-		return
-	}
-	// A deactivated account is refused exactly as a wrong password is (ADR-0010):
-	// naming the state would confirm the username exists, which is what the decoy
-	// hash above exists to prevent. The state is read only after auth.Verify has
-	// run, so the refusal costs the same argon2 work as any other failed login and
-	// does not become visible in the response time either.
-	if !ok || tr.Deactivated() {
-		s.renderLogin(w, r, http.StatusUnauthorized, username, translate(r, "login.badCredentials"))
 		return
 	}
 
@@ -151,13 +108,19 @@ func (s *Server) handlePasswordForm(w http.ResponseWriter, r *http.Request) {
 	s.renderPassword(w, r, http.StatusOK, "")
 }
 
-// handleChangePassword verifies the current password and applies the new one.
-// New and confirmation must match and satisfy the shared password policy; the
-// current password must be correct.
+// handleChangePassword applies a new password to the trainer's own account. The
+// two form fields have to agree, which is this page's question and is settled
+// here; whether the credentials permit the change is auth's, and is settled
+// there.
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	current := r.PostFormValue("current")
 	next := r.PostFormValue("new")
 	confirm := r.PostFormValue("confirm")
+
+	if next != confirm {
+		s.renderPassword(w, r, http.StatusBadRequest, translate(r, "password.mismatch"))
+		return
+	}
 
 	id := s.sessions.TrainerID(r.Context())
 	tr, err := store.TrainerByID(s.db, id)
@@ -166,30 +129,14 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := auth.Verify(current, tr.PasswordHash)
-	if err != nil {
-		serverError(w)
-		return
-	}
-	if !ok {
+	switch err := auth.ChangePassword(s.db, tr, current, next); {
+	case errors.Is(err, auth.ErrCurrentPasswordWrong):
 		s.renderPassword(w, r, http.StatusUnauthorized, translate(r, "password.currentWrong"))
 		return
-	}
-	if next != confirm {
-		s.renderPassword(w, r, http.StatusBadRequest, translate(r, "password.mismatch"))
-		return
-	}
-	if err := auth.ValidatePassword(next); err != nil {
+	case errors.Is(err, auth.ErrPasswordTooShort):
 		s.renderPassword(w, r, http.StatusBadRequest, translate(r, "password.tooShort"))
 		return
-	}
-
-	hash, err := auth.Hash(next)
-	if err != nil {
-		serverError(w)
-		return
-	}
-	if err := store.UpdateTrainerPassword(s.db, tr.ID, hash); err != nil {
+	case err != nil:
 		serverError(w)
 		return
 	}

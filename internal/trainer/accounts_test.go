@@ -19,8 +19,8 @@ func TestProvisionStoresAPasswordThatVerifies(t *testing.T) {
 	}
 
 	tr := account(t, db, "ada")
-	if ok, _ := auth.Verify(trainerPassword, tr.PasswordHash); !ok {
-		t.Error("provisioned password does not verify")
+	if _, err := auth.Authenticate(db, "ada", trainerPassword); err != nil {
+		t.Errorf("provisioned password does not sign the trainer in: %v", err)
 	}
 	// The stored value is a hash, not the plaintext.
 	if tr.PasswordHash == trainerPassword {
@@ -96,12 +96,11 @@ func TestResetPasswordReplacesTheHash(t *testing.T) {
 		t.Fatalf("trainer.ResetPassword: %v", err)
 	}
 
-	tr := account(t, db, "grace")
-	if ok, _ := auth.Verify("new-secret-2", tr.PasswordHash); !ok {
-		t.Error("new password does not verify after the reset")
+	if _, err := auth.Authenticate(db, "grace", "new-secret-2"); err != nil {
+		t.Errorf("new password does not sign the trainer in after the reset: %v", err)
 	}
-	if ok, _ := auth.Verify(trainerPassword, tr.PasswordHash); ok {
-		t.Error("old password still verifies after the reset")
+	if _, err := auth.Authenticate(db, "grace", trainerPassword); !errors.Is(err, auth.ErrBadCredentials) {
+		t.Errorf("old password after the reset = %v, want %v", err, auth.ErrBadCredentials)
 	}
 }
 

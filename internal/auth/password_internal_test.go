@@ -1,13 +1,11 @@
-package auth_test
+package auth
 
 import (
 	"testing"
-
-	"github.com/TheMaru/ma_training_organizer/internal/auth"
 )
 
 func TestHashThenVerifyAcceptsCorrectPassword(t *testing.T) {
-	hash, err := auth.Hash("correct horse battery staple")
+	hash, err := Hash("correct horse battery staple")
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
@@ -15,7 +13,7 @@ func TestHashThenVerifyAcceptsCorrectPassword(t *testing.T) {
 		t.Fatal("Hash returned empty string")
 	}
 
-	ok, err := auth.Verify("correct horse battery staple", hash)
+	ok, err := verify("correct horse battery staple", hash)
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
@@ -25,12 +23,12 @@ func TestHashThenVerifyAcceptsCorrectPassword(t *testing.T) {
 }
 
 func TestVerifyRejectsWrongPassword(t *testing.T) {
-	hash, err := auth.Hash("s3cret")
+	hash, err := Hash("s3cret")
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
 
-	ok, err := auth.Verify("not the password", hash)
+	ok, err := verify("not the password", hash)
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
@@ -42,11 +40,11 @@ func TestVerifyRejectsWrongPassword(t *testing.T) {
 // A hash embeds a random salt, so hashing the same password twice must yield
 // different encoded strings — otherwise identical passwords would be linkable.
 func TestHashIsSalted(t *testing.T) {
-	a, err := auth.Hash("same")
+	a, err := Hash("same")
 	if err != nil {
 		t.Fatalf("Hash a: %v", err)
 	}
-	b, err := auth.Hash("same")
+	b, err := Hash("same")
 	if err != nil {
 		t.Fatalf("Hash b: %v", err)
 	}
@@ -58,7 +56,7 @@ func TestHashIsSalted(t *testing.T) {
 // A garbage hash must surface an error rather than silently reporting no match,
 // so callers can distinguish "wrong password" from "corrupt stored hash".
 func TestVerifyErrorsOnMalformedHash(t *testing.T) {
-	if _, err := auth.Verify("whatever", "not-a-real-hash"); err == nil {
+	if _, err := verify("whatever", "not-a-real-hash"); err == nil {
 		t.Error("expected an error for a malformed hash, got nil")
 	}
 }

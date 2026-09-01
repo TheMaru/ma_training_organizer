@@ -1,8 +1,3 @@
-// Package auth holds the pure password-handling domain logic: hashing a
-// plaintext password for storage and verifying a candidate against a stored
-// hash. It wraps alexedwards/argon2id (the algorithm chosen in ADR-0002) so the
-// rest of the app never depends on it directly, and so the parameters live in
-// one place.
 package auth
 
 import (
@@ -32,14 +27,18 @@ func ValidatePassword(plain string) error {
 
 // Hash derives a storable, salted argon2id hash of a plaintext password. The
 // returned string is self-describing (it encodes the algorithm, parameters and
-// salt), so Verify needs nothing but the password and this string.
+// salt), so verify needs nothing but the password and this string.
 func Hash(plain string) (string, error) {
 	return argon2id.CreateHash(plain, argon2id.DefaultParams)
 }
 
-// Verify reports whether plain matches the previously stored hash. It returns a
+// verify reports whether plain matches the previously stored hash. It returns a
 // non-nil error only when hash is malformed (not for a simple mismatch), so a
 // corrupt stored hash is never mistaken for a wrong password.
-func Verify(plain, hash string) (bool, error) {
+//
+// Unexported: the acts in this package are the only callers, which is what makes
+// "a password is checked here and nowhere else" a compile error to break rather
+// than a rule to remember.
+func verify(plain, hash string) (bool, error) {
 	return argon2id.ComparePasswordAndHash(plain, hash)
 }
