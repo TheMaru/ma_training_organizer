@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 const passwordPagePath = "/account/password"
@@ -18,10 +20,10 @@ func revoke(t *testing.T, ts *httptest.Server, client *http.Client) *http.Respon
 
 func TestRevokeEndsTheOtherDeviceButNotThisOne(t *testing.T) {
 	ts, phone, _ := newAuthTestServer(t)
-	login(t, ts, phone, testUsername, testPassword).Body.Close()
+	login(t, ts, phone, testUsername, trainertest.Password).Body.Close()
 
 	laptop := newClient(t)
-	login(t, ts, laptop, testUsername, testPassword).Body.Close()
+	login(t, ts, laptop, testUsername, trainertest.Password).Body.Close()
 
 	revoke(t, ts, laptop).Body.Close()
 
@@ -47,12 +49,12 @@ func TestRevokeEndsTheOtherDeviceButNotThisOne(t *testing.T) {
 // installation must not be swept up by it.
 func TestRevokeSparesTheOtherTrainersSessions(t *testing.T) {
 	ts, mine, db := newAuthTestServer(t)
-	login(t, ts, mine, testUsername, testPassword).Body.Close()
+	login(t, ts, mine, testUsername, trainertest.Password).Body.Close()
 
 	const colleague = "grace"
-	addTrainer(t, db, colleague)
+	trainertest.Provision(t, db, colleague)
 	theirs := newClient(t)
-	login(t, ts, theirs, colleague, testPassword).Body.Close()
+	login(t, ts, theirs, colleague, trainertest.Password).Body.Close()
 
 	revoke(t, ts, mine).Body.Close()
 
@@ -69,14 +71,14 @@ func TestRevokeSparesTheOtherTrainersSessions(t *testing.T) {
 // decision rather than a patch.
 func TestChangingThePasswordLeavesTheOtherDeviceSignedIn(t *testing.T) {
 	ts, phone, _ := newAuthTestServer(t)
-	login(t, ts, phone, testUsername, testPassword).Body.Close()
+	login(t, ts, phone, testUsername, trainertest.Password).Body.Close()
 
 	laptop := newClient(t)
-	login(t, ts, laptop, testUsername, testPassword).Body.Close()
+	login(t, ts, laptop, testUsername, trainertest.Password).Body.Close()
 
 	const newPassword = "brand-new-secret"
 	post(t, ts, laptop, passwordPagePath, url.Values{
-		"current": {testPassword},
+		"current": {trainertest.Password},
 		"new":     {newPassword},
 		"confirm": {newPassword},
 	}).Body.Close()
@@ -92,7 +94,7 @@ func TestChangingThePasswordLeavesTheOtherDeviceSignedIn(t *testing.T) {
 // out of the phone they are holding at the mat side.
 func TestTheAccountAreaOffersTheControlBehindAConfirmation(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	body := readBody(t, get(t, ts, client, passwordPagePath))
 	for _, want := range []string{
@@ -110,7 +112,7 @@ func TestTheAccountAreaOffersTheControlBehindAConfirmation(t *testing.T) {
 // it returns to has to say that it happened.
 func TestRevokeReportsBackOnTheAccountPage(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := revoke(t, ts, client)
 	resp.Body.Close()
@@ -133,7 +135,7 @@ func TestRevokeReportsBackOnTheAccountPage(t *testing.T) {
 // reading it gets it in the language they are now reading (ADR-0008).
 func TestThePendingNoticeFollowsALanguageSwitch(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	revoke(t, ts, client).Body.Close()
 	switchTo(t, ts, client, "en", "/athletes").Body.Close()

@@ -9,21 +9,22 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 func TestProvisionStoresAPasswordThatVerifies(t *testing.T) {
 	db := storetest.NewDB(t)
 
-	if err := trainer.Provision(db, "ada", trainerPassword); err != nil {
+	if err := trainer.Provision(db, "ada", trainertest.Password); err != nil {
 		t.Fatalf("trainer.Provision: %v", err)
 	}
 
-	tr := account(t, db, "ada")
-	if _, err := auth.Authenticate(db, "ada", trainerPassword); err != nil {
+	tr := trainertest.Account(t, db, "ada")
+	if _, err := auth.Authenticate(db, "ada", trainertest.Password); err != nil {
 		t.Errorf("provisioned password does not sign the trainer in: %v", err)
 	}
 	// The stored value is a hash, not the plaintext.
-	if tr.PasswordHash == trainerPassword {
+	if tr.PasswordHash == trainertest.Password {
 		t.Error("password stored in plaintext")
 	}
 }
@@ -99,7 +100,7 @@ func TestResetPasswordReplacesTheHash(t *testing.T) {
 	if _, err := auth.Authenticate(db, "grace", "new-secret-2"); err != nil {
 		t.Errorf("new password does not sign the trainer in after the reset: %v", err)
 	}
-	if _, err := auth.Authenticate(db, "grace", trainerPassword); !errors.Is(err, auth.ErrBadCredentials) {
+	if _, err := auth.Authenticate(db, "grace", trainertest.Password); !errors.Is(err, auth.ErrBadCredentials) {
 		t.Errorf("old password after the reset = %v, want %v", err, auth.ErrBadCredentials)
 	}
 }
@@ -120,7 +121,7 @@ func TestResetPasswordRefusesADeactivatedTrainer(t *testing.T) {
 	if err := trainer.Deactivate(db, "grace"); err != nil {
 		t.Fatalf("trainer.Deactivate: %v", err)
 	}
-	before := account(t, db, "grace")
+	before := trainertest.Account(t, db, "grace")
 
 	err := trainer.ResetPassword(db, "grace", "brand-new-secret")
 
@@ -132,7 +133,7 @@ func TestResetPasswordRefusesADeactivatedTrainer(t *testing.T) {
 	}
 	// Refused, not half-applied: the old hash stands, so the password the operator
 	// typed is no way in either. That it is no way in at a login is web's to assert.
-	if got := account(t, db, "grace").PasswordHash; got != before.PasswordHash {
+	if got := trainertest.Account(t, db, "grace").PasswordHash; got != before.PasswordHash {
 		t.Error("password hash changed despite the refusal")
 	}
 }

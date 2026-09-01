@@ -10,6 +10,7 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // Refusing the next login is not enough on its own: the departed trainer is
@@ -19,7 +20,7 @@ import (
 func TestDeactivateEndsTheirSessionsOnly(t *testing.T) {
 	db := club(t, "ada", "grace")
 	sessions := sessiontest.NewManager(t, db)
-	ada, grace := trainerID(t, db, "ada"), trainerID(t, db, "grace")
+	ada, grace := trainertest.ID(t, db, "ada"), trainertest.ID(t, db, "grace")
 	sessiontest.SignIn(t, sessions, ada)
 	sessiontest.SignIn(t, sessions, ada)
 	sessiontest.SignIn(t, sessions, grace)
@@ -34,7 +35,7 @@ func TestDeactivateEndsTheirSessionsOnly(t *testing.T) {
 	if got := sessiontest.Count(t, sessions, grace); got != 1 {
 		t.Errorf("the colleague holds %d sessions, want 1", got)
 	}
-	if !account(t, db, "ada").Deactivated() {
+	if !trainertest.Account(t, db, "ada").Deactivated() {
 		t.Error("the account is not deactivated")
 	}
 }
@@ -59,7 +60,7 @@ func TestDeactivateTwiceKeepsTheFirstDate(t *testing.T) {
 		t.Errorf("second trainer.Deactivate: %v", err)
 	}
 
-	if got := account(t, db, "ada").DeactivatedAt.Format("2006-01-02 15:04:05"); got != longAgo {
+	if got := trainertest.Account(t, db, "ada").DeactivatedAt.Format("2006-01-02 15:04:05"); got != longAgo {
 		t.Errorf("deactivated_at = %q, want the first date %q", got, longAgo)
 	}
 }
@@ -84,7 +85,7 @@ func TestDeactivateAnAlreadyDeactivatedTrainerIsAllowed(t *testing.T) {
 // shows itself only there.
 func TestReactivateGivesTheAccountBackUnchanged(t *testing.T) {
 	db := club(t, "ada", "grace")
-	before := account(t, db, "ada")
+	before := trainertest.Account(t, db, "ada")
 	if err := trainer.Deactivate(db, "ada"); err != nil {
 		t.Fatalf("trainer.Deactivate: %v", err)
 	}
@@ -93,7 +94,7 @@ func TestReactivateGivesTheAccountBackUnchanged(t *testing.T) {
 		t.Fatalf("trainer.Reactivate: %v", err)
 	}
 
-	after := account(t, db, "ada")
+	after := trainertest.Account(t, db, "ada")
 	if after.Deactivated() {
 		t.Errorf("still deactivated at %v after reactivation", after.DeactivatedAt)
 	}
@@ -109,7 +110,7 @@ func TestReactivateGivesTheAccountBackUnchanged(t *testing.T) {
 func TestReactivateLeavesOtherSessionsAlone(t *testing.T) {
 	db := club(t, "ada", "grace")
 	sessions := sessiontest.NewManager(t, db)
-	grace := trainerID(t, db, "grace")
+	grace := trainertest.ID(t, db, "grace")
 	sessiontest.SignIn(t, sessions, grace)
 
 	if err := trainer.Deactivate(db, "ada"); err != nil {
@@ -138,7 +139,7 @@ func TestDeleteRemovesTheAccountAndFreesTheUsername(t *testing.T) {
 	}
 	// Freeing the name for reuse is half of why the act exists, so it is asserted
 	// rather than inferred from the row being gone.
-	if err := trainer.Provision(db, "grace", trainerPassword); err != nil {
+	if err := trainer.Provision(db, "grace", trainertest.Password); err != nil {
 		t.Errorf("trainer.Provision on the freed username: %v", err)
 	}
 }
@@ -149,7 +150,7 @@ func TestDeleteRemovesTheAccountAndFreesTheUsername(t *testing.T) {
 func TestDeleteEndsTheirSessionsOnly(t *testing.T) {
 	db := club(t, "ada", "grace")
 	sessions := sessiontest.NewManager(t, db)
-	ada, grace := trainerID(t, db, "ada"), trainerID(t, db, "grace")
+	ada, grace := trainertest.ID(t, db, "ada"), trainertest.ID(t, db, "grace")
 	sessiontest.SignIn(t, sessions, grace)
 	sessiontest.SignIn(t, sessions, ada)
 
@@ -178,7 +179,7 @@ func TestOffboardingRefusesTheOnlyActiveTrainer(t *testing.T) {
 		stillOnly func(*testing.T, *sql.DB, string)
 	}{
 		"deactivate": {trainer.Deactivate, func(t *testing.T, db *sql.DB, username string) {
-			if account(t, db, username).Deactivated() {
+			if trainertest.Account(t, db, username).Deactivated() {
 				t.Error("account deactivated despite the refusal")
 			}
 		}},
@@ -198,7 +199,7 @@ func TestOffboardingRefusesTheOnlyActiveTrainer(t *testing.T) {
 				}
 			}
 			sessions := sessiontest.NewManager(t, db)
-			ada := trainerID(t, db, "ada")
+			ada := trainertest.ID(t, db, "ada")
 			sessiontest.SignIn(t, sessions, ada)
 
 			err := act.do(db, "ada")

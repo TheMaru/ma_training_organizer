@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TheMaru/ma_training_organizer/internal/session/sessiontest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // wantNoCookies asserts the client's jar holds nothing for the server. That is how
@@ -32,7 +33,7 @@ func TestSessionExpiresWhenIdle(t *testing.T) {
 	const idle = 50 * time.Millisecond
 	ts, client, _ := newAuthTestServerIdle(t, idle)
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := get(t, ts, client, "/")
 	resp.Body.Close()
@@ -61,7 +62,7 @@ func TestSessionExpiresWhenIdle(t *testing.T) {
 // TestASessionThatOutlivedItsTrainerIsDestroyed.
 func TestSessionDiesWithItsTrainer(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	deleteTrainer(t, db, testUsername)
 
@@ -93,7 +94,7 @@ func TestASessionThatOutlivedItsTrainerIsDestroyed(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			ts, client, db := newAuthTestServer(t)
-			id := trainerIDOf(t, db, testUsername)
+			id := trainertest.ID(t, db, testUsername)
 			act(t, db, testUsername)
 			device := sessiontest.SignIn(t, sessiontest.NewManager(t, db), id)
 			u, err := url.Parse(ts.URL)
@@ -122,7 +123,7 @@ func TestASessionThatOutlivedItsTrainerIsDestroyed(t *testing.T) {
 // revocation reached nothing is the test above.
 func TestSessionDiesWhenItsTrainerIsDeactivated(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	deactivate(t, db, testUsername)
 
@@ -140,12 +141,12 @@ func TestSessionDiesWhenItsTrainerIsDeactivated(t *testing.T) {
 // trainer's departure leaves the colleague still in the middle of a training.
 func TestOnlyTheDeactivatedTrainersSessionDies(t *testing.T) {
 	ts, mine, db := newAuthTestServer(t)
-	login(t, ts, mine, testUsername, testPassword).Body.Close()
+	login(t, ts, mine, testUsername, trainertest.Password).Body.Close()
 
 	const colleague = "grace"
-	addTrainer(t, db, colleague)
+	trainertest.Provision(t, db, colleague)
 	theirs := newClient(t)
-	login(t, ts, theirs, colleague, testPassword).Body.Close()
+	login(t, ts, theirs, colleague, trainertest.Password).Body.Close()
 
 	deactivate(t, db, testUsername)
 
@@ -167,12 +168,12 @@ func TestOnlyTheDeactivatedTrainersSessionDies(t *testing.T) {
 // it. Without this the new check could pass by signing everybody out.
 func TestOnlyTheDeletedTrainersSessionDies(t *testing.T) {
 	ts, mine, db := newAuthTestServer(t)
-	login(t, ts, mine, testUsername, testPassword).Body.Close()
+	login(t, ts, mine, testUsername, trainertest.Password).Body.Close()
 
 	const colleague = "grace"
-	addTrainer(t, db, colleague)
+	trainertest.Provision(t, db, colleague)
 	theirs := newClient(t)
-	login(t, ts, theirs, colleague, testPassword).Body.Close()
+	login(t, ts, theirs, colleague, trainertest.Password).Body.Close()
 
 	deleteTrainer(t, db, testUsername)
 
@@ -195,7 +196,7 @@ func TestActivityKeepsSessionAlive(t *testing.T) {
 	const idle = 100 * time.Millisecond
 	ts, client, _ := newAuthTestServerIdle(t, idle)
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	for range 4 {
 		time.Sleep(idle / 2)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // promoteTo creates an athlete promoted to one seeded rank, returning their id.
@@ -66,7 +67,7 @@ func promoteForm(rankID int64, date string) url.Values {
 
 func TestAthleteDetailLoads(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -82,7 +83,7 @@ func TestAthleteDetailLoads(t *testing.T) {
 
 func TestAthleteDetailUnknownReturns404(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := get(t, ts, client, "/athletes/999")
 	defer resp.Body.Close()
@@ -111,7 +112,7 @@ func TestAthleteDetailRequiresAuth(t *testing.T) {
 
 func TestRecordPromotionEndToEnd(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -147,7 +148,7 @@ func TestRecordPromotionEndToEnd(t *testing.T) {
 // promotion changes the derived current rank, including across systems.
 func TestRecordPromotionUpdatesCurrentRank(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	kidsGreen := storetest.RankID(t, db, "BJJ Kids", "Green")
 	adultWhite := storetest.RankID(t, db, "BJJ Adult", "White")
@@ -183,7 +184,7 @@ func TestRecordPromotionUpdatesCurrentRank(t *testing.T) {
 
 func TestRecordPromotionRequiresRankAndDate(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -210,7 +211,7 @@ func TestRecordPromotionRequiresRankAndDate(t *testing.T) {
 // break every later read of the athlete's history).
 func TestRecordPromotionRejectsMalformedDate(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
@@ -259,7 +260,7 @@ func TestRecordPromotionRequiresAuth(t *testing.T) {
 
 func TestRecordPromotionUnknownAthleteReturns404(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	rankID := storetest.RankID(t, db, "BJJ Adult", "White")
 
@@ -278,7 +279,7 @@ func TestRecordPromotionUnknownAthleteReturns404(t *testing.T) {
 // the graphic is decorative there (ADR-0004).
 func TestAthleteDetailShowsTheBeltBesideTheRankName(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id := promoteTo(t, db, "Mia", "Kind", "BJJ Kids", "Grey-White, 2 stripes", "2026-02-02")
 
@@ -308,7 +309,7 @@ func TestAthleteDetailShowsTheBeltBesideTheRankName(t *testing.T) {
 
 func TestAthleteDetailFallsBackToTextWithoutAGraduation(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Sophie", LastName: "Neumann"})
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // athleteForm is the set of form fields the create/edit handlers accept.
@@ -37,7 +38,7 @@ func TestAthletesListRequiresAuth(t *testing.T) {
 
 func TestAthletesListLoadsWhenAuthenticated(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := get(t, ts, client, "/athletes")
 	defer resp.Body.Close()
@@ -48,7 +49,7 @@ func TestAthletesListLoadsWhenAuthenticated(t *testing.T) {
 
 func TestCreateAthleteEndToEnd(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp, err := client.PostForm(ts.URL+"/athletes",
 		athleteForm("Ada", "Lovelace", "1990-12-10", "2026-01-15", "linkshänder"))
@@ -79,7 +80,7 @@ func TestCreateAthleteEndToEnd(t *testing.T) {
 
 func TestCreateAthleteRequiresName(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp, err := client.PostForm(ts.URL+"/athletes", athleteForm("Ada", "", "", "", ""))
 	if err != nil {
@@ -114,7 +115,7 @@ func TestCreateAthleteRefusesAMalformedDate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ts, client, db := newAuthTestServer(t)
-			login(t, ts, client, testUsername, testPassword).Body.Close()
+			login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 			resp, err := client.PostForm(ts.URL+"/athletes",
 				athleteForm("Ada", "Lovelace", tt.birth, tt.joined, "linkshänder"))
@@ -154,7 +155,7 @@ func TestCreateAthleteRefusesAMalformedDate(t *testing.T) {
 
 func TestUpdateAthleteRefusesAMalformedDate(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{
 		FirstName: "Ada", LastName: "Lovelace", BirthDate: "1990-12-10",
@@ -210,7 +211,7 @@ func TestCreateAthleteRequiresAuth(t *testing.T) {
 
 func TestEditFormLoads(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -226,7 +227,7 @@ func TestEditFormLoads(t *testing.T) {
 
 func TestEditFormUnknownAthleteReturns404(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := get(t, ts, client, "/athletes/999/edit")
 	defer resp.Body.Close()
@@ -237,7 +238,7 @@ func TestEditFormUnknownAthleteReturns404(t *testing.T) {
 
 func TestUpdateAthleteEndToEnd(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -265,7 +266,7 @@ func TestUpdateAthleteEndToEnd(t *testing.T) {
 
 func TestUpdateAthleteRequiresName(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -291,7 +292,7 @@ func TestUpdateAthleteRequiresName(t *testing.T) {
 
 func TestUpdateUnknownAthleteReturns404(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp, err := client.PostForm(ts.URL+"/athletes/999", athleteForm("Ghost", "Rider", "", "", ""))
 	if err != nil {
@@ -305,7 +306,7 @@ func TestUpdateUnknownAthleteReturns404(t *testing.T) {
 
 func TestDeleteAthleteEndToEnd(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
@@ -328,7 +329,7 @@ func TestDeleteAthleteEndToEnd(t *testing.T) {
 
 func TestDeleteUnknownAthleteReturns404(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp, err := client.PostForm(ts.URL+"/athletes/999/delete", nil)
 	if err != nil {

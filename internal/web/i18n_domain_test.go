@@ -14,11 +14,12 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 func TestRosterRankLabelFollowsTheLocale(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	// The roster's belt graphic stands alone, so the composed label is what a screen
@@ -44,7 +45,7 @@ func TestRosterRankLabelFollowsTheLocale(t *testing.T) {
 
 func TestRosterFilterChipsCarryLocalizedSystemNames(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	// The chips must name the systems the way the rows they filter do, or the filter
@@ -65,7 +66,7 @@ func TestRosterFilterChipsCarryLocalizedSystemNames(t *testing.T) {
 
 func TestAthleteDetailLocalizesRankAndSystem(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id := promoteTo(t, db, "Mia", "Kind", "BJJ Kids", "Grey-White, 2 stripes", "2026-02-02")
 	path := fmt.Sprintf("/athletes/%d", id)
 
@@ -112,7 +113,7 @@ func TestAthleteDetailLocalizesRankAndSystem(t *testing.T) {
 // was already correct in both languages: composition must not disturb it.
 func TestUngradedAthleteKeepsTheNoRankWording(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes"))
@@ -141,7 +142,7 @@ func TestUngradedAthleteKeepsTheNoRankWording(t *testing.T) {
 // while the system beside it still localizes. The two fall back independently.
 func TestUnresolvableRankKeepsItsNameBesideALocalizedSystem(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	kids := seededSystemID(t, db, "BJJ Kids")
 	rankID := storetest.MustInsert(t, db,

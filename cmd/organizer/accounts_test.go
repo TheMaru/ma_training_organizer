@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
-	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // TestCLIDatabaseCarriesTheGradingSystems is the defect the one-call open closes:
@@ -18,9 +18,7 @@ import (
 // GradingSystem to pick.
 func TestCLIDatabaseCarriesTheGradingSystems(t *testing.T) {
 	err := withDB(filepath.Join(t.TempDir(), "cli.db"), func(db *sql.DB) error {
-		if err := trainer.Provision(db, "ada", "correct-horse"); err != nil {
-			return err
-		}
+		trainertest.Provision(t, db, "ada")
 		systems, err := store.ListGradingSystems(db)
 		if err != nil {
 			return err

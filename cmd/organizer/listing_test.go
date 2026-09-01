@@ -11,6 +11,7 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // theListing is what list-trainers renders: the store's answer to "who has
@@ -29,7 +30,7 @@ func theListing(t *testing.T, db *sql.DB) trainerListing {
 // shows one trainer to another, so without this the operator is working blind.
 func TestListTrainersShowsBothStates(t *testing.T) {
 	db := storetest.NewDB(t)
-	addTrainers(t, db, "ada", "grace")
+	trainertest.Provision(t, db, "ada", "grace")
 	if err := trainer.Deactivate(db, "grace"); err != nil {
 		t.Fatalf("trainer.Deactivate: %v", err)
 	}
@@ -85,7 +86,7 @@ func TestListTrainersOnAnEmptyDatabase(t *testing.T) {
 // sorts ahead of every lowercase letter, which is an order but not a legible one.
 func TestListTrainersOrdersByUsername(t *testing.T) {
 	db := storetest.NewDB(t)
-	addTrainers(t, db, "Zoe", "ada", "mira", "bea")
+	trainertest.Provision(t, db, "Zoe", "ada", "mira", "bea")
 
 	listing := theListing(t, db)
 
@@ -105,11 +106,8 @@ func TestListTrainersOrdersByUsername(t *testing.T) {
 // so a hash arriving in some future column fails this too.
 func TestListTrainersCarriesNoPasswordMaterial(t *testing.T) {
 	db := storetest.NewDB(t)
-	addTrainers(t, db, "ada", "grace")
-	tr, err := store.TrainerByUsername(db, "ada")
-	if err != nil {
-		t.Fatalf("TrainerByUsername: %v", err)
-	}
+	trainertest.Provision(t, db, "ada", "grace")
+	tr := trainertest.Account(t, db, "ada")
 
 	listing := theListing(t, db)
 
@@ -121,7 +119,7 @@ func TestListTrainersCarriesNoPasswordMaterial(t *testing.T) {
 		if strings.Contains(subject, "$argon2") {
 			t.Errorf("listing carries argon2 material: %s", subject)
 		}
-		if strings.Contains(subject, trainerPassword) {
+		if strings.Contains(subject, trainertest.Password) {
 			t.Errorf("listing carries a plaintext password: %s", subject)
 		}
 	}

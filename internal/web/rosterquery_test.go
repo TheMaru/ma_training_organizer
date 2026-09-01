@@ -8,6 +8,7 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // rosterSortQuery is one roster query as a trainer's URL carries it.
@@ -45,7 +46,7 @@ func TestDeleteReturnsToSortedRoster(t *testing.T) {
 	for _, query := range sortedRosterQueries() {
 		t.Run(query.sort+"-"+query.dir, func(t *testing.T) {
 			ts, client, db := newAuthTestServer(t)
-			login(t, ts, client, testUsername, testPassword).Body.Close()
+			login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 			id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 			if err != nil {
 				t.Fatalf("CreateAthlete: %v", err)
@@ -59,7 +60,7 @@ func TestDeleteReturnsToSortedRoster(t *testing.T) {
 
 func TestDeleteViaHTMXReturnsToSortedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -73,7 +74,7 @@ func TestDeleteViaHTMXReturnsToSortedRoster(t *testing.T) {
 
 func TestCreateReturnsToSortedRoster(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := post(t, ts, client, "/athletes?sort=joinedOn&dir=desc",
 		athleteForm("Ada", "Lovelace", "", "", ""))
@@ -82,7 +83,7 @@ func TestCreateReturnsToSortedRoster(t *testing.T) {
 
 func TestUpdateReturnsToSortedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -95,7 +96,7 @@ func TestUpdateReturnsToSortedRoster(t *testing.T) {
 
 func TestMutationWithJunkQueryRedirectsToWhitelistedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -109,7 +110,7 @@ func TestMutationWithJunkQueryRedirectsToWhitelistedRoster(t *testing.T) {
 
 func TestMutationRedirectCarriesNormalisedQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -124,7 +125,7 @@ func TestMutationRedirectCarriesNormalisedQuery(t *testing.T) {
 
 func TestRosterLinksCarryTheQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -144,7 +145,7 @@ func TestRosterLinksCarryTheQuery(t *testing.T) {
 
 func TestDefaultRosterLinksCarryNoQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"}); err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
 	}
@@ -158,7 +159,7 @@ func TestDefaultRosterLinksCarryNoQuery(t *testing.T) {
 
 func TestEditFormReturnsToSortedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -177,7 +178,7 @@ func TestEditFormReturnsToSortedRoster(t *testing.T) {
 
 func TestAthleteDetailOffersAWayBackToTheSortedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -195,7 +196,7 @@ func TestAthleteDetailOffersAWayBackToTheSortedRoster(t *testing.T) {
 
 func TestRecordingAPromotionKeepsTheQuery(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -213,7 +214,7 @@ func TestRecordingAPromotionKeepsTheQuery(t *testing.T) {
 
 func TestMutationRedirectKeepsTheFilter(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -228,7 +229,7 @@ func TestMutationRedirectKeepsTheFilter(t *testing.T) {
 
 func TestFilterOnlyQueryCarriesNoSortKeys(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 	if err != nil {
 		t.Fatalf("CreateAthlete: %v", err)
@@ -250,7 +251,7 @@ func TestMalformedFilterIsDropped(t *testing.T) {
 	} {
 		t.Run(junk, func(t *testing.T) {
 			ts, client, db := newAuthTestServer(t)
-			login(t, ts, client, testUsername, testPassword).Body.Close()
+			login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 			id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
 			if err != nil {
 				t.Fatalf("CreateAthlete: %v", err)
@@ -264,7 +265,7 @@ func TestMalformedFilterIsDropped(t *testing.T) {
 
 func TestRosterLinksCarryTheFilter(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	id := promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
 	promoteTo(t, db, "Adam", "Adult", "BJJ Adult", "Blue", "2026-01-01")
 

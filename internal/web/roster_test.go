@@ -11,6 +11,7 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // readBody returns the response body as a string, closing it.
@@ -231,7 +232,7 @@ func threeRosterAthletes(t *testing.T, db *sql.DB) {
 
 func TestRosterDefaultsToFirstNameAscending(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes"))
@@ -260,7 +261,7 @@ func TestRosterDefaultsToFirstNameAscending(t *testing.T) {
 
 func TestRosterSortsByRequestedColumn(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes?sort=lastName&dir=desc"))
@@ -280,7 +281,7 @@ func TestRosterSortsByRequestedColumn(t *testing.T) {
 
 func TestRosterUnknownSortParamsFallBackToDefault(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	// Sorting is a view concern: junk params render the default view, not an error.
@@ -305,7 +306,7 @@ var rosterColumnLabels = []string{"Nachname", "Vorname", "Geburtsdatum", "Eintri
 
 func TestRosterSortChipsLinkWhereTheHeadersDo(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	// Two surfaces, one truth: whatever view the roster is in, a chip and its
@@ -324,7 +325,7 @@ func TestRosterSortChipsLinkWhereTheHeadersDo(t *testing.T) {
 
 func TestRosterSortChipMarksTheActiveColumn(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	// The default view: Vorname is active and ascending, and says so where the
@@ -362,7 +363,7 @@ func TestRosterSortChipMarksTheActiveColumn(t *testing.T) {
 
 func TestRosterSortChipRowIsALabelledNav(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes"))
@@ -380,7 +381,7 @@ func TestRosterSortChipRowIsALabelledNav(t *testing.T) {
 
 func TestRosterSortTargetIsTheWholeHeaderCell(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	// app.css hangs the cell-filling click target off this class: the cell gives
@@ -400,7 +401,7 @@ func TestRosterSortTargetIsTheWholeHeaderCell(t *testing.T) {
 
 func TestRosterSortIndicatorIsHiddenFromAssistiveTech(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	threeRosterAthletes(t, db)
 
 	// The bare ▲/▼ is announced as a character name; the meaning is carried by
@@ -420,7 +421,7 @@ func TestRosterSortIndicatorIsHiddenFromAssistiveTech(t *testing.T) {
 // through its label rather than as visible text.
 func TestRosterShowsCurrentRank(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	promoteTo(t, db, "Ada", "Lovelace", "BJJ Adult", "Blue, 2 stripes", "2026-01-15")
 	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}); err != nil {
@@ -454,7 +455,7 @@ func TestRosterShowsCurrentRank(t *testing.T) {
 
 func TestRosterFallsBackToTheRankNameForAnUnknownColour(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	// A grading system the colour table knows nothing about (ADR-0004): no belt, and
 	// the plain rank name carries the meaning instead of a broken graphic.
@@ -485,7 +486,7 @@ func TestRosterFallsBackToTheRankNameForAnUnknownColour(t *testing.T) {
 // detail page must produce byte-identical geometry, so the markup cannot drift.
 func TestBeltMarkupIsIdenticalAcrossSurfaces(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	id := promoteTo(t, db, "Mia", "Kind", "BJJ Kids", "Yellow-Black, 3 stripes", "2026-02-02")
 
@@ -594,7 +595,7 @@ func rosterNames(body string) []string {
 
 func TestRosterFilterNarrowsToOneSystem(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	// The filter's whole promise: pick a system and every athlete shown is in it.
@@ -620,7 +621,7 @@ func TestRosterFilterNarrowsToOneSystem(t *testing.T) {
 
 func TestRosterFilterChipsOfferEveryNonEmptyCell(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes"))
@@ -653,7 +654,7 @@ func TestRosterFilterChipsOfferEveryNonEmptyCell(t *testing.T) {
 
 func TestRosterFilterChipsKeepTheSort(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	// Narrowing does not reorder: filter and sort compose in one URL.
@@ -672,7 +673,7 @@ func TestRosterFilterChipsKeepTheSort(t *testing.T) {
 
 func TestRosterUnrepresentedFilterFallsBackToAll(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	// Slug-shaped but nobody's system: the form check passes it, the representation
@@ -698,7 +699,7 @@ func TestRosterUnrepresentedFilterFallsBackToAll(t *testing.T) {
 
 func TestNoOfferedFilterYieldsAnEmptyRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	// The invariant that lets the page do without a zero-hit message: every chip a
@@ -714,7 +715,7 @@ func TestNoOfferedFilterYieldsAnEmptyRoster(t *testing.T) {
 
 func TestRosterFilterRowIsAbsentWithFewerThanTwoOptions(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
 	promoteTo(t, db, "Kim", "Klein", "BJJ Kids", "White", "2026-01-01")
 
@@ -736,7 +737,7 @@ func TestRosterFilterRowIsAbsentWithFewerThanTwoOptions(t *testing.T) {
 
 func TestRosterFilterRowIsALabelledNavAboveTheSortRow(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes"))

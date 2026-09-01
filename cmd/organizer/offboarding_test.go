@@ -9,23 +9,8 @@ import (
 	"testing"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
-	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
-
-// trainerPassword is what every trainer these tests provision logs in with.
-const trainerPassword = "correct-horse"
-
-// addTrainers provisions trainers through the act the operator invokes, so a
-// wiring test starts from the state a real database is in. Most tests here need
-// at least two: the last-active-trainer rule refuses an act on the only one left.
-func addTrainers(t *testing.T, db *sql.DB, usernames ...string) {
-	t.Helper()
-	for _, u := range usernames {
-		if err := trainer.Provision(db, u, trainerPassword); err != nil {
-			t.Fatalf("trainer.Provision %q: %v", u, err)
-		}
-	}
-}
 
 // The one act nothing gives back, so the operator is asked first — and a
 // mistyped username survives an answer that is not a clear yes.
@@ -73,7 +58,7 @@ func TestDeleteTrainerProceedsOnAYes(t *testing.T) {
 func cliDatabase(t *testing.T, usernames ...string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "cli.db")
-	withCLIDatabase(t, path, func(db *sql.DB) { addTrainers(t, db, usernames...) })
+	withCLIDatabase(t, path, func(db *sql.DB) { trainertest.Provision(t, db, usernames...) })
 	return path
 }
 

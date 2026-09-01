@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // getWithLanguage performs a GET carrying an Accept-Language header, the only
@@ -63,7 +65,7 @@ func TestLoginPageFallsBackToGerman(t *testing.T) {
 
 func TestLanguageChoicePersistsOnTheAccount(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp := switchTo(t, ts, client, "en", "/athletes")
 	defer resp.Body.Close()
@@ -82,7 +84,7 @@ func TestLanguageChoicePersistsOnTheAccount(t *testing.T) {
 	// A second login from a fresh session on a different device, whose browser asks
 	// for German: the account's choice outranks Accept-Language and the session.
 	other := newClient(t)
-	login(t, ts, other, testUsername, testPassword).Body.Close()
+	login(t, ts, other, testUsername, trainertest.Password).Body.Close()
 	body = readBody(t, getWithLanguage(t, ts, other, "/athletes", "de-DE,de;q=0.9"))
 	if !strings.Contains(body, "New athlete") {
 		t.Error("the stored language did not survive into a new session")
@@ -94,7 +96,7 @@ func TestLanguageChoicePersistsOnTheAccount(t *testing.T) {
 
 func TestUnsupportedLanguageResolvesToGerman(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	switchTo(t, ts, client, "en", "/athletes").Body.Close()
 
 	switchTo(t, ts, client, "fr", "/athletes").Body.Close()
@@ -107,7 +109,7 @@ func TestUnsupportedLanguageResolvesToGerman(t *testing.T) {
 
 func TestLanguageSwitchOnlyReturnsWithinTheApp(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	// Each of these travels percent-encoded in the form body and arrives at the
 	// handler as written here — the tab as %09, which is how it reaches the check
@@ -132,7 +134,7 @@ func TestLanguageSwitchOnlyReturnsWithinTheApp(t *testing.T) {
 
 func TestGoSideMessagesFollowTheLocale(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	switchTo(t, ts, client, "en", "/athletes").Body.Close()
 
 	// A validation message the handler produces itself, not the template.
@@ -152,7 +154,7 @@ func TestGoSideMessagesFollowTheLocale(t *testing.T) {
 // The desktop headers and the phone cards' data-labels must move together.
 func TestRosterColumnLabelsAndCardLabelsStayInSync(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 	switchTo(t, ts, client, "en", "/athletes").Body.Close()
 
@@ -171,7 +173,7 @@ func TestRosterColumnLabelsAndCardLabelsStayInSync(t *testing.T) {
 // is the normalised query rather than whatever the URL happened to say.
 func TestSwitcherReturnsToTheNormalisedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 
 	body := readBody(t, get(t, ts, client, "/athletes?sort=lastName&dir=desc&system=bjj-elderly"))
@@ -200,7 +202,7 @@ func langSwitchForm(t *testing.T, body string) string {
 // fail in the browser.
 func TestEveryPageRendersInEnglish(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 	mixedRoster(t, db)
 	switchTo(t, ts, client, "en", "/athletes").Body.Close()
 

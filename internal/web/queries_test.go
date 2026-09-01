@@ -15,6 +15,7 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // trainerByID is the read this file counts: store.TrainerByID, matched on the
@@ -32,7 +33,7 @@ var trainerByIDReads atomic.Int64
 // than making the page slower and nothing else.
 func TestAnAuthenticatedRequestReadsTheTrainerOnce(t *testing.T) {
 	ts, client := newCountedServer(t)
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	tests := []struct {
 		name string
@@ -42,7 +43,7 @@ func TestAnAuthenticatedRequestReadsTheTrainerOnce(t *testing.T) {
 		{"GET /account/password", func() *http.Response { return get(t, ts, client, "/account/password") }},
 		{"POST /account/password", func() *http.Response {
 			return post(t, ts, client, "/account/password", url.Values{
-				"current": {testPassword},
+				"current": {trainertest.Password},
 				"new":     {"a-brand-new-secret"},
 				"confirm": {"a-brand-new-secret"},
 			})
@@ -82,8 +83,7 @@ func newCountedServer(t *testing.T) (*httptest.Server, *http.Client) {
 	path := filepath.Join(t.TempDir(), "test.db")
 	storetest.NewDBOn(t, path)
 	counted := openCounted(t, path)
-	addTrainer(t, counted, testUsername)
-	addTrainer(t, counted, spareUsername)
+	trainertest.Provision(t, counted, testUsername, spareUsername)
 
 	return startServer(t, counted, time.Hour)
 }

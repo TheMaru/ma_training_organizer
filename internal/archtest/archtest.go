@@ -27,9 +27,10 @@ type File struct {
 // in one of the allowed directories, and hands it to check.
 //
 // Directly in: a subdirectory of an allowed one is on the outside of the line.
-// Both callers rely on that — internal/store/storetest and
-// internal/session/sessiontest are fixtures other suites import, so they have no
-// more business crossing a boundary than any other caller.
+// Both callers rely on that — storetest, sessiontest and trainertest are fixtures
+// other suites import, so they have no more business crossing a boundary than any
+// other caller. trainertest is the case that shows it: it sits under
+// internal/trainer, an allowed directory, and is checked anyway.
 //
 // The allowed paths are module-root-relative, e.g. "internal/session".
 func EachFileOutside(t *testing.T, allowed []string, mode parser.Mode, check func(File)) {

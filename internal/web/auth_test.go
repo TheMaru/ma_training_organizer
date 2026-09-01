@@ -12,27 +12,24 @@ import (
 
 	"github.com/TheMaru/ma_training_organizer/internal/auth"
 	"github.com/TheMaru/ma_training_organizer/internal/session"
-	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
 	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
 const (
 	testUsername = "trainer"
-	testPassword = "correct-horse"
-	// spareUsername is a second active trainer every fixture holds. An Offboarding
-	// act refuses to take the club's last login away (trainer.ErrLastActiveTrainer),
-	// so a server with one trainer on it is a state the Operator cannot reach — and
-	// these tests set their state up through the acts the Operator invokes.
+	// spareUsername is the second active trainer every fixture here holds;
+	// trainertest.Provision says why one is not enough.
 	spareUsername = "spare"
 )
 
 // newAuthTestServer starts an httptest server backed by a ready database that
 // already holds two trainers (testUsername and spareUsername, both on
-// testPassword), and returns a client whose cookie jar carries the session across
-// requests. Redirects are not followed, so tests can assert on the 303/Location
-// and HX-Redirect responses.
+// trainertest.Password), and returns a client whose cookie jar carries the session
+// across requests. Redirects are not followed, so tests can assert on the
+// 303/Location and HX-Redirect responses.
 func newAuthTestServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
 	t.Helper()
 	return newAuthTestServerIdle(t, time.Hour)
@@ -44,8 +41,7 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	t.Helper()
 
 	db := storetest.NewDB(t)
-	addTrainer(t, db, testUsername)
-	addTrainer(t, db, spareUsername)
+	trainertest.Provision(t, db, testUsername, spareUsername)
 	ts, client := startServer(t, db, idle)
 	return ts, client, db
 }
@@ -67,21 +63,12 @@ func startServer(t *testing.T, db *sql.DB, idle time.Duration) (*httptest.Server
 	return ts, newClient(t)
 }
 
-// addTrainer provisions a trainer who logs in with testPassword — the one the
-// test server starts with, and any colleague a test needs beside them.
-//
-// The helpers below go through internal/trainer, the acts the Operator invokes.
-// What is under test in this package is the enforcement, not the acts — but the
-// state it is verified against has to be the state those acts produce (see
-// internal/trainer's package doc).
-func addTrainer(t *testing.T, db *sql.DB, username string) {
-	t.Helper()
-	if err := trainer.Provision(db, username, testPassword); err != nil {
-		t.Fatalf("trainer.Provision %q: %v", username, err)
-	}
-}
-
 // deleteTrainer removes a trainer's account outright, the erasure act.
+//
+// It and the two acts after it go through internal/trainer, the acts the Operator
+// invokes. What is under test in this package is the enforcement, not the acts —
+// but the state it is verified against has to be the state those acts produce (see
+// internal/trainer's package doc).
 func deleteTrainer(t *testing.T, db *sql.DB, username string) {
 	t.Helper()
 	if err := trainer.Delete(db, username); err != nil {
@@ -97,17 +84,6 @@ func deactivate(t *testing.T, db *sql.DB, username string) {
 	if err := trainer.Deactivate(db, username); err != nil {
 		t.Fatalf("trainer.Deactivate %q: %v", username, err)
 	}
-}
-
-// trainerIDOf is the id a Session records, read while the account is still there —
-// see session.Manager.RevokeAll for why the Session survives the row.
-func trainerIDOf(t *testing.T, db *sql.DB, username string) int64 {
-	t.Helper()
-	tr, err := store.TrainerByUsername(db, username)
-	if err != nil {
-		t.Fatalf("TrainerByUsername %q: %v", username, err)
-	}
-	return tr.ID
 }
 
 // reactivate gives an account back, the way through the refusal.
@@ -228,7 +204,7 @@ func TestUnauthenticatedAppRouteRedirectsToLogin(t *testing.T) {
 func TestLoginWithCorrectCredentialsStartsSession(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 
-	resp := login(t, ts, client, testUsername, testPassword)
+	resp := login(t, ts, client, testUsername, trainertest.Password)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("login status = %d, want %d", resp.StatusCode, http.StatusSeeOther)
@@ -276,7 +252,7 @@ func TestDeactivatedTrainerLoginIsIndistinguishable(t *testing.T) {
 	deactivate(t, db, testUsername)
 
 	client := newClient(t)
-	refused := login(t, ts, client, testUsername, testPassword)
+	refused := login(t, ts, client, testUsername, trainertest.Password)
 	refusedStatus, refusedBody := refused.StatusCode, readBody(t, refused)
 
 	if refusedStatus != wrongStatus {
@@ -299,7 +275,7 @@ func TestDeactivatedTrainerLoginIsIndistinguishable(t *testing.T) {
 func TestReactivatedTrainerLogsInWithTheSamePassword(t *testing.T) {
 	ts, _, db := newAuthTestServer(t)
 	deactivate(t, db, testUsername)
-	refused := login(t, ts, newClient(t), testUsername, testPassword)
+	refused := login(t, ts, newClient(t), testUsername, trainertest.Password)
 	refused.Body.Close()
 	if refused.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("login while deactivated = %d, want %d", refused.StatusCode, http.StatusUnauthorized)
@@ -308,7 +284,7 @@ func TestReactivatedTrainerLogsInWithTheSamePassword(t *testing.T) {
 	reactivate(t, db, testUsername)
 
 	client := newClient(t)
-	resp := login(t, ts, client, testUsername, testPassword)
+	resp := login(t, ts, client, testUsername, trainertest.Password)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("login after reactivation = %d, want %d", resp.StatusCode, http.StatusSeeOther)
@@ -325,7 +301,7 @@ func TestReactivatedTrainerLogsInWithTheSamePassword(t *testing.T) {
 func TestLoginWithUnknownUserFails(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 
-	resp := login(t, ts, client, "nobody", testPassword)
+	resp := login(t, ts, client, "nobody", trainertest.Password)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
@@ -335,7 +311,7 @@ func TestLoginWithUnknownUserFails(t *testing.T) {
 func TestLogoutEndsSession(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp, err := client.PostForm(ts.URL+"/logout", nil)
 	if err != nil {
@@ -357,10 +333,10 @@ func TestChangePasswordEndToEnd(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 	const newPassword = "brand-new-secret"
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
-		"current": {testPassword},
+		"current": {trainertest.Password},
 		"new":     {newPassword},
 		"confirm": {newPassword},
 	})
@@ -382,7 +358,7 @@ func TestChangePasswordEndToEnd(t *testing.T) {
 	} else {
 		r.Body.Close()
 	}
-	if r := login(t, ts, newClient(t), testUsername, testPassword); r.StatusCode != http.StatusUnauthorized {
+	if r := login(t, ts, newClient(t), testUsername, trainertest.Password); r.StatusCode != http.StatusUnauthorized {
 		r.Body.Close()
 		t.Errorf("login with old password status = %d, want %d", r.StatusCode, http.StatusUnauthorized)
 	} else {
@@ -393,8 +369,8 @@ func TestChangePasswordEndToEnd(t *testing.T) {
 func TestChangePasswordWrongCurrentIsRejected(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
-	before, _ := store.TrainerByUsername(db, testUsername)
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
+	before := trainertest.Account(t, db, testUsername)
 
 	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
 		"current": {"not-the-current"},
@@ -409,7 +385,7 @@ func TestChangePasswordWrongCurrentIsRejected(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
 	}
 
-	after, _ := store.TrainerByUsername(db, testUsername)
+	after := trainertest.Account(t, db, testUsername)
 	if before.PasswordHash != after.PasswordHash {
 		t.Error("password hash changed despite wrong current password")
 	}
@@ -418,11 +394,11 @@ func TestChangePasswordWrongCurrentIsRejected(t *testing.T) {
 func TestChangePasswordMismatchIsRejected(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
-	before, _ := store.TrainerByUsername(db, testUsername)
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
+	before := trainertest.Account(t, db, testUsername)
 
 	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
-		"current": {testPassword},
+		"current": {trainertest.Password},
 		"new":     {"secret-one"},
 		"confirm": {"secret-two"},
 	})
@@ -434,7 +410,7 @@ func TestChangePasswordMismatchIsRejected(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
 	}
 
-	after, _ := store.TrainerByUsername(db, testUsername)
+	after := trainertest.Account(t, db, testUsername)
 	if before.PasswordHash != after.PasswordHash {
 		t.Error("password hash changed despite mismatched confirmation")
 	}
@@ -443,11 +419,11 @@ func TestChangePasswordMismatchIsRejected(t *testing.T) {
 func TestChangePasswordTooShortIsRejected(t *testing.T) {
 	ts, client, _ := newAuthTestServer(t)
 
-	login(t, ts, client, testUsername, testPassword).Body.Close()
+	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
 
 	short := strings.Repeat("a", auth.MinPasswordLength-1)
 	resp, err := client.PostForm(ts.URL+"/account/password", url.Values{
-		"current": {testPassword},
+		"current": {trainertest.Password},
 		"new":     {short},
 		"confirm": {short},
 	})

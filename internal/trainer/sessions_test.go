@@ -7,6 +7,7 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/session/sessiontest"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/trainer"
+	"github.com/TheMaru/ma_training_organizer/internal/trainer/trainertest"
 )
 
 // The operator's path spares nothing — including the device they might be holding
@@ -19,7 +20,7 @@ import (
 func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
 	db := club(t, "ada", "grace")
 	sessions := sessiontest.NewManager(t, db)
-	ada, grace := trainerID(t, db, "ada"), trainerID(t, db, "grace")
+	ada, grace := trainertest.ID(t, db, "ada"), trainertest.ID(t, db, "grace")
 	sessiontest.SignIn(t, sessions, ada)
 	sessiontest.SignIn(t, sessions, ada)
 	sessiontest.SignIn(t, sessions, grace)
@@ -51,7 +52,7 @@ func TestRevokeSessionsEndsEveryDevice(t *testing.T) {
 func TestRevokeSessionsWorksOnADeactivatedTrainer(t *testing.T) {
 	db := club(t, "ada", "grace")
 	sessions := sessiontest.NewManager(t, db)
-	grace := trainerID(t, db, "grace")
+	grace := trainertest.ID(t, db, "grace")
 	sessiontest.SignIn(t, sessions, grace)
 	if err := store.DeactivateTrainer(db, grace); err != nil {
 		t.Fatalf("DeactivateTrainer: %v", err)
