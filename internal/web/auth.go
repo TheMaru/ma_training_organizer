@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -21,28 +22,67 @@ const (
 	revokePath   = "/account/sessions/revoke"
 )
 
-// requireAuth gates a route: requests without a logged-in trainer are redirected
-// to the login page instead of reaching the handler.
+// trainerContextKey is the request-context key holding the request's trainer. It
+// is an unexported type so no other package can collide with it.
+type trainerContextKey struct{}
+
+// resolveTrainer loads the session's trainer once and puts them in the request
+// context, for everything downstream that has a question about them: their
+// locale, whether they may be here at all, their password hash. Before it, the
+// same row was read three times, one field each.
 //
 // The id in the session is not taken as proof that the account may still be used,
-// so the trainer is loaded on every request and their state read. Without that, a
-// session outlives the account it belongs to — deleting or deactivating a trainer
-// would leave their browser with full access until the session happened to
-// expire, and revocation is a separate act that cannot be relied on to have
-// happened (ADR-0010).
-func (s *Server) requireAuth(next http.Handler) http.Handler {
+// so the state is read on every request. Without that, a session outlives the
+// account it belongs to — deleting or deactivating a trainer would leave their
+// browser with full access until the session happened to expire, and revocation
+// is a separate act that cannot be relied on to have happened (ADR-0010).
+//
+// A trainer who may not use the app leaves the context empty rather than being
+// refused here: this middleware runs outside requireAuth, because the login page
+// is downstream of it too. Refusing is requireAuth's act.
+func (s *Server) resolveTrainer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := s.sessions.TrainerID(r.Context())
 		if id == 0 {
-			redirect(w, r, "/login")
+			next.ServeHTTP(w, r)
 			return
 		}
-		_, mayContinue, err := auth.TrainerMayUseTheApp(s.db, id)
+		tr, mayUse, err := auth.TrainerMayUseTheApp(s.db, id)
 		if err != nil {
 			serverError(w)
 			return
 		}
-		if mayContinue {
+		if mayUse {
+			r = r.WithContext(context.WithValue(r.Context(), trainerContextKey{}, tr))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// trainerOf reads the trainer resolveTrainer put in the context. The zero Trainer
+// means nobody: no session, a session naming an account that is gone or
+// deactivated, or a request that never passed the middleware at all (static
+// assets, the health check). Nothing downstream needs those apart, and a marker
+// saying which would be a second answer to a question the session already
+// answers.
+func trainerOf(ctx context.Context) store.Trainer {
+	tr, _ := ctx.Value(trainerContextKey{}).(store.Trainer)
+	return tr
+}
+
+// requireAuth gates a route: requests without a usable trainer are redirected to
+// the login page instead of reaching the handler.
+//
+// It tells its two refusals apart by asking the session, which costs no query: no
+// session at all is a plain redirect, while a session naming nobody usable is
+// worth destroying first.
+func (s *Server) requireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.sessions.TrainerID(r.Context()) == 0 {
+			redirect(w, r, "/login")
+			return
+		}
+		if trainerOf(r.Context()).ID != 0 {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -122,14 +162,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := s.sessions.TrainerID(r.Context())
-	tr, err := store.TrainerByID(s.db, id)
-	if err != nil {
-		serverError(w)
-		return
-	}
-
-	switch err := auth.ChangePassword(s.db, tr, current, next); {
+	switch err := auth.ChangePassword(s.db, trainerOf(r.Context()), current, next); {
 	case errors.Is(err, auth.ErrCurrentPasswordWrong):
 		s.renderPassword(w, r, http.StatusUnauthorized, translate(r, "password.currentWrong"))
 		return

@@ -41,6 +41,11 @@ func NewServer(db *sql.DB, sessions *session.Manager) (*Server, error) {
 // unauthenticated, and the remaining app routes are gated by requireAuth, which
 // redirects anonymous requests to the login page.
 //
+// The order of the three inner middlewares is what they are made of, not a
+// preference. resolveTrainer loads the session's trainer once; resolveLocale and
+// requireAuth both read that, and so do the account handlers. Move resolveTrainer
+// below resolveLocale and every page renders in Accept-Language, silently.
+//
 // There is deliberately no client-IP middleware: chi's middleware.RealIP reads
 // the address from headers the client itself sends, so r.RemoteAddr would name
 // whatever the caller typed. Anything later keyed on the address wants the
@@ -57,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 
 	r.Group(func(r chi.Router) {
 		r.Use(s.sessions.Middleware)
+		r.Use(s.resolveTrainer)
 		r.Use(s.resolveLocale)
 
 		r.Get("/login", s.handleLoginForm)

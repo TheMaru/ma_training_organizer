@@ -22,8 +22,8 @@ const (
 )
 
 // resolveLocale puts the request's UI language in its context (ADR-0008). It
-// sits inside the session middleware and outside requireAuth, because the login
-// page needs a locale too — from Accept-Language, no trainer being known yet.
+// sits inside resolveTrainer and outside requireAuth, because the login page
+// needs a locale too — from Accept-Language, no trainer being known yet.
 func (s *Server) resolveLocale(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), localeContextKey{}, s.localeFor(r))
@@ -35,17 +35,13 @@ func (s *Server) resolveLocale(next http.Handler) http.Handler {
 // trainer who never chose (empty column) or whose stored value is no longer
 // supported is treated like a first visit.
 //
-// The lookup can also miss outright, a session naming an account that is gone.
-// That is not this fallback's to catch and never was: requireAuth refuses such a
-// request. What the fallback is for is the login page, which has to render in some
-// language whether a trainer is known or not.
+// It reads the trainer resolveTrainer already loaded rather than the store, so
+// resolving a locale costs no query of its own. The fallback reads "no trainer in
+// the context, so Accept-Language", and what it is for is the login page, which
+// has to render in some language whether a trainer is known or not.
 func (s *Server) localeFor(r *http.Request) i18n.Locale {
-	if id := s.sessions.TrainerID(r.Context()); id != 0 {
-		if tr, err := store.TrainerByID(s.db, id); err == nil {
-			if locale, ok := i18n.Parse(tr.Locale); ok {
-				return locale
-			}
-		}
+	if locale, ok := i18n.Parse(trainerOf(r.Context()).Locale); ok {
+		return locale
 	}
 	return i18n.Match(r.Header.Get("Accept-Language"))
 }
