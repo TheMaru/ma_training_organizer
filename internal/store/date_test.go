@@ -186,3 +186,32 @@ func TestARefusedDateLeavesEveryListingReadable(t *testing.T) {
 		t.Fatalf("ListPromotions after a refused write: %v", err)
 	}
 }
+
+// The cases are the ones the callers actually meet: a German cell from a
+// spreadsheet, an unpadded month from a hand-written form, an untrimmed cell, an
+// empty optional column.
+func TestIsDateAcceptsOnlyISOAndBlankOnlyAsOptional(t *testing.T) {
+	tests := []struct {
+		date        string
+		want        bool
+		wantOrBlank bool
+	}{
+		{"1990-12-10", true, true},
+		{"", false, true},
+		{"10.12.1990", false, false},
+		{"1990-12-1", false, false},
+		{"1990-13-45", false, false},
+		{"morgen", false, false},
+		{" 1990-12-10", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.date, func(t *testing.T) {
+			if got := store.IsDate(tt.date); got != tt.want {
+				t.Errorf("IsDate(%q) = %v, want %v", tt.date, got, tt.want)
+			}
+			if got := store.IsDateOrBlank(tt.date); got != tt.wantOrBlank {
+				t.Errorf("IsDateOrBlank(%q) = %v, want %v", tt.date, got, tt.wantOrBlank)
+			}
+		})
+	}
+}

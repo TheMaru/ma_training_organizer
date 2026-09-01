@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
@@ -52,10 +51,8 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 	query := rosterQueryFrom(r)
 	rankID, _ := strconv.ParseInt(r.PostFormValue("rankId"), 10, 64)
 	date := strings.TrimSpace(r.PostFormValue("promotedOn"))
-	// The date the store will refuse (store.ErrMalformedDate) is refused here first,
-	// so the trainer gets a message instead of a 500. <input type="date"> guards the
-	// UI; this guards a hand-crafted POST.
-	if _, err := time.Parse(store.ISODate, date); rankID == 0 || err != nil {
+	// <input type="date"> guards the UI; this guards a hand-crafted POST.
+	if rankID == 0 || !store.IsDate(date) {
 		s.renderAthleteDetail(w, r, http.StatusBadRequest, query, a, translate(r, "promotion.required"))
 		return
 	}

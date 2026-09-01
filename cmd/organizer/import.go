@@ -201,10 +201,11 @@ func parseImportDate(s string) (string, error) {
 	if s == "" {
 		return "", nil
 	}
-	for _, layout := range []string{store.ISODate, germanDate} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t.Format(store.ISODate), nil
-		}
+	if store.IsDate(s) {
+		return s, nil
+	}
+	if t, err := time.Parse(germanDate, s); err == nil {
+		return t.Format(store.ISODate), nil
 	}
 	return "", fmt.Errorf("%q ist kein gültiges Datum (JJJJ-MM-TT oder TT.MM.JJJJ)", s)
 }

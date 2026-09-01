@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -118,22 +117,10 @@ func athleteFromForm(r *http.Request) (store.Athlete, string) {
 	if a.FirstName == "" || a.LastName == "" {
 		return a, translate(r, "athlete.nameRequired")
 	}
-	if !isoDateOrBlank(a.BirthDate) || !isoDateOrBlank(a.JoinedOn) {
+	if !store.IsDateOrBlank(a.BirthDate) || !store.IsDateOrBlank(a.JoinedOn) {
 		return a, translate(r, "athlete.dateInvalid")
 	}
 	return a, ""
-}
-
-// isoDateOrBlank reports whether a date field is one the store will accept
-// (store.ErrMalformedDate). Checking it here is what makes the refusal a message
-// the trainer can act on rather than a 500; <input type="date"> guards the
-// browser, this guards everything else.
-func isoDateOrBlank(date string) bool {
-	if date == "" {
-		return true
-	}
-	_, err := time.Parse(store.ISODate, date)
-	return err == nil
 }
 
 // athleteID parses the {id} route parameter, reporting false for a non-numeric

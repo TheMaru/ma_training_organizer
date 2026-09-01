@@ -1,6 +1,6 @@
 # 06 — The store publishes the date question, not the layout
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — Wave B depends on nothing
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 10 of 10 in the architecture review (2026-08-18)
@@ -63,20 +63,51 @@ shared and what may not — and the callers' own comments settle the rest.
 
 ## Acceptance
 
-- [ ] `internal/store` exports the date question in both forms — required and
+- [x] `internal/store` exports the date question in both forms — required and
       optional-means-blank — sharing its implementation with `checkDate` and
       `checkOptionalDate` so there is exactly one parse in the package.
-- [ ] Its docstring says the caller gets a yes/no and formats its own message, and
+- [x] Its docstring says the caller gets a yes/no and formats its own message, and
       names why (ADR-0008: the store's own error is English, the web's is
       translated, the import's is German).
-- [ ] `isoDateOrBlank` is gone from `internal/web`; its caller asks the store.
-- [ ] `internal/web/promotions.go` no longer parses the date itself, and still
+- [x] `isoDateOrBlank` is gone from `internal/web`; its caller asks the store.
+- [x] `internal/web/promotions.go` no longer parses the date itself, and still
       answers a bad date with `promotion.required` at `400` rather than a 500.
-- [ ] `parseImportDate` asks the store for the ISO case and keeps `germanDate` and
+- [x] `parseImportDate` asks the store for the ISO case and keeps `germanDate` and
       its German message. Its behaviour is unchanged: empty stays empty, both
       layouts are accepted, output is ISO.
-- [ ] No file outside `internal/store` calls `time.Parse(store.ISODate, …)`.
+- [x] No file outside `internal/store` calls `time.Parse(store.ISODate, …)`.
       `store.ISODate` is still exported and still used for formatting.
-- [ ] `go test ./...` passes — the existing date tests in `internal/store`,
+- [x] `go test ./...` passes — the existing date tests in `internal/store`,
       `internal/web` and the import suite unchanged — and the analysers in
       `docs/agents/analysis.md` run clean.
+
+## Comments
+
+One decision in the ticket was not followed to the letter. **`parseImportDate`
+lost its loop.** The ticket said it keeps it — but once the ISO half is a call to
+`store.IsDate` rather than a layout, the loop has one element left, and a range
+over a one-element slice says less than two branches do. It was raised before the
+edit. Behaviour is unchanged and that was checked rather than assumed: for any
+string `time.Parse(store.ISODate, s)` accepts, `Format(store.ISODate)` returns `s`
+verbatim, so the new `return s` is byte-identical to the old normalisation. Empty
+still returns empty first, ISO is still tried before German, and the German
+message and layout are untouched.
+
+Two things the review pass added on top of the ticket.
+
+- **`checkOptionalDate` now asks `IsDateOrBlank`.** Writing the exported form as
+  `date == "" || IsDate(date)` left the blank-means-absent rule stated twice in
+  one file — the ticket's own defect, one level down. `IsDateOrBlank` owns the
+  rule and `checkOptionalDate` calls it; the `nullIfEmpty` half stays on
+  `checkOptionalDate`, because that is the part about the column rather than the
+  question.
+- **The comment at the promotion guard shrank to the half the store cannot say.**
+  "The date the store will refuse is refused here first, so the trainer gets a
+  message instead of a 500" is now `store.IsDate`'s own docstring. What is left is
+  the web-local fact: `<input type="date">` guards the UI, this guards a
+  hand-crafted POST. The twin guard in `athleteFromForm` carries no comment —
+  a function named for form validation does not need one.
+
+`gofmt -l`, `go vet`, `go test ./...`, `staticcheck` and `govulncheck` all clean
+(`govulncheck` 2026-09-01: 0 reachable, 2 in required modules the code does not
+call).
