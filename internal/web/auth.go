@@ -28,8 +28,7 @@ type trainerContextKey struct{}
 
 // resolveTrainer loads the session's trainer once and puts them in the request
 // context, for everything downstream that has a question about them: their
-// locale, whether they may be here at all, their password hash. Before it, the
-// same row was read three times, one field each.
+// locale, whether they may be here at all, their password hash.
 //
 // The id in the session is not taken as proof that the account may still be used,
 // so the state is read on every request. Without that, a session outlives the
@@ -62,9 +61,7 @@ func (s *Server) resolveTrainer(next http.Handler) http.Handler {
 // trainerOf reads the trainer resolveTrainer put in the context. The zero Trainer
 // means nobody: no session, a session naming an account that is gone or
 // deactivated, or a request that never passed the middleware at all (static
-// assets, the health check). Nothing downstream needs those apart, and a marker
-// saying which would be a second answer to a question the session already
-// answers.
+// assets, the health check). Nothing downstream needs those apart.
 func trainerOf(ctx context.Context) store.Trainer {
 	tr, _ := ctx.Value(trainerContextKey{}).(store.Trainer)
 	return tr
@@ -108,9 +105,8 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleLogin submits the credentials to auth and, on success, starts a session.
-// Every refusal is one page with one message: which of them it was — unknown
-// username, wrong password, deactivated account — is a disclosure auth goes to
-// some trouble to prevent, and the handler does not undo that here.
+// Every refusal renders one page with one message, so the handler gives away
+// nothing auth.ErrBadCredentials withholds.
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.PostFormValue("username")
 	password := r.PostFormValue("password")

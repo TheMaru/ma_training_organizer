@@ -6,20 +6,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/TheMaru/ma_training_organizer/internal/session"
+	"github.com/TheMaru/ma_training_organizer/internal/store"
 	"github.com/TheMaru/ma_training_organizer/internal/store/storetest"
-	"github.com/TheMaru/ma_training_organizer/internal/web"
 )
 
-// trainerByID is the read this file counts: store.TrainerByID, the one an
-// authenticated request is meant to make exactly once. Matched on the clause that
-// tells it from the login's lookup by username.
+// trainerByID is the read this file counts: store.TrainerByID, matched on the
+// clause that tells it from the login's lookup by username.
 const trainerByID = "FROM trainers WHERE id"
 
 // trainerByIDReads counts them across the whole test binary. The tests below read
@@ -27,16 +26,12 @@ const trainerByID = "FROM trainers WHERE id"
 // this suite runs its requests sequentially.
 var trainerByIDReads atomic.Int64
 
-// A trainer's row was being read three times per request, once per field wanted:
-// the locale middleware took Locale, requireAuth took Deactivated, and the
-// password handler took PasswordHash. One middleware loads it now and all three
-// read that.
-//
-// Counted at the driver rather than asserted by eye, so it stays true: the next
-// handler that reaches for the store makes this fail rather than making the page
-// slower and nothing else.
+// One middleware loads the trainer and resolveLocale, requireAuth and the account
+// handlers all read it. Counted at the driver rather than asserted by eye, so it
+// stays true: the next handler that reaches for the store makes this fail rather
+// than making the page slower and nothing else.
 func TestAnAuthenticatedRequestReadsTheTrainerOnce(t *testing.T) {
-	ts, client, _ := newCountedServer(t)
+	ts, client := newCountedServer(t)
 	login(t, ts, client, testUsername, testPassword).Body.Close()
 
 	tests := []struct {
@@ -65,10 +60,10 @@ func TestAnAuthenticatedRequestReadsTheTrainerOnce(t *testing.T) {
 	}
 }
 
-// The login page is served to nobody, so there is no trainer to load. This is the
-// other half of the claim: the middleware asks only when the session names an id.
+// The other half of the claim: the middleware asks only when the session names an
+// id, so the login page costs nothing.
 func TestAnAnonymousRequestReadsNoTrainer(t *testing.T) {
-	ts, client, _ := newCountedServer(t)
+	ts, client := newCountedServer(t)
 
 	before := trainerByIDReads.Load()
 	get(t, ts, client, "/login").Body.Close()
@@ -78,44 +73,27 @@ func TestAnAnonymousRequestReadsNoTrainer(t *testing.T) {
 	}
 }
 
-// newCountedServer is newAuthTestServer with the server's database swapped for a
-// counted one. The fixture keeps its own handle, so the trainers the helpers
-// provision are not counted as the server's reads.
-func newCountedServer(t *testing.T) (*httptest.Server, *http.Client, *sql.DB) {
+// newCountedServer is the shared fixture with the server's handle swapped for a
+// counted one. Everything goes through that handle, the provisioning included, so
+// there is one writer on the file.
+func newCountedServer(t *testing.T) (*httptest.Server, *http.Client) {
 	t.Helper()
 
-	fixture := storetest.NewDB(t)
-	addTrainer(t, fixture, testUsername)
-	addTrainer(t, fixture, spareUsername)
+	path := filepath.Join(t.TempDir(), "test.db")
+	storetest.NewDBOn(t, path)
+	counted := openCounted(t, path)
+	addTrainer(t, counted, testUsername)
+	addTrainer(t, counted, spareUsername)
 
-	counted := openCounted(t, dbPath(t, fixture))
-	sessions := session.ForServer(counted, session.Policy{Lifetime: time.Hour, IdleTimeout: time.Hour})
-	srv, err := web.NewServer(counted, sessions)
-	if err != nil {
-		t.Fatalf("NewServer: %v", err)
-	}
-	ts := httptest.NewServer(srv.Handler())
-	t.Cleanup(ts.Close)
-
-	return ts, newClient(t), fixture
+	return startServer(t, counted, time.Hour)
 }
 
-// dbPath is the file a *sql.DB is open on, so a second handle can be opened on
-// the same database. SQLite-specific, as this whole fixture is.
-func dbPath(t *testing.T, db *sql.DB) string {
-	t.Helper()
-	var path string
-	if err := db.QueryRow(`SELECT file FROM pragma_database_list WHERE name = 'main'`).Scan(&path); err != nil {
-		t.Fatalf("read the database's file path: %v", err)
-	}
-	return path
-}
-
-// openCounted opens an already-migrated database through the counting driver.
+// openCounted opens an already-migrated database through the counting driver, on
+// the connection string the app itself would have used.
 func openCounted(t *testing.T, path string) *sql.DB {
 	t.Helper()
 	registerCountingDriver(t)
-	db, err := sql.Open(countingDriverName, "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	db, err := sql.Open(countingDriverName, store.DSN(path))
 	if err != nil {
 		t.Fatalf("open counted database: %v", err)
 	}
@@ -128,9 +106,8 @@ const countingDriverName = "sqlite-counting"
 
 var registerOnce sync.Once
 
-// registerCountingDriver registers a driver that wraps the real one and counts
-// the trainer reads passing through it. Driver names are global, so it happens
-// once for the binary.
+// registerCountingDriver registers the driver once for the binary, driver names
+// being global.
 func registerCountingDriver(t *testing.T) {
 	t.Helper()
 	registerOnce.Do(func() {
@@ -143,9 +120,6 @@ func registerCountingDriver(t *testing.T) {
 	})
 }
 
-// countingDriver counts what the database was actually asked, rather than what a
-// counter planted in the store would say it was asked. It cannot drift from the
-// code, and it measures a whole request rather than one function.
 type countingDriver struct{ inner driver.Driver }
 
 func (d countingDriver) Open(name string) (driver.Conn, error) {

@@ -1,6 +1,6 @@
 # 07 — Authentication needs a module
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — Wave B depends on nothing
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 8 of 10 in the architecture review (2026-08-18)
@@ -172,58 +172,131 @@ confirmed.
 
 ## Acceptance
 
-- [ ] `internal/auth` exports `Authenticate`, `TrainerMayUseTheApp` and
+- [x] `internal/auth` exports `Authenticate`, `TrainerMayUseTheApp` and
       `ChangePassword` with the signatures above, plus `ErrBadCredentials` and
       `ErrCurrentPasswordWrong`. `MinPasswordLength`, `ErrPasswordTooShort`,
       `ValidatePassword` and `Hash` are unchanged.
-- [ ] `Verify` is gone from the package's API. No file outside `internal/auth`
+- [x] `Verify` is gone from the package's API. No file outside `internal/auth`
       mentions it, and nothing was added to `docs/agents/analysis.md` to make that
       true.
-- [ ] The decoy hash lives in `internal/auth`, unexported, with the reasoning that is
+- [x] The decoy hash lives in `internal/auth`, unexported, with the reasoning that is
       in `internal/web/auth.go:24-27` today.
-- [ ] `internal/auth`'s package doc says what the module owns, that it is the only
+- [x] `internal/auth`'s package doc says what the module owns, that it is the only
       place a password is checked, and why the login checks the password before it
       reads the Deactivated state.
-- [ ] An unexported `authenticate` takes the looked-up Trainer, whether it was found,
+- [x] An unexported `authenticate` takes the looked-up Trainer, whether it was found,
       the submitted password and the check function, and returns the Trainer to sign
       in or `ErrBadCredentials`.
-- [ ] A table test in `internal/auth` drives `authenticate` over unknown username,
+- [x] A table test in `internal/auth` drives `authenticate` over unknown username,
       wrong password and deactivated account, and asserts exactly one password check
       in each. It fails when the Deactivated read is moved ahead of the check, and it
       fails when the decoy check is removed — both verified by planting the mutation,
       both recorded in `## Comments`.
-- [ ] `internal/web` gained a `resolveTrainer` middleware, registered after the
+- [x] `internal/web` gained a `resolveTrainer` middleware, registered after the
       session middleware and before `resolveLocale`. It puts a `store.Trainer` in the
       request context, empty when nobody may use the app, and answers a store failure
       with a 500.
-- [ ] `internal/web/locale.go` no longer reads the store: `localeFor` takes the
+- [x] `internal/web/locale.go` no longer reads the store: `localeFor` takes the
       Trainer from the context, and falls back to `Accept-Language` when there is
       none.
-- [ ] `requireAuth` reads the context rather than the store. It redirects a request
+- [x] `requireAuth` reads the context rather than the store. It redirects a request
       with no Session, and destroys the Session before redirecting when the Session
       names a Trainer who may not use the app. `trainerMayUseTheApp` is gone from
       `internal/web`.
-- [ ] `handleChangePassword` checks `next != confirm` first, then calls
+- [x] `handleChangePassword` checks `next != confirm` first, then calls
       `auth.ChangePassword` with the Trainer from the context. It keeps the
       `session.Renew` and the comment explaining why the other Sessions are left
       alone.
-- [ ] An authenticated request makes exactly one `TrainerByID` call, including
+- [x] An authenticated request makes exactly one `TrainerByID` call, including
       `POST /account/password`. Verified rather than asserted by eye — a counting
       `sql.DB` wrapper in a test, or a temporary counter checked by hand and removed;
       say which in `## Comments`.
-- [ ] `internal/web`'s existing tests still pass unchanged, and still assert what the
+- [x] `internal/web`'s existing tests still pass unchanged, and still assert what the
       trainer observes: the indistinguishable refusal, the session that dies with its
       trainer, the login after reactivation, the three password-change rejections.
-- [ ] `CONTEXT.md`'s *Deactivated* entry says the refusal is indistinguishable from a
+- [x] `CONTEXT.md`'s *Deactivated* entry says the refusal is indistinguishable from a
       wrong password.
-- [ ] ADR-0008 carries a dated update, 2026-08-21, correcting the per-request
+- [x] ADR-0008 carries a dated update, 2026-08-21, correcting the per-request
       `TrainerByID` consequence. Its text is left as written.
-- [ ] `.scratch/trainer-offboarding/spec.md` carries a second dated note under the
+- [x] `.scratch/trainer-offboarding/spec.md` carries a second dated note under the
       struck passage: claim A true in substance and not in wording, claim B moot
       rather than true.
-- [ ] `.scratch/architecture-deepening/plan.md`'s "Deliberately left alone" list notes
+- [x] `.scratch/architecture-deepening/plan.md`'s "Deliberately left alone" list notes
       that `internal/auth` was reopened by this ticket.
-- [ ] Two commits, in the order above; each one leaves `go test ./...` passing.
-- [ ] `go test ./...`, `go test -race ./...`, `go vet` and `staticcheck` are clean.
+- [x] Two commits, in the order above; each one leaves `go test ./...` passing.
+- [x] `go test ./...`, `go test -race ./...`, `go vet` and `staticcheck` are clean.
       `govulncheck` is not re-run — this change adds no dependency, and the deploy
       ticket owns the fresh scan (`docs/agents/analysis.md`).
+
+## Comments
+
+**Done, 2026-09-01.** `internal/auth` holds `Authenticate` · `TrainerMayUseTheApp`
+· `ChangePassword` beside the primitives, `verify` is unexported, and
+`internal/web` carries a `resolveTrainer` middleware. Three commits: the module,
+the single read, and the `/code-review` and `/reuse-and-trim` findings.
+
+**Both mutations fail against the new test, and both still leave `internal/web`
+green.** Planted and run while building, then re-planted independently by the
+spec reviewer:
+
+| Mutation | `internal/auth` | `internal/web` |
+| --- | --- | --- |
+| `tr.Deactivated()` checked before `check(...)` in `authenticate` | FAIL — `deactivated account: password checks = 0, want 1` | ok |
+| the decoy dropped, `!found` returning `ErrBadCredentials` early | FAIL — `unknown username: password checks = 0, want 1` | ok |
+
+A third mutation checks the other half of the ticket: putting the old
+`store.TrainerByID` back into `localeFor` takes all three counted routes from one
+read to two, and `TestAnAuthenticatedRequestReadsTheTrainerOnce` fails on each.
+
+**The single read is counted by a driver wrapper**, the first of the two options
+the acceptance line offered. `internal/web/queries_test.go` registers a
+`database/sql` driver that wraps the real one and counts the statements matching
+`FROM trainers WHERE id`. The wrapper embeds `driver.Conn` rather than forwarding
+to it, which is the mechanism and not an accident: an embedded interface promotes
+only its own methods, so the wrapper does not satisfy `driver.QueryerContext`, and
+`database/sql` therefore routes every statement through `Prepare`, where the
+count is taken. `TestAnAnonymousRequestReadsNoTrainer` holds the other half — the
+login page loads no Trainer at all.
+
+Four things worth recording, all found while building:
+
+- **`auth.Verify` had five callers, not three.** The Decisions section says
+  "exactly three callers today, all in `internal/web/auth.go`" and counted only
+  the non-test ones. `internal/trainer/accounts_test.go` and
+  `internal/web/auth_test.go` called it too, so the acceptance line "`internal/web`'s
+  existing tests still pass unchanged" is met in substance and not literally.
+  Both now ask the question they were really asking: `internal/trainer` asserts
+  that a provisioned or reset password signs the trainer in, through
+  `auth.Authenticate`; `TestChangePasswordEndToEnd` lost its two `auth.Verify`
+  assertions on the stored hash, which said nothing the two logins on the next
+  lines do not. The four behaviours the acceptance line names are untouched.
+- **`internal/auth`'s own tests became internal ones.** `password_test.go` is
+  `password_internal_test.go` in package `auth`, because three of its four tests
+  are about `verify`. Nothing was added to make the unexporting possible; the test
+  moved to the side of the line the function is on.
+- **The middleware order is load-bearing and nothing checks it.** No `archtest`
+  boundary was added, per the ticket, and the decision does not cover this: what
+  the compiler holds is "only `internal/auth` checks a password", not "`resolveTrainer`
+  runs first". `Handler`'s doc says what each misplacement costs — below
+  `requireAuth` every request redirects, below `resolveLocale` every page silently
+  falls back to `Accept-Language`. Worth a test only if it moves.
+- **A deactivated trainer with a live session now resolves their locale from
+  `Accept-Language`**, the context being empty for them. Unobservable: every
+  response on that path is `requireAuth`'s redirect, which has no body.
+
+From the two review passes, applied: `localeFor` and `resolveLocale` lost a
+`*Server` receiver they no longer used and are free functions; `handleLanguage`
+reads the trainer from the context like the other three consumers, rather than
+being the one site left asking the Session; `newAuthTestServer` and the counting
+fixture share `startServer`; `store.DSN` is exported and `storetest.NewDBOn`
+added, so the counted handle opens on the store's own connection string instead of
+a second copy of it; and the decoy-and-ordering argument, which had been written
+out six times across three files, is stated once at `authenticate` and pointed at
+from the package doc.
+
+Left as it is, with reasons: the `errors.Is(err, store.ErrTrainerNotFound)` switch
+stands twice in `internal/auth`, the two lookups differing in their store call and
+their message — the same call `internal/store`'s own comment makes about the
+Trainer near-duplicates. And `TrainerMayUseTheApp`'s three return values, its
+name, and `authenticate`'s `tr`/`found` pair were all read as smells by the
+Standards review and are all decisions this ticket already argued.

@@ -63,7 +63,7 @@ func (s *Server) Handler() http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(s.sessions.Middleware)
 		r.Use(s.resolveTrainer)
-		r.Use(s.resolveLocale)
+		r.Use(resolveLocale)
 
 		r.Get("/login", s.handleLoginForm)
 		r.Post("/login", s.handleLogin)

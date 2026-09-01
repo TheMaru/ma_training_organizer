@@ -22,11 +22,11 @@ const (
 )
 
 // resolveLocale puts the request's UI language in its context (ADR-0008). It
-// sits inside resolveTrainer and outside requireAuth, because the login page
-// needs a locale too — from Accept-Language, no trainer being known yet.
-func (s *Server) resolveLocale(next http.Handler) http.Handler {
+// runs outside requireAuth, because the login page needs a locale too — from
+// Accept-Language, no trainer being known yet.
+func resolveLocale(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), localeContextKey{}, s.localeFor(r))
+		ctx := context.WithValue(r.Context(), localeContextKey{}, localeFor(r))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -39,7 +39,7 @@ func (s *Server) resolveLocale(next http.Handler) http.Handler {
 // resolving a locale costs no query of its own. The fallback reads "no trainer in
 // the context, so Accept-Language", and what it is for is the login page, which
 // has to render in some language whether a trainer is known or not.
-func (s *Server) localeFor(r *http.Request) i18n.Locale {
+func localeFor(r *http.Request) i18n.Locale {
 	if locale, ok := i18n.Parse(trainerOf(r.Context()).Locale); ok {
 		return locale
 	}
@@ -79,8 +79,7 @@ func returnTarget(r *http.Request) string {
 // error — it resolves to the default, as an unknown stored value does.
 func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
 	locale, _ := i18n.Parse(r.PostFormValue(localeField))
-	id := s.sessions.TrainerID(r.Context())
-	if err := store.UpdateTrainerLocale(s.db, id, string(locale)); err != nil {
+	if err := store.UpdateTrainerLocale(s.db, trainerOf(r.Context()).ID, string(locale)); err != nil {
 		serverError(w)
 		return
 	}

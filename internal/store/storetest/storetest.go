@@ -22,7 +22,14 @@ import (
 // empty database.
 func NewDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	return NewDBOn(t, filepath.Join(t.TempDir(), "test.db"))
+}
+
+// NewDBOn is NewDB on a named file, for a test that has to open a second handle
+// on the same database and therefore has to know which file it is.
+func NewDBOn(t *testing.T, path string) *sql.DB {
+	t.Helper()
+	db, err := store.Open(path)
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

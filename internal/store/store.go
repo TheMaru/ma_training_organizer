@@ -41,7 +41,7 @@ var migrationsFS embed.FS
 // and one connection sidesteps "database is locked" entirely at this app's
 // tiny, trainer-only scale.
 func Open(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", dsn(path))
+	db, err := sql.Open("sqlite", DSN(path))
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %q: %w", path, err)
 	}
@@ -61,11 +61,16 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-// dsn renders the driver connection string for a database file. The pragmas ride
+// DSN renders the driver connection string for a database file. The pragmas ride
 // in a query string, so path goes over as an escaped file: URI — both the driver
 // and SQLite cut the string at its first "?", and a path holding one would
 // otherwise open a different file with none of the pragmas applied.
-func dsn(path string) string {
+//
+// Exported for the one caller that cannot go through Open: internal/web's test
+// that counts the statements a request makes opens a second handle on the same
+// file through a driver of its own, and it has to be the same connection the app
+// would have made.
+func DSN(path string) string {
 	// SQLite percent-decodes a file: URI, so a literal "%" needs escaping too.
 	uri := strings.NewReplacer("%", "%25", "?", "%3F", "#", "%23").Replace(path)
 	return "file:" + uri + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"

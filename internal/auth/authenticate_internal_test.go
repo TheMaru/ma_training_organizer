@@ -8,18 +8,14 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
-// A refused login has to cost the same argon2 work whatever the reason for the
-// refusal — an unknown username, a wrong password and a deactivated account are
-// one answer from outside (CONTEXT.md, on Deactivated). Status and body already
-// agree, and internal/web's tests hold that. What they cannot see is the work
-// behind the answer, which is the one axis the three cases could differ on, so
-// this counts the password checks instead.
+// internal/web's tests hold that the three refusals give one status and one body.
+// What they cannot see is the argon2 work behind that answer, which is the one
+// axis the cases could still differ on, so this counts the password checks.
 //
-// Both ways to break it show up as a count of zero. Reading Deactivated before
-// the check skips it for the deactivated account; dropping the decoy skips it for
-// the unknown username. Neither changes anything else observable.
+// Both ways to break it show up as a count of zero: reading Deactivated before
+// the check, and dropping the decoy. Neither changes anything else observable.
 //
-// The success row is not decoration: without it a function that always refused
+// The success row is not decoration — without it a function that always refused
 // would pass every other row.
 func TestEveryLoginChecksExactlyOnePassword(t *testing.T) {
 	const password = "correct horse battery staple"

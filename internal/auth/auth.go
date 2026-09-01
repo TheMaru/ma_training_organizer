@@ -10,13 +10,9 @@
 // claim is held by the compiler rather than by a comment. A handler that wanted
 // to check one would have to move the decision in here first.
 //
-// Authenticate checks the password before it reads the Deactivated state, and
-// checks a decoy hash when the username is unknown. Both cost the same argon2
-// work, so a refused login says nothing about whether the account exists or what
-// state it is in — the refusal has to be indistinguishable from a wrong password
-// (ADR-0010, CONTEXT.md on Deactivated). That ordering is the point of splitting
-// authenticate out as a pure function: a test can count the password checks and
-// hold it, where status and body cannot see it.
+// A refused login has to be indistinguishable from a wrong password (ADR-0010,
+// CONTEXT.md on Deactivated), which costs Authenticate a decoy hash and an
+// ordering. Each is stated where it stands, at decoyHash and in authenticate.
 package auth
 
 import (
@@ -28,9 +24,7 @@ import (
 )
 
 // ErrBadCredentials is the one answer a failed login gets, whether the username
-// is unknown, the password is wrong or the account is deactivated. Telling them
-// apart is the disclosure this package exists to prevent, so they are not told
-// apart here either.
+// is unknown, the password is wrong or the account is deactivated.
 var ErrBadCredentials = errors.New("auth: bad credentials")
 
 // ErrCurrentPasswordWrong is returned by ChangePassword when the current password
@@ -69,12 +63,8 @@ func Authenticate(db *sql.DB, username, password string) (store.Trainer, error) 
 }
 
 // authenticate decides a login from a Trainer already looked up, with the check
-// passed in. Pure, so the ordering above is testable by counting the checks: see
+// passed in. Pure, so the ordering below is testable by counting the checks: see
 // TestEveryLoginChecksExactlyOnePassword.
-//
-// found is carried beside tr rather than read off it, because the decoy is what
-// the unknown username is checked against and a zero Trainer's empty hash would
-// not do — argon2 rejects it without the work.
 func authenticate(tr store.Trainer, found bool, password string, check func(plain, hash string) (bool, error)) (store.Trainer, error) {
 	hash := tr.PasswordHash
 	if !found {
@@ -85,9 +75,9 @@ func authenticate(tr store.Trainer, found bool, password string, check func(plai
 		return store.Trainer{}, fmt.Errorf("verify password: %w", err)
 	}
 	// The Deactivated read comes after the check, never before it, so the refusal
-	// costs the same argon2 work as a wrong password. !found is here rather than
-	// above for the same reason, and it is load-bearing besides: whoever submits
-	// the decoy's own plaintext gets a match against it.
+	// costs the same argon2 work as a wrong password. !found is here for the same
+	// reason, and is load-bearing besides: whoever submits the decoy's own
+	// plaintext gets a match against it.
 	if !ok || !found || tr.Deactivated() {
 		return store.Trainer{}, ErrBadCredentials
 	}
@@ -100,8 +90,7 @@ func authenticate(tr store.Trainer, found bool, password string, check func(plai
 // database that could not answer is one (ADR-0010).
 //
 // It returns the Trainer as well as the verdict so one read serves every question
-// a request has about them — their locale, their password hash — instead of each
-// consumer asking the store again.
+// a request has about them.
 func TrainerMayUseTheApp(db *sql.DB, id int64) (store.Trainer, bool, error) {
 	tr, err := store.TrainerByID(db, id)
 	switch {

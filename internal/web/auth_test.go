@@ -46,6 +46,15 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	db := storetest.NewDB(t)
 	addTrainer(t, db, testUsername)
 	addTrainer(t, db, spareUsername)
+	ts, client := startServer(t, db, idle)
+	return ts, client, db
+}
+
+// startServer wires a server over a database and returns it with a client. The
+// database is a parameter because the query-counting test serves its requests
+// from a handle of its own (see queries_test.go).
+func startServer(t *testing.T, db *sql.DB, idle time.Duration) (*httptest.Server, *http.Client) {
+	t.Helper()
 
 	sessions := session.ForServer(db, session.Policy{Lifetime: time.Hour, IdleTimeout: idle})
 	srv, err := web.NewServer(db, sessions)
@@ -55,7 +64,7 @@ func newAuthTestServerIdle(t *testing.T, idle time.Duration) (*httptest.Server, 
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 
-	return ts, newClient(t), db
+	return ts, newClient(t)
 }
 
 // addTrainer provisions a trainer who logs in with testPassword — the one the
