@@ -175,3 +175,26 @@ tests), all of which are wanted and recorded.
 `go vet`, `go test ./...`, `go test -race ./...`, `staticcheck` and `govulncheck`
 all clean afterwards (`govulncheck` 2026-08-21: 0 reachable, 1 in a required
 module the code does not call — unchanged, and this wave added no dependency).
+
+## Candidate 7, grilled 2026-09-04
+
+`/grill-with-docs`, three rounds, every recommendation taken. Wave C's first
+ticket is `issues/08-rank-as-a-value-and-one-display-module.md`, `ready-for-agent`.
+The Decisions there are the record; three of them change something at this plan's
+level:
+
+- **A new package, `internal/rankview`,** takes the belt graphic and the composed
+  rank name out of `internal/web`, with four exported functions — one per distinct
+  rendering, which is four and not six, because the detail page's current rank and
+  its history rows render identically and differ only in what surrounds them.
+- **A third boundary test** joins the two Wave A left behind, and it is the first
+  that is a claim about **literals** rather than about imports or calls: no `.go`
+  file outside the package may hold a belt hex or a rank-catalog key prefix. That
+  is coarser than the other two and can produce a false positive; the ticket says
+  so. It is recorded in `docs/agents/analysis.md`, which already anticipated a
+  third.
+- **ADR-0009 gets a dated `## Update`,** not a rewrite: its last Decision bullet
+  describes the scalar signatures this ticket ends, and that sentence was true when
+  written. ADR-0004 and `CONTEXT.md` get nothing — the quarantine ADR-0004 decided
+  is exactly what the new package is, and the glossary gains no term, because how a
+  rank is shown is view vocabulary.
