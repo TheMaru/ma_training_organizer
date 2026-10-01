@@ -6,11 +6,8 @@
 </div>
 
 <dl class="meta">
-  {{/* Belt graphic *and* name here (unlike the roster): the name is right beside
-       the graphic, so `belt` is called without a label and draws a decorative
-       image rather than announcing the rank a second time. */}}
   <div><dt>{{t "athlete.rank"}}</dt>
-    <dd>{{if .HasCurrent}}{{belt .Current.Group .Current.Degree ""}} {{rankLabel .Current.Group .Current.Degree .Current.RankName}} <span class="muted">({{systemLabel .Current.SystemSlug .Current.SystemName}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">{{t "athlete.noRank"}}</span>{{end}}</dd>
+    <dd>{{if .HasCurrent}}{{rankWithBelt .Current.Rank}} <span class="muted">({{systemName .Current.Rank.System}}, {{.Current.PromotedOn}})</span>{{else}}<span class="muted">{{t "athlete.noRank"}}</span>{{end}}</dd>
   </div>
   {{if .Athlete.BirthDate}}<div><dt>{{t "athlete.birthDate"}}</dt><dd>{{.Athlete.BirthDate}}</dd></div>{{end}}
   {{if .Athlete.JoinedOn}}<div><dt>{{t "athlete.joinedOn"}}</dt><dd>{{.Athlete.JoinedOn}}</dd></div>{{end}}
@@ -28,8 +25,8 @@
     <select name="rankId" required>
       <option value="" selected disabled>{{t "promotion.rankPlaceholder"}}</option>
       {{range .Systems}}
-      <optgroup label="{{systemLabel .Slug .Name}}">
-        {{range .Ranks}}<option value="{{.ID}}">{{rankLabel .Group .Degree .Name}}</option>{{end}}
+      <optgroup label="{{systemName .System}}">
+        {{range .Ranks}}<option value="{{.ID}}">{{rankName .}}</option>{{end}}
       </optgroup>
       {{end}}
     </select>
@@ -59,8 +56,8 @@
     <tr>
       <td data-label="{{t "promotion.date"}}">{{.PromotedOn}}</td>
       {{/* Graphic + name again, so every belt can be checked against its label. */}}
-      <td data-label="{{t "promotion.rank"}}">{{belt .Group .Degree ""}} {{rankLabel .Group .Degree .RankName}}</td>
-      <td data-label="{{t "promotion.system"}}">{{systemLabel .SystemSlug .SystemName}}</td>
+      <td data-label="{{t "promotion.rank"}}">{{rankWithBelt .Rank}}</td>
+      <td data-label="{{t "promotion.system"}}">{{systemName .Rank.System}}</td>
     </tr>
     {{end}}
   </tbody>

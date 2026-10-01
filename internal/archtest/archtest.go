@@ -1,7 +1,7 @@
 // Package archtest walks the module's Go files so a package can state a boundary
-// as a test. Both boundaries this repo checks (docs/agents/analysis.md) parse
+// as a test. Every boundary this repo checks (docs/agents/analysis.md) parses
 // every file outside the directories that are allowed across the line; only what
-// they then look for differs, and that is what a caller supplies.
+// it then looks for differs, and that is what a caller supplies.
 package archtest
 
 import (
@@ -27,7 +27,7 @@ type File struct {
 // in one of the allowed directories, and hands it to check.
 //
 // Directly in: a subdirectory of an allowed one is on the outside of the line.
-// Both callers rely on that — storetest, sessiontest and trainertest are fixtures
+// The callers rely on that — storetest, sessiontest and trainertest are fixtures
 // other suites import, so they have no more business crossing a boundary than any
 // other caller. trainertest is the case that shows it: it sits under
 // internal/trainer, an allowed directory, and is checked anyway.

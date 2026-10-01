@@ -41,3 +41,24 @@ func TestListGradingSystemsGroupsRanksInOrder(t *testing.T) {
 		t.Error("rank ID = 0, want a real id for the promotion form")
 	}
 }
+
+func TestListGradingSystemsGivesEveryRankItsSystem(t *testing.T) {
+	db := storetest.NewDB(t)
+
+	systems, err := store.ListGradingSystems(db)
+	if err != nil {
+		t.Fatalf("ListGradingSystems: %v", err)
+	}
+
+	want := map[string]string{"BJJ Kids": "bjj-kids", "BJJ Adult": "bjj-adult"}
+	for _, gs := range systems {
+		if gs.Slug != want[gs.Name] {
+			t.Fatalf("system %q slug = %q, want %q", gs.Name, gs.Slug, want[gs.Name])
+		}
+		for _, r := range gs.Ranks {
+			if r.System != gs.System {
+				t.Errorf("%s rank %q System = %+v, want %+v", gs.Name, r.Name, r.System, gs.System)
+			}
+		}
+	}
+}

@@ -1,4 +1,4 @@
-package web
+package rankview
 
 import (
 	"fmt"
@@ -113,18 +113,16 @@ func resolveBelt(group string, degree int) (belt, bool) {
 	return drawn, true
 }
 
-// beltSVG renders a rank as an inline SVG belt, the one helper behind all three
-// rank surfaces (roster, detail current rank, promotion history) so their markup
-// cannot drift apart. It returns an empty string for a rank resolveBelt cannot
-// draw, and the templates print the plain rank name instead — the graphic is
-// never the sole carrier of meaning, so a grading system with no colours degrades
-// gracefully rather than breaking (ADR-0004).
+// beltSVG renders a rank as an inline SVG belt, the one renderer behind every
+// surface that draws one, so their markup cannot drift apart. It returns an empty
+// string for a rank resolveBelt cannot draw, and the caller writes the rank name
+// instead — the graphic is never the sole carrier of meaning, so a grading system
+// with no colours degrades gracefully rather than breaking (ADR-0004).
 //
 // label is the rank as assistive tech should hear it. Pass it where the graphic
 // stands alone (the roster) and it becomes the graphic's accessible name and its
 // tooltip; pass an empty string where the rank name is printed right next to the
-// belt (the detail surfaces) and the graphic is marked decorative, so the name is
-// not announced twice.
+// belt and the graphic is marked decorative, so the name is not announced twice.
 //
 // Every colour and coordinate comes from the table above or from arithmetic on
 // the constants, so the only untrusted text in the output is label — escaped.

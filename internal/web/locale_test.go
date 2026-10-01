@@ -1,8 +1,8 @@
 package web
 
-// Unit and fuzz tests for returnPath. In-package for the same reason belt_test.go
-// is: the check is unexported, and the property worth pinning is about the string
-// it returns rather than about any page. That the language switcher actually
+// Unit and fuzz tests for returnPath. In-package because the check is unexported,
+// and the property worth pinning is about the string it returns rather than about
+// any page. That the language switcher actually
 // applies it is tested over HTTP in i18n_test.go.
 
 import (

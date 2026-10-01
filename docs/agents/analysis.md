@@ -14,15 +14,15 @@ to hang it on either, so it lives here.
 
 **`go vet`** and **`go test`**, as always.
 
-**Two module boundaries are checked by a test**, not by a linter. Both parse every
+**Three module boundaries are checked by a test**, not by a linter. All parse every
 `.go` file in the module and fail on a package that crossed the line. They are
 tests rather than rules in a config file because each is a claim about this
 codebase that only this codebase can state — and because `go test ./...` is
 already run, so nobody has to remember them.
 
-The walk itself is `internal/archtest`, shared by both: what differs between them
+The walk itself is `internal/archtest`, shared by all three: what differs between them
 is only which directories are allowed across the line and what they look for in
-each file. A third boundary therefore costs a predicate rather than another copy
+each file. A further boundary therefore costs a predicate rather than another copy
 of the walk. It finds the module root by the `go.mod` above it, so a boundary test
 does not break by moving a directory deeper.
 
@@ -35,6 +35,12 @@ does not break by moving a directory deeper.
   rather than the import block, and it reads each file's import name
   (`archtest.ImportName`) so an alias does not slip past. What it protects, and
   why, is in `internal/trainer`'s package doc.
+- `TestRankviewIsTheOnlyPackageThatSpellsABeltOrARankKey` in `internal/rankview`:
+  no Go file outside that package holds a belt hex (`#2563eb`) or a rank-catalog
+  key (`rank.colour.`, `rank.degree.`, `rank.split`, `system.`) as a string
+  literal. A claim about **literals**, so it reads string literals and not
+  comments. It is the coarsest of the three and the first that can be wrong; what
+  to do then is in the test's doc.
 
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a
 dependency that behaves differently from how it reads at the call site. It found

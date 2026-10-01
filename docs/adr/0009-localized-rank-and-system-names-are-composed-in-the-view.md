@@ -130,3 +130,22 @@ and corrected here.
   stored name is still the fallback for a rank whose colour the view cannot
   resolve, and still a lookup key — just for the demo fixture rather than the
   seed. The decision's own conclusion is unaffected: it must stay English.
+
+## Update, 2026-10-01
+
+The decision stands untouched — names are composed in the view, from catalog
+pieces, and never stored. Its last Decision bullet does not, and is corrected here
+rather than in place, because it described a deliberate choice that was true when
+written.
+
+- **The signatures no longer mirror `belt`.** The store now publishes a rank as
+  one `store.Rank` value that carries its `store.System`, on the roster row, the
+  promotion row and the promotion form's ranks alike. The composition moved to
+  `internal/rankview`, which exports one function per rendering — `RosterRank`,
+  `RankWithBelt`, `RankName` and `SystemName` — and each takes that one value.
+  The roster's conditional, the bracketed system an ungraded athlete does not get,
+  now asks `store.Rank.IsZero` instead of taking the whole row.
+- **The roster's label and its visible fallback are composed once.** The
+  template used to build the same sentence a second time for a rank without a
+  belt; `RosterRank` returns the whole cell, so the screen reader and the screen
+  cannot disagree.

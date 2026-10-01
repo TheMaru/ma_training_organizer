@@ -61,8 +61,9 @@ worked deliberately by agents — stated intent and ADR pointers in code are how
 reader who has never opened `docs/adr/` finds the reasoning at all.
 
 Going by Go's exported/unexported line would not substitute: this is an
-application, not a library, nothing consumes `internal/web` from outside, and the
-densest files there (`rosterquery.go`, `belt.go`) export nothing at all — so that
-line would delete hardest exactly where the non-obvious reasoning sits.
+application, not a library, nothing outside the module consumes its packages, and
+two of the densest files (`internal/web/rosterquery.go`, `internal/rankview/belt.go`)
+export nothing at all — so that line would delete hardest exactly where the
+non-obvious reasoning sits.
 
 An exception with a reason, not an oversight.

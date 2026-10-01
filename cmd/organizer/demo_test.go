@@ -29,7 +29,7 @@ func currentRankOf(t *testing.T, db *sql.DB, first, last string) string {
 	if !ok {
 		return ""
 	}
-	return cur.RankName
+	return cur.Rank.Name
 }
 
 func TestSeedDemoIsIdempotent(t *testing.T) {

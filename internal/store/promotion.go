@@ -20,11 +20,7 @@ type Promotion struct {
 // ListPromotions and have no meaning on write.
 type PromotionRow struct {
 	Promotion
-	RankName   string
-	SystemName string
-	SystemSlug string
-	Group      string // rank_group, the belt colour name (ADR-0001): free text
-	Degree     int    // sub-level within the group, e.g. BJJ stripes
+	Rank Rank
 }
 
 // CreatePromotion records a promotion and returns its id. The derived current rank
@@ -74,9 +70,10 @@ func ListPromotions(db *sql.DB, athleteID int64) ([]PromotionRow, error) {
 			p        PromotionRow
 			promoted sql.NullTime
 		)
-		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.RankName, &p.SystemName, &p.SystemSlug, &p.Group, &p.Degree); err != nil {
+		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.Rank.Name, &p.Rank.System.Name, &p.Rank.System.Slug, &p.Rank.Group, &p.Rank.Degree); err != nil {
 			return nil, fmt.Errorf("scan promotion row: %w", err)
 		}
+		p.Rank.ID = p.RankID
 		p.PromotedOn = formatDate(promoted)
 		promotions = append(promotions, p)
 	}

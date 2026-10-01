@@ -3,7 +3,7 @@ package web_test
 // The rendered-page seam for localized domain data (ADR-0009): rank and
 // grading-system names as a trainer actually reads them, in both languages,
 // through the real templates. The exhaustive colour × degree matrix and the
-// fallbacks are unit-tested in-package instead — see ranklabel_test.go.
+// fallbacks are unit-tested in internal/rankview instead.
 
 import (
 	"database/sql"

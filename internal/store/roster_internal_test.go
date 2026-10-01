@@ -30,9 +30,7 @@ func partitionRows() []RosterRow {
 func partitionRow(first string, rankID int64, slug, system string, order int) RosterRow {
 	return RosterRow{
 		Athlete:     Athlete{FirstName: first},
-		RankID:      rankID,
-		SystemSlug:  slug,
-		SystemName:  system,
+		Rank:        Rank{ID: rankID, System: System{Name: system, Slug: slug}},
 		SystemOrder: order,
 	}
 }
@@ -136,9 +134,9 @@ func TestFilterRosterRestrictsToOneCell(t *testing.T) {
 // what it restricts — the sort happens in SQL, upstream of this.
 func TestFilterRosterKeepsTheOrderItWasGiven(t *testing.T) {
 	rows := []RosterRow{
-		{Athlete: Athlete{FirstName: "Zoe"}, SystemSlug: "bjj-kids"},
+		{Athlete: Athlete{FirstName: "Zoe"}, Rank: Rank{ID: 1, System: System{Slug: "bjj-kids"}}},
 		{Athlete: Athlete{FirstName: "Uwe"}},
-		{Athlete: Athlete{FirstName: "Ada"}, SystemSlug: "bjj-kids"},
+		{Athlete: Athlete{FirstName: "Ada"}, Rank: Rank{ID: 2, System: System{Slug: "bjj-kids"}}},
 	}
 	if got := firstNames(filterRoster(rows, "bjj-kids")); !slices.Equal(got, []string{"Zoe", "Ada"}) {
 		t.Errorf("filtered order = %v, want [Zoe Ada]", got)

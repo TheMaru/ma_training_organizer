@@ -139,7 +139,7 @@ func TestRecordPromotionEndToEnd(t *testing.T) {
 	if len(promotions) != 1 {
 		t.Fatalf("promotions = %d, want 1", len(promotions))
 	}
-	if promotions[0].RankName != "White" || promotions[0].PromotedOn != "2026-01-15" {
+	if promotions[0].Rank.Name != "White" || promotions[0].PromotedOn != "2026-01-15" {
 		t.Errorf("promotion = %+v, want White/2026-01-15", promotions[0])
 	}
 }
@@ -170,14 +170,14 @@ func TestRecordPromotionUpdatesCurrentRank(t *testing.T) {
 
 	post(kidsGreen, "2024-06-01")
 	promotions, _ := store.ListPromotions(db, id)
-	if cur, _ := store.CurrentRank(promotions); cur.RankName != "Green" || cur.SystemName != "BJJ Kids" {
+	if cur, _ := store.CurrentRank(promotions); cur.Rank.Name != "Green" || cur.Rank.System.Name != "BJJ Kids" {
 		t.Fatalf("current after kids = %+v, want Green/BJJ Kids", cur)
 	}
 
 	// Crossing to the adult system with a later date makes the adult rank current.
 	post(adultWhite, "2026-02-01")
 	promotions, _ = store.ListPromotions(db, id)
-	if cur, _ := store.CurrentRank(promotions); cur.RankName != "White" || cur.SystemName != "BJJ Adult" {
+	if cur, _ := store.CurrentRank(promotions); cur.Rank.Name != "White" || cur.Rank.System.Name != "BJJ Adult" {
 		t.Errorf("current after adult = %+v, want White/BJJ Adult", cur)
 	}
 }

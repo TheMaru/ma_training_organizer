@@ -39,34 +39,21 @@ var rosterTieBreak = []string{"a.first_name", "a.last_name"}
 
 // RosterRow is one line of the athlete roster: the athlete plus their derived
 // current rank (ADR-0001), joined in SQL rather than derived per row in Go. Rank
-// fields are empty/zero for an ungraded athlete, who has no rank at all — that is
+// is the zero Rank for an ungraded athlete, who has no rank at all — that is
 // distinct from the lowest rank, which is a graduation.
 //
-// Group, Degree and SystemSlug are carried for the view: group and degree are the
-// rank's descriptive breakdown (ADR-0001), which the belt graphic composes from
-// (ADR-0004), and the roster filter partitions on the slug without a second query
-// (ADR-0007). The slug is the system's identity, SystemName only its display label
-// (ADR-0006).
+// SystemOrder is the system's sort key and only orders the filter's
+// chips, so it stays off the Rank, which is a value for display.
 type RosterRow struct {
 	Athlete
-	RankID      int64
-	RankName    string
-	SystemName  string
-	SystemSlug  string
+	Rank        Rank
 	SystemOrder int
-	Group       string
-	Degree      int
 }
 
 // Ungraded reports whether the athlete is in no grading system at all
 // (CONTEXT.md) — distinct from holding the lowest rank, which is a graduation.
-//
-// It asks the rank id because that is the field the LEFT JOIN leaves zero, and so
-// the only one that decides. The slug only correlates: it is empty on a system
-// that never passed through ensureGradingSystem, whose athletes still hold a real
-// rank.
 func (r RosterRow) Ungraded() bool {
-	return r.RankID == 0
+	return r.Rank.IsZero()
 }
 
 // RosterFilterUngraded is the roster filter's value for the athletes who are in
@@ -177,14 +164,15 @@ func rosterFilterOptions(rows []RosterRow) []RosterOption {
 		// A system without a slug has no identity in a URL (ADR-0006), and the empty
 		// value already means Alle, so it can carry no chip of its own
 		// (ADR-0007, Update 2026-09-01).
-		if row.SystemSlug == "" {
+		system := row.Rank.System
+		if system.Slug == "" {
 			continue
 		}
-		if _, seen := orders[row.SystemSlug]; seen {
+		if _, seen := orders[system.Slug]; seen {
 			continue
 		}
-		orders[row.SystemSlug] = row.SystemOrder
-		systems = append(systems, RosterOption{Value: row.SystemSlug, Name: row.SystemName})
+		orders[system.Slug] = row.SystemOrder
+		systems = append(systems, RosterOption{Value: system.Slug, Name: system.Name})
 	}
 	// Systems that share a sort_order fall back to the slug, because SortFunc is
 	// not stable and grading_systems.sort_order defaults to 0 (migration 00003):
@@ -227,7 +215,7 @@ func inRosterCell(row RosterRow, option string) bool {
 	if option == RosterFilterUngraded {
 		return row.Ungraded()
 	}
-	return row.SystemSlug == option
+	return row.Rank.System.Slug == option
 }
 
 // NormalizeRosterSort maps a requested sort column onto the whitelist, returning
@@ -325,12 +313,13 @@ func scanRosterRow(scan func(dest ...any) error) (RosterRow, error) {
 	}
 	row.BirthDate = formatDate(birth)
 	row.JoinedOn = formatDate(joined)
-	row.RankID = rankID.Int64
-	row.RankName = rankName.String
-	row.SystemName = systemName.String
-	row.SystemSlug = systemSlug.String
+	row.Rank = Rank{
+		ID:     rankID.Int64,
+		Name:   rankName.String,
+		Group:  group.String,
+		Degree: int(degree.Int64),
+		System: System{Name: systemName.String, Slug: systemSlug.String},
+	}
 	row.SystemOrder = int(systemOrder.Int64)
-	row.Group = group.String
-	row.Degree = int(degree.Int64)
 	return row, nil
 }

@@ -62,6 +62,7 @@ cmd/organizer/      Entry point: HTTP server + CLI subcommands
 internal/
   config/           Environment-variable configuration
   web/              Router, handlers, html/templates, static assets (HTMX, CSS)
+  rankview/         How a rank is shown: the belt graphic and the localized name
   store/            Data-access layer, goose migrations, grading-system seeding
   session/          A Trainer's sign-in on one device, and revoking it
   trainer/          The Operator's acts on a Trainer account, and their rules

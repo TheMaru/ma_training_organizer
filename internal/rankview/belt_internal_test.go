@@ -1,11 +1,11 @@
-package web
+package rankview
 
-// Unit tests for the belt renderer. In-package, like ranklabel_test.go beside
-// it: the colour table and the parser are deliberately unexported view-layer
+// Unit tests for the belt renderer. In-package, like ranklabel_internal_test.go
+// beside it: the colour table and the parser are deliberately unexported view-layer
 // detail (ADR-0004), and testing the geometry through rendered pages would say
-// much less about it. Which surface draws a belt, and how it is labelled, is
-// tested black-box like everything else — roster_test.go for the roster,
-// promotions_test.go for the two athlete-detail surfaces.
+// much less about it. How each surface draws a rank is tested through the exported
+// functions in rankview_test.go, and on the pages in internal/web — roster_test.go
+// for the roster, promotions_test.go for the two athlete-detail surfaces.
 
 import (
 	"strings"

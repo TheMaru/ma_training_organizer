@@ -199,11 +199,11 @@ func TestListRosterReportsCurrentRank(t *testing.T) {
 	}
 	// The most recent promotion is the current rank, not the first or the last row
 	// inserted.
-	if rows[0].RankName != "Green" || rows[0].SystemName != "BJJ Kids" || rows[0].RankID != f.kidsAdvanced {
+	if rows[0].Rank.Name != "Green" || rows[0].Rank.System.Name != "BJJ Kids" || rows[0].Rank.ID != f.kidsAdvanced {
 		t.Errorf("Kai's current rank = %+v, want Green / BJJ Kids", rows[0])
 	}
 	// Ungraded athletes survive the join with an empty rank.
-	if rows[1].RankName != "" || rows[1].SystemName != "" || rows[1].RankID != 0 {
+	if rows[1].Rank.Name != "" || rows[1].Rank.System.Name != "" || rows[1].Rank.ID != 0 {
 		t.Errorf("Uwe's rank = %+v, want empty", rows[1])
 	}
 }
@@ -220,13 +220,13 @@ func TestListRosterCarriesTheSystemSlug(t *testing.T) {
 	addAthlete(t, db, store.Athlete{FirstName: "Uwe", LastName: "Unbelted"}, 0, "")
 
 	rows := listRoster(t, db, store.RosterSortFirstName, false)
-	if rows[0].SystemSlug != "bjj-kids" {
-		t.Errorf("Kai's system slug = %q, want %q", rows[0].SystemSlug, "bjj-kids")
+	if rows[0].Rank.System.Slug != "bjj-kids" {
+		t.Errorf("Kai's system slug = %q, want %q", rows[0].Rank.System.Slug, "bjj-kids")
 	}
 	// An ungraded athlete is in no system at all, which is a distinct state from
 	// being in one — not a slug the filter could match.
-	if rows[1].SystemSlug != "" {
-		t.Errorf("Uwe's system slug = %q, want empty", rows[1].SystemSlug)
+	if rows[1].Rank.System.Slug != "" {
+		t.Errorf("Uwe's system slug = %q, want empty", rows[1].Rank.System.Slug)
 	}
 }
 
@@ -240,12 +240,12 @@ func TestListRosterCarriesRankGroupAndDegree(t *testing.T) {
 	rows := listRoster(t, db, store.RosterSortFirstName, false)
 	// The descriptive breakdown rides along so the roster can render the rank
 	// without a second query (ADR-0004).
-	if rows[0].Group != "Grey-White" || rows[0].Degree != 2 {
-		t.Errorf("Kai's group/degree = %q/%d, want Grey-White/2", rows[0].Group, rows[0].Degree)
+	if rows[0].Rank.Group != "Grey-White" || rows[0].Rank.Degree != 2 {
+		t.Errorf("Kai's group/degree = %q/%d, want Grey-White/2", rows[0].Rank.Group, rows[0].Rank.Degree)
 	}
 	// Ungraded: the LEFT JOIN's NULLs must land as zero values, not an error.
-	if rows[1].Group != "" || rows[1].Degree != 0 {
-		t.Errorf("Uwe's group/degree = %q/%d, want empty/0", rows[1].Group, rows[1].Degree)
+	if rows[1].Rank.Group != "" || rows[1].Rank.Degree != 0 {
+		t.Errorf("Uwe's group/degree = %q/%d, want empty/0", rows[1].Rank.Group, rows[1].Rank.Degree)
 	}
 }
 
@@ -273,13 +273,11 @@ func TestListRosterCurrentRankMatchesCurrentRank(t *testing.T) {
 		current, ok := store.CurrentRank(promotions)
 		switch {
 		case !ok:
-			if row.RankID != 0 || row.RankName != "" {
-				t.Errorf("%s: roster rank = %+v, want none (CurrentRank found none)", row.FirstName, row)
+			if row.Rank != (store.Rank{}) {
+				t.Errorf("%s: roster rank = %+v, want none (CurrentRank found none)", row.FirstName, row.Rank)
 			}
-		case row.RankID != current.RankID || row.RankName != current.RankName || row.SystemName != current.SystemName:
-			t.Errorf("%s: roster rank = (%d, %q, %q), CurrentRank = (%d, %q, %q)",
-				row.FirstName, row.RankID, row.RankName, row.SystemName,
-				current.RankID, current.RankName, current.SystemName)
+		case row.Rank != current.Rank:
+			t.Errorf("%s: roster rank = %+v, CurrentRank = %+v", row.FirstName, row.Rank, current.Rank)
 		}
 	}
 }

@@ -1,6 +1,6 @@
 # 08 — Rank is a value, and one module renders it
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — Wave B is done and Wave C starts here
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 7 of 10 in the architecture review (2026-08-18)
@@ -231,40 +231,70 @@ Three grilling rounds, 2026-09-04. Every recommendation was taken.
 
 ## Acceptance
 
-- [ ] `store.System{Name, Slug}` exists, `store.GradingSystem` embeds it, and
+- [x] `store.System{Name, Slug}` exists, `store.GradingSystem` embeds it, and
       `store.Rank` carries one. `ListGradingSystems` fills it on every child rank.
-- [ ] `store.RosterRow` and `store.PromotionRow` each carry a single `Rank Rank`
+- [x] `store.RosterRow` and `store.PromotionRow` each carry a single `Rank Rank`
       and no loose rank or system columns. `RosterRow.SystemOrder` remains.
-- [ ] `store.Rank.IsZero()` exists, carrying ticket `05`'s reasoning for why the
+- [x] `store.Rank.IsZero()` exists, carrying ticket `05`'s reasoning for why the
       rank id decides, and `RosterRow.Ungraded()` is defined in terms of it. No site
       anywhere tests a zero rank by any other field.
-- [ ] `internal/rankview` exists and exports exactly `RosterRank`, `RankWithBelt`,
+- [x] `internal/rankview` exists and exports exactly `RosterRank`, `RankWithBelt`,
       `RankName` and `SystemName`. `internal/web` contains no belt colour, no belt
       geometry and no rank-name composition.
-- [ ] `internal/web/templates.go` binds four keys — `rosterRank`, `rankWithBelt`,
+- [x] `internal/web/templates.go` binds four keys — `rosterRank`, `rankWithBelt`,
       `rankName`, `systemName` — and `belt`, `rankLabel`, `systemLabel` and
       `rosterRankLabel` are gone.
-- [ ] All six template call sites render through one function each. No template
+- [x] All six template call sites render through one function each. No template
       contains a fallback branch between a belt and a name.
-- [ ] Text that came from the database is escaped in every string the module
+- [x] Text that came from the database is escaped in every string the module
       builds. A rank whose stored name contains `<` renders it as text, pinned by a
       test.
-- [ ] `rosterLabel` is a named unexported function and its existing tests — the
+- [x] `rosterLabel` is a named unexported function and its existing tests — the
       Ungraded branch and the empty-system-name branch from ticket `05` — still test
       it directly rather than through rendered markup.
-- [ ] `internal/rankview/literals_test.go` fails for a planted belt hex and for a
+- [x] `internal/rankview/literals_test.go` fails for a planted belt hex and for a
       planted catalog key prefix in a package outside it. Checked by planting both,
       as Wave A's boundary tests were.
-- [ ] The package has `belt_internal_test.go`, `ranklabel_internal_test.go` and an
+- [x] The package has `belt_internal_test.go`, `ranklabel_internal_test.go` and an
       external `rankview_test.go`, and every test that moved still asserts what it
       asserted before.
-- [ ] `internal/web/i18n_domain_test.go` is unchanged in intent and still passes:
+- [x] `internal/web/i18n_domain_test.go` is unchanged in intent and still passes:
       the rendered pages say the same thing in both locales.
-- [ ] ADR-0009 carries a dated `## Update` correcting its last Decision bullet, and
+- [x] ADR-0009 carries a dated `## Update` correcting its last Decision bullet, and
       nothing above that Update is rewritten.
-- [ ] `docs/agents/analysis.md` lists the third boundary test beside the other two.
-- [ ] ADR-0004 and `CONTEXT.md` are unchanged.
-- [ ] `internal/web`'s handlers, `rosterLine`, `rosterLines`, `rosterHeaders` and
+- [x] `docs/agents/analysis.md` lists the third boundary test beside the other two.
+- [x] ADR-0004 and `CONTEXT.md` are unchanged.
+- [x] `internal/web`'s handlers, `rosterLine`, `rosterLines`, `rosterHeaders` and
       `rosterFilters` are unchanged.
-- [ ] `go vet`, `gofmt -l`, `go test ./...`, `go test -race ./...` and
+- [x] `go vet`, `gofmt -l`, `go test ./...`, `go test -race ./...` and
       `staticcheck` are clean.
+
+## Comments
+
+**2026-10-01 — built.** Every Acceptance box holds. Where the build went past or
+beside the Decisions above:
+
+- **`rankLabel` and `systemLabel` are gone, not wrapped.** Their bodies became
+  `RankName` and `SystemName`, and the in-package matrices call those with a
+  `store.Rank` or `store.System` literal. A scalar helper under each exported
+  function would have kept two names for one composition.
+- **`rosterNames` sits under `rosterLabel`.** The label and `RosterRank`'s visible
+  fallback both take the rank and system from it, so the decision "is there a
+  system to name" stands once. Each still has its own `if system == ""`, because
+  the two formats differ: plain brackets in the label, a muted span on the screen.
+- **`literals_test.go` reads string literals through the syntax tree**, so the
+  comment at `internal/i18n/i18n.go:98` needs no entry in the allowed list. It is
+  in package `rankview`, against the `_internal_test.go` convention, so that it
+  checks the key constants themselves: a renamed prefix cannot leave the test
+  checking the old one. Planted and checked: a hex and a `system.` key in
+  `internal/web`, a `rank.degree.` key there after the move in-package, and a
+  `rank.split` key in a subdirectory of `internal/rankview`.
+- **`ListPromotions` fills `Rank.ID` from `Promotion.RankID`**, so `IsZero` is
+  false on every history row. The id stands twice on a `PromotionRow`; the
+  alternative was a `Rank` that does not know itself.
+- **Touched outside the list, because the move made them stale:**
+  `docs/agents/comments.md` (the `belt.go` path), `internal/archtest`'s doc ("both"
+  boundaries), `README.md`'s layout, and the headers of `locale_test.go` and
+  `i18n_domain_test.go`.
+- **Visible change:** `RankWithBelt` writes no leading space before a name it
+  cannot draw a belt for; the template wrote `{{belt}} {{rankLabel}}` and so did.

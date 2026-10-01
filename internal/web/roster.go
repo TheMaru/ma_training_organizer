@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/TheMaru/ma_training_organizer/internal/i18n"
+	"github.com/TheMaru/ma_training_organizer/internal/rankview"
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
@@ -125,7 +126,7 @@ func filterLabel(locale i18n.Locale, option store.RosterOption) string {
 	if option.Value == store.RosterFilterUngraded {
 		return i18n.T(locale, filterUngradedKey)
 	}
-	return systemLabel(locale, option.Value, option.Name)
+	return rankview.SystemName(locale, store.System{Name: option.Name, Slug: option.Value})
 }
 
 func rosterLines(rows []store.RosterRow, query rosterQuery) []rosterLine {
