@@ -198,3 +198,14 @@ level:
   written. ADR-0004 and `CONTEXT.md` get nothing — the quarantine ADR-0004 decided
   is exactly what the new package is, and the glossary gains no term, because how a
   rank is shown is view vocabulary.
+
+## Candidate 9, grilled 2026-10-02
+
+`/grill-with-docs`, two rounds, every recommendation taken. Ticket
+`issues/09-the-roster-query-is-resolved-at-the-edges.md`, `ready-for-agent`. One
+decision changes something at this plan's level: the review's "the redirect seam
+collects only 4 of the ~14 call sites; the template hrefs are the other question"
+is answered by splitting the sites. The four redirects and the two render helpers
+move into this ticket, so no handler holds the query any more. The template
+hrefs stay Go-built data fields and are left to candidate 2 (`10`), which is the
+order Wave C already assumed. No ADR and no glossary term.
