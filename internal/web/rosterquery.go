@@ -36,9 +36,11 @@ type rosterQuery struct {
 // defaultRosterQuery is what a bare /athletes renders: Vorname ascending.
 var defaultRosterQuery = rosterQuery{sort: store.RosterSortDefault}
 
-// rosterQueryFrom resolves the query from one request's own query string — every
-// handler reads it from the request it is answering, so a mutation knows the
-// roster it was triggered from. This is the whitelist: no user-controlled string
+// rosterQueryFrom resolves the query from one request's own query string, so a
+// mutation knows the roster it was triggered from. Only the edges that turn the
+// query into a URL call it — renderAthleteForm, renderAthleteDetail,
+// redirectWithinRoster, returnTarget and the roster handler — so no handler has
+// to remember to carry it. This is the whitelist: no user-controlled string
 // survives it into a rendered URL or a Location header.
 //
 // The filter is checked for its *form* only, and this function stays pure and
@@ -50,6 +52,13 @@ func rosterQueryFrom(r *http.Request) rosterQuery {
 		descending: r.URL.Query().Get("dir") == dirDescending,
 		system:     normalizeSystemFilter(r.URL.Query().Get("system")),
 	}
+}
+
+// redirectWithinRoster returns the trainer to the sorted, filtered view a roster
+// mutation came from. redirect itself appends nothing: /login and / must carry no
+// roster query, and the language switcher's target already carries its own.
+func redirectWithinRoster(w http.ResponseWriter, r *http.Request, bare string) {
+	redirect(w, r, rosterQueryFrom(r).path(bare))
 }
 
 // storeQuery is this query as the roster takes it. The two types carry the same

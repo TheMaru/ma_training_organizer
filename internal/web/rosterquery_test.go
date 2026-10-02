@@ -42,7 +42,77 @@ func (q rosterSortQuery) rosterURL() string {
 	return "/athletes?" + q.params()
 }
 
-func TestDeleteReturnsToSortedRoster(t *testing.T) {
+// rosterQueryParams is one non-default query with every key set, so a redirect
+// that drops any part of it fails.
+const rosterQueryParams = "sort=rank&dir=desc&system=bjj-adult"
+
+func TestOnlyRosterRedirectsKeepTheQuery(t *testing.T) {
+	routes := []struct {
+		name string
+		path func(id int64) string
+		form func(rankID int64) url.Values
+		want func(id int64) string
+	}{
+		{
+			name: "create",
+			path: func(int64) string { return "/athletes" },
+			form: func(int64) url.Values { return athleteForm("Grace", "Hopper", "", "", "") },
+			want: func(int64) string { return "/athletes?" + rosterQueryParams },
+		},
+		{
+			name: "update",
+			path: func(id int64) string { return fmt.Sprintf("/athletes/%d", id) },
+			form: func(int64) url.Values { return athleteForm("Augusta", "King", "", "", "") },
+			want: func(int64) string { return "/athletes?" + rosterQueryParams },
+		},
+		{
+			name: "delete",
+			path: func(id int64) string { return fmt.Sprintf("/athletes/%d/delete", id) },
+			form: func(int64) url.Values { return nil },
+			want: func(int64) string { return "/athletes?" + rosterQueryParams },
+		},
+		{
+			name: "promote",
+			path: func(id int64) string { return fmt.Sprintf("/athletes/%d/promotions", id) },
+			form: func(rankID int64) url.Values {
+				return url.Values{"rankId": {fmt.Sprint(rankID)}, "promotedOn": {"2026-01-15"}}
+			},
+			want: func(id int64) string { return fmt.Sprintf("/athletes/%d?%s", id, rosterQueryParams) },
+		},
+		{
+			name: "logout",
+			path: func(int64) string { return "/logout" },
+			form: func(int64) url.Values { return nil },
+			want: func(int64) string { return "/login" },
+		},
+	}
+	for _, route := range routes {
+		for _, htmx := range []bool{false, true} {
+			name := route.name
+			if htmx {
+				name += "-htmx"
+			}
+			t.Run(name, func(t *testing.T) {
+				ts, client, db := newAuthTestServer(t)
+				login(t, ts, client, testUsername, trainertest.Password).Body.Close()
+				id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
+				if err != nil {
+					t.Fatalf("CreateAthlete: %v", err)
+				}
+				rankID := storetest.RankID(t, db, "BJJ Adult", "Blue")
+
+				path := route.path(id) + "?" + rosterQueryParams
+				if htmx {
+					hxRedirectTo(t, postHTMX(t, ts, client, path, route.form(rankID)), route.want(id))
+				} else {
+					seeOtherTo(t, post(t, ts, client, path, route.form(rankID)), route.want(id))
+				}
+			})
+		}
+	}
+}
+
+func TestEverySortRoundTripsThroughARedirect(t *testing.T) {
 	for _, query := range sortedRosterQueries() {
 		t.Run(query.sort+"-"+query.dir, func(t *testing.T) {
 			ts, client, db := newAuthTestServer(t)
@@ -56,42 +126,6 @@ func TestDeleteReturnsToSortedRoster(t *testing.T) {
 			seeOtherTo(t, post(t, ts, client, path, nil), query.rosterURL())
 		})
 	}
-}
-
-func TestDeleteViaHTMXReturnsToSortedRoster(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
-	if err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-
-	// The roster's delete button posts via HTMX; the sort must survive on that path
-	// too, where the target travels in HX-Redirect instead of Location.
-	path := fmt.Sprintf("/athletes/%d/delete?sort=rank&dir=desc", id)
-	hxRedirectTo(t, postHTMX(t, ts, client, path, nil), "/athletes?sort=rank&dir=desc")
-}
-
-func TestCreateReturnsToSortedRoster(t *testing.T) {
-	ts, client, _ := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-
-	resp := post(t, ts, client, "/athletes?sort=joinedOn&dir=desc",
-		athleteForm("Ada", "Lovelace", "", "", ""))
-	seeOtherTo(t, resp, "/athletes?sort=joinedOn&dir=desc")
-}
-
-func TestUpdateReturnsToSortedRoster(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
-	if err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-
-	resp := post(t, ts, client, fmt.Sprintf("/athletes/%d?sort=lastName&dir=desc", id),
-		athleteForm("Augusta", "King", "", "", ""))
-	seeOtherTo(t, resp, "/athletes?sort=lastName&dir=desc")
 }
 
 func TestMutationWithJunkQueryRedirectsToWhitelistedRoster(t *testing.T) {
@@ -192,39 +226,6 @@ func TestAthleteDetailOffersAWayBackToTheSortedRoster(t *testing.T) {
 	if want := fmt.Sprintf(`href="/athletes/%d/edit?sort=birthDate&amp;dir=desc"`, id); !strings.Contains(body, want) {
 		t.Errorf("detail page is missing %s", want)
 	}
-}
-
-func TestRecordingAPromotionKeepsTheQuery(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
-	if err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-	rankID := storetest.RankID(t, db, "BJJ Adult", "Blue")
-
-	// The detail page is reached from the roster, so its own form must not drop the
-	// state either — otherwise the way back is lost after recording a promotion.
-	resp := post(t, ts, client, fmt.Sprintf("/athletes/%d/promotions?sort=rank&dir=desc", id), url.Values{
-		"rankId":     {fmt.Sprint(rankID)},
-		"promotedOn": {"2026-01-15"},
-	})
-	seeOtherTo(t, resp, fmt.Sprintf("/athletes/%d?sort=rank&dir=desc", id))
-}
-
-func TestMutationRedirectKeepsTheFilter(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
-	if err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-
-	// Filter and sort compose in one URL, and a mutation returns to both. The
-	// value is carried through without the database being asked whether anyone is
-	// in that system — only the roster handler checks that.
-	path := fmt.Sprintf("/athletes/%d/delete?sort=rank&dir=desc&system=bjj-adult", id)
-	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=rank&dir=desc&system=bjj-adult")
 }
 
 func TestFilterOnlyQueryCarriesNoSortKeys(t *testing.T) {

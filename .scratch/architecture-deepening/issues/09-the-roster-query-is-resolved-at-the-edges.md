@@ -1,6 +1,6 @@
 # 09 — The roster query is resolved at the edges, not in each handler
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — `08` is done
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 9 of 10 in the architecture review (2026-08-18)
@@ -94,26 +94,43 @@ Two grilling rounds, 2026-10-02. Every recommendation was taken.
 
 ## Acceptance
 
-- [ ] No handler in `internal/web` declares or passes a `rosterQuery`.
+- [x] No handler in `internal/web` declares or passes a `rosterQuery`.
       `rosterQueryFrom` is called only by `renderAthleteForm`,
       `renderAthleteDetail`, the new redirect function, `returnTarget` and the
       roster handler.
-- [ ] `renderAthleteForm` and `renderAthleteDetail` take no query parameter.
-- [ ] Create, update, delete and promote redirect through the new function;
+- [x] `renderAthleteForm` and `renderAthleteDetail` take no query parameter.
+- [x] Create, update, delete and promote redirect through the new function;
       `redirect` itself is unchanged and appends nothing.
-- [ ] The roster page still renders every link from `rosterQueryOf(view.Query)`,
+- [x] The roster page still renders every link from `rosterQueryOf(view.Query)`,
       and `TestRosterUnrepresentedFilterFallsBackToAll` still passes.
-- [ ] `rosterquery_test.go` has one table test over the four mutation routes ×
+- [x] `rosterquery_test.go` has one table test over the four mutation routes ×
       {POST, HTMX} with a filtered, sorted query, plus the bare-`/login` row for
       `/logout`. The six route-only tests it replaces are gone.
-- [ ] The four normalisation tests and the link tests (`RosterLinksCarry…`,
+- [x] The four normalisation tests and the link tests (`RosterLinksCarry…`,
       `EditFormReturns…`, `AthleteDetailOffers…`, `DefaultRosterLinksCarryNoQuery`)
       pass unchanged.
-- [ ] The doc comment on `rosterQueryFrom` names the edges that call it, in place
+- [x] The doc comment on `rosterQueryFrom` names the edges that call it, in place
       of "every handler reads it".
-- [ ] No new in-package test file, no new archtest rule, `CONTEXT.md` and
+- [x] No new in-package test file, no new archtest rule, `CONTEXT.md` and
       `docs/adr/` unchanged.
-- [ ] `go vet`, `gofmt -l`, `go test ./...`, `go test -race ./...` and
+- [x] `go vet`, `gofmt -l`, `go test ./...`, `go test -race ./...` and
       `staticcheck ./...` are clean.
 
 ## Comments
+
+**2026-10-02 — built.** Every Acceptance box holds. Where the build went past or
+beside the Decisions above:
+
+- **`redirectWithinRoster` lives in `rosterquery.go`, not beside `redirect` in
+  `server.go`.** Its only work is the roster query's, so it sits with the
+  function whose doc names it as an edge.
+- **The table is `TestOnlyRosterRedirectsKeepTheQuery`.** The logout row asserts a
+  bare `/login`, so a name about mutations alone would contradict one of its
+  rows. Logout runs as POST and as HTMX, like the four mutation routes.
+- **`TestDeleteReturnsToSortedRoster` is folded, as
+  `TestEverySortRoundTripsThroughARedirect`.** The new table uses one query, so it
+  proves neither that every column passes the whitelist nor that the default
+  comes back as a bare `/athletes`; the folded test still does.
+- **The logout row is checked against a merge.** With `redirect` made to append
+  and `redirectWithinRoster` reduced to a call of it, only the two logout rows
+  fail — the row defends the decision it was written for.

@@ -26,7 +26,7 @@ func (s *Server) handleAthleteDetail(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	s.renderAthleteDetail(w, r, http.StatusOK, rosterQueryFrom(r), a, "")
+	s.renderAthleteDetail(w, r, http.StatusOK, a, "")
 }
 
 // handleAthletePromote records a promotion for the athlete, then redirects back
@@ -48,12 +48,11 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := rosterQueryFrom(r)
 	rankID, _ := strconv.ParseInt(r.PostFormValue("rankId"), 10, 64)
 	date := strings.TrimSpace(r.PostFormValue("promotedOn"))
 	// <input type="date"> guards the UI; this guards a hand-crafted POST.
 	if rankID == 0 || !store.IsDate(date) {
-		s.renderAthleteDetail(w, r, http.StatusBadRequest, query, a, translate(r, "promotion.required"))
+		s.renderAthleteDetail(w, r, http.StatusBadRequest, a, translate(r, "promotion.required"))
 		return
 	}
 
@@ -62,15 +61,16 @@ func (s *Server) handleAthletePromote(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
-	redirect(w, r, query.path(athletePath(id)))
+	redirectWithinRoster(w, r, athletePath(id))
 }
 
 // renderAthleteDetail loads the athlete's promotion history and the grading
 // systems for the record form, derives the current rank, and renders the detail
-// page. errMsg is shown when re-rendering after a rejected record attempt. query
-// is the roster this page was opened from: every link and form on the page keeps
-// carrying it, so the way back stays the sorted roster.
-func (s *Server) renderAthleteDetail(w http.ResponseWriter, r *http.Request, status int, query rosterQuery, a store.Athlete, errMsg string) {
+// page. errMsg is shown when re-rendering after a rejected record attempt. Every
+// link and form on the page carries the roster query, so the way back stays the
+// sorted roster.
+func (s *Server) renderAthleteDetail(w http.ResponseWriter, r *http.Request, status int, a store.Athlete, errMsg string) {
+	query := rosterQueryFrom(r)
 	promotions, err := store.ListPromotions(s.db, a.ID)
 	if err != nil {
 		serverError(w)
