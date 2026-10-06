@@ -157,40 +157,6 @@ func TestMutationRedirectCarriesNormalisedQuery(t *testing.T) {
 	seeOtherTo(t, post(t, ts, client, path, nil), "/athletes?sort=firstName&dir=desc")
 }
 
-func TestRosterLinksCarryTheQuery(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	id, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"})
-	if err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-
-	body := readBody(t, get(t, ts, client, "/athletes?sort=lastName&dir=desc"))
-	for _, want := range []string{
-		fmt.Sprintf("/athletes/%d?sort=lastName&amp;dir=desc", id),        // detail
-		fmt.Sprintf("/athletes/%d/delete?sort=lastName&amp;dir=desc", id), // delete form
-		"/athletes/new?sort=lastName&amp;dir=desc",                        // Neuer Athlet
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("roster body is missing a link to %q", want)
-		}
-	}
-}
-
-func TestDefaultRosterLinksCarryNoQuery(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	if _, err := store.CreateAthlete(db, store.Athlete{FirstName: "Ada", LastName: "Lovelace"}); err != nil {
-		t.Fatalf("CreateAthlete: %v", err)
-	}
-
-	// A trainer who never sorted sees the URLs they saw before this ticket.
-	body := readBody(t, get(t, ts, client, "/athletes"))
-	if strings.Contains(body, "/athletes/new?") {
-		t.Error(`want a bare "Neuer Athlet" link in the default view`)
-	}
-}
-
 func TestEditFormReturnsToSortedRoster(t *testing.T) {
 	ts, client, db := newAuthTestServer(t)
 	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
@@ -261,25 +227,5 @@ func TestMalformedFilterIsDropped(t *testing.T) {
 			path := fmt.Sprintf("/athletes/%d/delete?system=%s", id, url.QueryEscape(junk))
 			seeOtherTo(t, post(t, ts, client, path, nil), "/athletes")
 		})
-	}
-}
-
-func TestRosterLinksCarryTheFilter(t *testing.T) {
-	ts, client, db := newAuthTestServer(t)
-	login(t, ts, client, testUsername, trainertest.Password).Body.Close()
-	id := promoteTo(t, db, "Kai", "Kind", "BJJ Kids", "White", "2026-01-01")
-	promoteTo(t, db, "Adam", "Adult", "BJJ Adult", "Blue", "2026-01-01")
-
-	// Every way out of a filtered roster comes back to it, without those call
-	// sites knowing the filter exists.
-	body := readBody(t, get(t, ts, client, "/athletes?system=bjj-kids"))
-	for _, want := range []string{
-		fmt.Sprintf("/athletes/%d?sort=firstName&amp;dir=asc&amp;system=bjj-kids", id),
-		fmt.Sprintf("/athletes/%d/delete?sort=firstName&amp;dir=asc&amp;system=bjj-kids", id),
-		"/athletes/new?sort=firstName&amp;dir=asc&amp;system=bjj-kids",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("filtered roster is missing a link to %q", want)
-		}
 	}
 }

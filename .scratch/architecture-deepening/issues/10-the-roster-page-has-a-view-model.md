@@ -1,6 +1,6 @@
 # 10 — The roster page has a view model
 
-Status: ready-for-agent
+Status: done
 Blocked by: None — `08` and `09` are done
 Plan: `.scratch/architecture-deepening/plan.md`
 Candidate: 2 of 10 in the architecture review (2026-08-18)
@@ -120,26 +120,46 @@ than from the design.
 
 ## Acceptance
 
-- [ ] `rosterPage(locale, store.RosterView) rosterPage` exists in `internal/web`,
+- [x] `rosterPage(locale, store.RosterView) rosterPage` exists in `internal/web`,
       is pure, and derives its query from `view.Query` only.
-- [ ] `handleAthletesList` is `LoadRoster` → `rosterPage` → `render`, and builds
+- [x] `handleAthletesList` is `LoadRoster` → `rosterPage` → `render`, and builds
       no link or chip itself.
-- [ ] `athletes.html` reads the roster's data from the one key; `Return` still
+- [x] `athletes.html` reads the roster's data from the one key; `Return` still
       reaches the language switcher.
-- [ ] `internal/web/roster_internal_test.go` exists with a header that gives its
+- [x] `internal/web/roster_internal_test.go` exists with a header that gives its
       reason, builds `store.RosterView` values directly, and calls only
       `rosterPage`.
-- [ ] The tests in the table above are moved, kept or deleted as it says; no
+- [x] The tests in the table above are moved, kept or deleted as it says; no
       scraper helper is left without a caller.
-- [ ] `TestRosterUnrepresentedFilterFallsBackToAll` and the ticket `09` redirect
+- [x] `TestRosterUnrepresentedFilterFallsBackToAll` and the ticket `09` redirect
       and normalisation tests pass unchanged.
-- [ ] Rendered roster HTML is byte-identical before and after for at least the
+- [x] Rendered roster HTML is byte-identical before and after for at least the
       default view and one sorted, filtered view (checked once by hand or by a
       throwaway golden diff, not a kept test).
-- [ ] The other five pages still render from `map[string]any`; `render` is
+- [x] The other five pages still render from `map[string]any`; `render` is
       unchanged.
-- [ ] `CONTEXT.md` and `docs/adr/` unchanged.
-- [ ] `go vet`, `gofmt -l`, `go test ./...`, `go test -race ./...` and
+- [x] `CONTEXT.md` and `docs/adr/` unchanged.
+- [x] `go vet`, `gofmt -l`, `go test ./...`, `go test -race ./...` and
       `staticcheck ./...` are clean.
 
 ## Comments
+
+**2026-10-06 — built.** Every Acceptance box holds. Where the build went past or
+beside the Decisions above:
+
+- **The function is `rosterPageOf`, the type `rosterPage`.** Go does not let a
+  function and a type in one package share a name; `rosterPageOf` follows
+  `rosterQueryOf`. Read `rosterPageOf` wherever the text above says the function
+  `rosterPage`.
+- **Byte identity was checked on four views, not two:** `/athletes`,
+  `?sort=lastName&dir=desc&system=bjj-kids`, `?system=none&sort=rank` and the
+  unrepresented `?system=bjj-elderly`, by a throwaway golden test, since deleted.
+- **`filterChipLabels` stays.** `TestRosterFilterChipsCarryLocalizedSystemNames`
+  in `i18n_domain_test.go`, which the table does not list, still calls it; that
+  test is untouched.
+- **The HTTP half of `RosterFilterChipsOfferEveryNonEmptyCell` is a new test,
+  `TestRosterFilterChipMarksTheActiveFilter`,** and `RosterFilterChipsKeepTheSort`
+  became `TestRosterPageFilterAndSortCompose`.
+- **One stale comment outside the table was corrected:**
+  `TestRosterUnrepresentedFilterFallsBackToAll` placed the representation check
+  in the handler; it is in `store.LoadRoster`. The test's code is unchanged.

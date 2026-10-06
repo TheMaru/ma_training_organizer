@@ -2,16 +2,16 @@
 {{define "content"}}
 <div class="row-between">
   <h1>{{t "roster.heading"}}</h1>
-  <a class="btn" href="{{.NewHref}}">{{t "athlete.new"}}</a>
+  <a class="btn" href="{{.Roster.NewHref}}">{{t "athlete.new"}}</a>
 </div>
-{{if .Athletes}}
+{{if .Roster.Athletes}}
 {{/* The grading-system filter (ADR-0007): one chip per non-empty cell of the
      roster's partition, plus Alle. Above the sort row — narrow first, then
      order — and rendered at every width, since unlike the sort chips it has no
      <thead> equivalent to defer to on a desktop. Absent below two options, which
-     is why .Filters may be empty. Every chip is guaranteed to match at least one
-     athlete, so there is no empty-result branch to write. */}}
-{{with .Filters}}
+     is why .Roster.Filters may be empty. Every chip is guaranteed to match at
+     least one athlete, so there is no empty-result branch to write. */}}
+{{with .Roster.Filters}}
 <div class="filter-controls">
   <span class="muted chip-row-label" id="roster-filter-label">{{t "roster.filter.label"}}</span>
   <nav class="filter-chips" aria-labelledby="roster-filter-label">
@@ -30,7 +30,7 @@
 <div class="sort-controls">
   <span class="muted chip-row-label" id="roster-sort-label">{{t "roster.sort.label"}}</span>
   <nav class="sort-chips" aria-labelledby="roster-sort-label">
-    {{range .Headers}}
+    {{range .Roster.Headers}}
     {{- /* aria-sort is only meaningful on a columnheader, so the active chip says
            its state with aria-current plus text a screen reader can read. */}}
     <a class="chip{{if .Active}} active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span><span class="sr-only">, {{if .Descending}}{{t "roster.sort.descending"}}{{else}}{{t "roster.sort.ascending"}}{{end}}</span>{{end}}</a>
@@ -43,19 +43,19 @@
       {{/* Every data column is a sort link; the active one carries the ▲/▼. The
            glyph is decorative — aria-sort already carries the direction, and a
            bare arrow is read out as a character name. */}}
-      {{range .Headers}}
+      {{range .Roster.Headers}}
       <th class="sortable" aria-sort="{{.AriaSort}}"><a href="{{.Href}}">{{.Label}}{{if .Active}} <span class="sort-dir" aria-hidden="true">{{.Indicator}}</span>{{end}}</a></th>
       {{end}}
       <th class="actions"></th>
     </tr>
   </thead>
   <tbody>
-    {{range .Athletes}}
+    {{range .Roster.Athletes}}
     {{/* Whole row opens the detail view; the name stays a real link for
          keyboard/screen-reader access. Both carry the roster's query, so the
          detail page can lead back to the same sorted roster. The delete form stops
          the click from bubbling to the row so deleting never navigates. The
-         data-labels repeat the keys rosterColumns renders .Headers from. */}}
+         data-labels repeat the keys rosterColumns renders .Roster.Headers from. */}}
     <tr class="clickable" onclick="location.href='{{.Href}}'">
       <td data-label="{{t "roster.column.lastName"}}"><a href="{{.Href}}">{{.LastName}}</a></td>
       <td data-label="{{t "roster.column.firstName"}}">{{.FirstName}}</td>

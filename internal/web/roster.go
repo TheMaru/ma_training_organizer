@@ -67,31 +67,47 @@ type rosterFilter struct {
 	Active bool
 }
 
+// rosterPage is everything athletes.html renders, built from one store answer.
+type rosterPage struct {
+	Athletes []rosterLine
+	Headers  []rosterHeader
+	Filters  []rosterFilter
+	NewHref  string
+	// Return is the one canonical URL the request cannot supply: a filter nobody
+	// is in was resolved away in the store, and only the resolved query knows that.
+	Return string
+}
+
+// rosterPageOf links everything from the resolved query; see store.RosterView for
+// what "resolved" guarantees.
+func rosterPageOf(locale i18n.Locale, view store.RosterView) rosterPage {
+	query := rosterQueryOf(view.Query)
+	return rosterPage{
+		Athletes: rosterLines(view.Rows, query),
+		Headers:  rosterHeaders(locale, query),
+		Filters:  rosterFilters(locale, query, view.Options),
+		NewHref:  query.path(rosterPath + "/new"),
+		Return:   query.path(rosterPath),
+	}
+}
+
 // handleAthletesList renders the shared roster, sorted server-side by
 // ?sort=<col>&dir=<asc|desc> and narrowed by ?system=<slug|none>.
 //
 // Which filters are *represented* is settled inside store.LoadRoster (ADR-0007b),
-// so this handler renders an answer rather than assembling one. Every link comes
-// from the resolved query, never from the request's own — see store.RosterView for
-// what "resolved" guarantees.
+// so this handler renders an answer rather than assembling one.
 func (s *Server) handleAthletesList(w http.ResponseWriter, r *http.Request) {
 	view, err := store.LoadRoster(s.db, rosterQueryFrom(r).storeQuery())
 	if err != nil {
 		serverError(w)
 		return
 	}
-	query := rosterQueryOf(view.Query)
-	locale := localeOf(r.Context())
-
+	page := rosterPageOf(localeOf(r.Context()), view)
 	s.tmpl.render(w, r, http.StatusOK, "athletes.html", map[string]any{
 		"Authenticated": true,
-		"Athletes":      rosterLines(view.Rows, query),
-		"Headers":       rosterHeaders(locale, query),
-		"Filters":       rosterFilters(locale, query, view.Options),
-		"NewHref":       query.path(rosterPath + "/new"),
-		// The one page whose canonical URL the request cannot supply: a filter nobody
-		// is in was resolved away in the store, and only the resolved query knows that.
-		"Return": query.path(rosterPath),
+		"Roster":        page,
+		// base.html reads Return at the top level, and renderer.render keeps it there.
+		"Return": page.Return,
 	})
 }
 
