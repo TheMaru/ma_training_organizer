@@ -39,7 +39,9 @@ does not break by moving a directory deeper.
   no Go file outside that package holds a belt hex (`#2563eb`) or a rank-catalog
   key (`rank.colour.`, `rank.degree.`, `rank.split`, `system.`) as a string
   literal. A claim about **literals**, so it reads string literals and not
-  comments. It is the coarsest of the three and the first that can be wrong; what
+  comments. Its sibling `TestNoTemplateOrStylesheetSpellsABeltOrARankKey` reads
+  the templates line by line for a hex or a catalog key, and `app.css` for a belt
+  fill only, because the stylesheet has its own UI colours. It is the coarsest of the three and the first that can be wrong; what
   to do then is in the test's doc.
 
 **`staticcheck`** — deeper static analysis than `go vet`, notably for a

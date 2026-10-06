@@ -38,9 +38,7 @@ var defaultRosterQuery = rosterQuery{sort: store.RosterSortDefault}
 
 // rosterQueryFrom resolves the query from one request's own query string, so a
 // mutation knows the roster it was triggered from. Only the edges that turn the
-// query into a URL call it — renderAthleteForm, renderAthleteDetail,
-// redirectWithinRoster, returnTarget and the roster handler — so no handler has
-// to remember to carry it. This is the whitelist: no user-controlled string
+// query into a URL call it, so no handler has to remember to carry it. This is the whitelist: no user-controlled string
 // survives it into a rendered URL or a Location header.
 //
 // The filter is checked for its *form* only, and this function stays pure and

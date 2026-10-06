@@ -52,7 +52,7 @@ func CreatePromotion(db *sql.DB, p Promotion) (int64, error) {
 // matches CurrentRank's tie-break.
 func ListPromotions(db *sql.DB, athleteID int64) ([]PromotionRow, error) {
 	rows, err := db.Query(`
-		SELECT p.id, p.athlete_id, p.rank_id, p.promoted_on, r.name, g.name, g.slug,
+		SELECT p.id, p.athlete_id, p.rank_id, p.promoted_on, r.id, r.name, g.name, g.slug,
 		       r.rank_group, r.degree
 		FROM promotions p
 		JOIN ranks r ON r.id = p.rank_id
@@ -70,10 +70,9 @@ func ListPromotions(db *sql.DB, athleteID int64) ([]PromotionRow, error) {
 			p        PromotionRow
 			promoted sql.NullTime
 		)
-		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.Rank.Name, &p.Rank.System.Name, &p.Rank.System.Slug, &p.Rank.Group, &p.Rank.Degree); err != nil {
+		if err := rows.Scan(&p.ID, &p.AthleteID, &p.RankID, &promoted, &p.Rank.ID, &p.Rank.Name, &p.Rank.System.Name, &p.Rank.System.Slug, &p.Rank.Group, &p.Rank.Degree); err != nil {
 			return nil, fmt.Errorf("scan promotion row: %w", err)
 		}
-		p.Rank.ID = p.RankID
 		p.PromotedOn = formatDate(promoted)
 		promotions = append(promotions, p)
 	}

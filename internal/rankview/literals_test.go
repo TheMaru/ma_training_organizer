@@ -3,7 +3,10 @@ package rankview
 import (
 	"go/ast"
 	"go/token"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -55,4 +58,48 @@ func spells(value string) bool {
 		}
 	}
 	return false
+}
+
+// Templates and the stylesheet are the two other places a second copy could sit. A
+// template has no business with a hex at all, so it gets the full check. The
+// stylesheet holds the UI's own colours, so there only a belt fill counts.
+func TestNoTemplateOrStylesheetSpellsABeltOrARankKey(t *testing.T) {
+	fills := []string{beltRed}
+	for _, fill := range beltColours {
+		fills = append(fills, fill)
+	}
+	spellsAFill := func(line string) bool {
+		return slices.ContainsFunc(fills, func(fill string) bool {
+			return strings.Contains(strings.ToLower(line), fill)
+		})
+	}
+
+	for glob, spells := range map[string]func(string) bool{
+		"../web/templates/*.html": func(line string) bool {
+			return hexColour.MatchString(line) || containsCatalogKey(line)
+		},
+		"../web/static/*.css": spellsAFill,
+	} {
+		paths, err := filepath.Glob(glob)
+		if err != nil || len(paths) == 0 {
+			t.Fatalf("glob %s: %v, %d files", glob, err, len(paths))
+		}
+		for _, path := range paths {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, line := range strings.Split(string(content), "\n") {
+				if spells(line) {
+					t.Errorf("%s:%d spells a belt or a rank key — ask internal/rankview instead", path, i+1)
+				}
+			}
+		}
+	}
+}
+
+func containsCatalogKey(line string) bool {
+	return slices.ContainsFunc(catalogKeyPrefixes, func(prefix string) bool {
+		return strings.Contains(line, `"`+prefix)
+	})
 }

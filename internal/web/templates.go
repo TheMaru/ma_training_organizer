@@ -22,8 +22,7 @@ var templateFS embed.FS
 // "t" looks a translation up in that locale. A template func cannot see the
 // request, so the locale is baked into the parsed template set — one per locale
 // — rather than passed at every call site (ADR-0008). The rank funcs close over
-// the same locale, which is why the composition needs nothing threaded through
-// handlers or store types.
+// the same locale, so no handler passes a locale to them.
 func templateFuncs(locale i18n.Locale) template.FuncMap {
 	return template.FuncMap{
 		"rosterRank": func(rank store.Rank) template.HTML {
