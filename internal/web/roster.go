@@ -136,13 +136,12 @@ func rosterFilters(locale i18n.Locale, query rosterQuery, options []store.Roster
 
 // filterLabel names one option's chip: the ungraded cell has a label of its own,
 // since it is in no system and so has no name to render, and a system cell carries
-// the same localized name as the rows it filters. The option's value is the slug
-// the label is keyed on (ADR-0009).
+// the same localized name as the rows it filters (ADR-0009).
 func filterLabel(locale i18n.Locale, option store.RosterOption) string {
 	if option.Value == store.RosterFilterUngraded {
 		return i18n.T(locale, filterUngradedKey)
 	}
-	return rankview.SystemName(locale, store.System{Name: option.Name, Slug: option.Value})
+	return rankview.SystemName(locale, option.System)
 }
 
 func rosterLines(rows []store.RosterRow, query rosterQuery) []rosterLine {

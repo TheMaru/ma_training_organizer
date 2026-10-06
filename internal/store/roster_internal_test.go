@@ -65,11 +65,11 @@ func TestRosterFilterOptionsPartitionTheRoster(t *testing.T) {
 	}
 	// The display name rides along; the ungraded cell is in no system and so has
 	// none to show.
-	if options[0].Name != "BJJ Kids" {
-		t.Errorf("first option name = %q, want %q", options[0].Name, "BJJ Kids")
+	if options[0].System.Name != "BJJ Kids" {
+		t.Errorf("first option name = %q, want %q", options[0].System.Name, "BJJ Kids")
 	}
-	if options[2].Name != "" {
-		t.Errorf("ungraded option name = %q, want empty", options[2].Name)
+	if options[2].System.Name != "" {
+		t.Errorf("ungraded option name = %q, want empty", options[2].System.Name)
 	}
 }
 

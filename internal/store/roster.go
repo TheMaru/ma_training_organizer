@@ -62,11 +62,11 @@ func (r RosterRow) Ungraded() bool {
 const RosterFilterUngraded = "none"
 
 // RosterOption is one cell of the roster's partition and one chip in the filter
-// row: the value that identifies it in ?system=, and the system's display name —
-// empty on the ungraded cell, which is in no system and so has no name of its own.
+// row: the value that identifies it in ?system=, and the system it stands for —
+// zero on the ungraded cell, which is in no system.
 type RosterOption struct {
-	Value string
-	Name  string
+	Value  string
+	System System
 }
 
 // RosterQuery is what a caller asks of the roster: the view of it they want. The
@@ -172,7 +172,7 @@ func rosterFilterOptions(rows []RosterRow) []RosterOption {
 			continue
 		}
 		orders[system.Slug] = row.SystemOrder
-		systems = append(systems, RosterOption{Value: system.Slug, Name: system.Name})
+		systems = append(systems, RosterOption{Value: system.Slug, System: system})
 	}
 	// Systems that share a sort_order fall back to the slug, because SortFunc is
 	// not stable and grading_systems.sort_order defaults to 0 (migration 00003):

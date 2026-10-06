@@ -31,9 +31,6 @@ const (
 // catalog cannot spell renders rank.Name, the stored English name — see
 // splitRankGroup for why an unresolvable colour is the same case for the name as
 // it is for the graphic.
-//
-// The two names differ on purpose: rank.Name is stored and English, RankName is
-// what a trainer reads.
 func RankName(locale i18n.Locale, rank store.Rank) string {
 	body, bar, ok := splitRankGroup(rank.Group)
 	if !ok {
@@ -70,8 +67,7 @@ func SystemName(locale i18n.Locale, system store.System) string {
 // where the belt graphic stands alone (ADR-0004): the rank plus the system that
 // disambiguates same-named ranks across cohorts — White exists in both the kids
 // and the adult system. Empty for no rank at all.
-func rosterLabel(locale i18n.Locale, rank store.Rank) string {
-	name, system := rosterNames(locale, rank)
+func rosterLabel(name, system string) string {
 	if system == "" {
 		return name
 	}

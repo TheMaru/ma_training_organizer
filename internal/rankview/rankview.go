@@ -16,12 +16,12 @@ import (
 	"github.com/TheMaru/ma_training_organizer/internal/store"
 )
 
-// RosterRank is a rank as the roster shows it; empty for no rank at all.
+// RosterRank is empty for no rank at all.
 func RosterRank(locale i18n.Locale, rank store.Rank) template.HTML {
-	if belt := beltSVG(rank.Group, rank.Degree, rosterLabel(locale, rank)); belt != "" {
+	name, system := rosterNames(locale, rank)
+	if belt := beltSVG(rank.Group, rank.Degree, rosterLabel(name, system)); belt != "" {
 		return belt
 	}
-	name, system := rosterNames(locale, rank)
 	text := html.EscapeString(name)
 	if system != "" {
 		text += ` <span class="muted">(` + html.EscapeString(system) + `)</span>`

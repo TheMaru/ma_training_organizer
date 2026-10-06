@@ -149,15 +149,15 @@ func TestRosterLabelNamesRankAndSystemTogether(t *testing.T) {
 		Degree: 2,
 		System: store.System{Name: "BJJ Kids", Slug: "bjj-kids"},
 	}
-	if got := rosterLabel(i18n.German, graded); got != "Grau-Weiß, 2 Streifen (BJJ Kinder)" {
+	if got := rosterLabel(rosterNames(i18n.German, graded)); got != "Grau-Weiß, 2 Streifen (BJJ Kinder)" {
 		t.Errorf("German roster label = %q, want %q", got, "Grau-Weiß, 2 Streifen (BJJ Kinder)")
 	}
-	if got := rosterLabel(i18n.English, graded); got != "Grey-White, 2 stripes (BJJ Kids)" {
+	if got := rosterLabel(rosterNames(i18n.English, graded)); got != "Grey-White, 2 stripes (BJJ Kids)" {
 		t.Errorf("English roster label = %q, want %q", got, "Grey-White, 2 stripes (BJJ Kids)")
 	}
 
 	// An ungraded athlete has no rank and no system, so there is nothing to name.
-	if got := rosterLabel(i18n.German, store.Rank{}); got != "" {
+	if got := rosterLabel(rosterNames(i18n.German, store.Rank{})); got != "" {
 		t.Errorf("ungraded roster label = %q, want it empty", got)
 	}
 }
@@ -174,19 +174,19 @@ func TestRosterLabelNamesTheSystemOfAnyRank(t *testing.T) {
 		Group:  "White",
 		System: store.System{Name: "Club System"},
 	}
-	if got := rosterLabel(i18n.German, rank); got != "Weiß (Club System)" {
+	if got := rosterLabel(rosterNames(i18n.German, rank)); got != "Weiß (Club System)" {
 		t.Errorf("slugless system label = %q, want %q", got, "Weiß (Club System)")
 	}
 
 	// "BJJ Kinder" comes from the catalog, keyed on the slug (ADR-0009).
 	rank.System = store.System{Slug: "bjj-kids"}
-	if got := rosterLabel(i18n.German, rank); got != "Weiß (BJJ Kinder)" {
+	if got := rosterLabel(rosterNames(i18n.German, rank)); got != "Weiß (BJJ Kinder)" {
 		t.Errorf("unnamed system label = %q, want %q", got, "Weiß (BJJ Kinder)")
 	}
 
 	// Neither: the empty-label guard in rosterLabel.
 	rank.System = store.System{}
-	if got := rosterLabel(i18n.German, rank); got != "Weiß" {
+	if got := rosterLabel(rosterNames(i18n.German, rank)); got != "Weiß" {
 		t.Errorf("nameless system label = %q, want %q", got, "Weiß")
 	}
 }

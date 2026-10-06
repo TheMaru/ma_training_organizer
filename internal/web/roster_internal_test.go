@@ -13,7 +13,7 @@ import (
 // is worth pinning about the roster page is its values — which header is active,
 // where each link points, which chips exist — not the markup they are rendered
 // into, so these build store.RosterView values directly and touch no database or
-// server. Prior art: internal/store/roster_internal_test.go.
+// server.
 
 func headerLabelled(t *testing.T, page rosterPage, label string) rosterHeader {
 	t.Helper()
@@ -75,8 +75,8 @@ func TestRosterPageOffersEveryColumnInDisplayOrder(t *testing.T) {
 }
 
 var (
-	kidsOption     = store.RosterOption{Value: "bjj-kids", Name: "BJJ Kids"}
-	adultOption    = store.RosterOption{Value: "bjj-adult", Name: "BJJ Adult"}
+	kidsOption     = store.RosterOption{Value: "bjj-kids", System: store.System{Name: "BJJ Kids", Slug: "bjj-kids"}}
+	adultOption    = store.RosterOption{Value: "bjj-adult", System: store.System{Name: "BJJ Adult", Slug: "bjj-adult"}}
 	ungradedOption = store.RosterOption{Value: store.RosterFilterUngraded}
 )
 
