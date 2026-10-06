@@ -209,3 +209,15 @@ is answered by splitting the sites. The four redirects and the two render helper
 move into this ticket, so no handler holds the query any more. The template
 hrefs stay Go-built data fields and are left to candidate 2 (`10`), which is the
 order Wave C already assumed. No ADR and no glossary term.
+
+## Candidate 2, grilled 2026-10-06
+
+`/grill-with-docs`, two rounds, every recommendation taken. Ticket
+`issues/10-the-roster-page-has-a-view-model.md`, `ready-for-agent`, the last of
+Wave C. One decision changes something at this plan's level: the view model stays
+in `internal/web` and is tested in-package, rather than becoming a package of its
+own the way `internal/rankview` did in `08`. Almost every field of the roster page
+is a URL, and the URLs belong to the router, which is in `web`; `rankview` could
+leave because a rank's display has no URL. The candidate's "unreachable" is
+therefore answered by one in-package entry point, `rosterPage`, not by an export.
+No ADR and no glossary term.
